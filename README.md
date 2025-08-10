@@ -1,40 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# ExpoSaaS - Next.js with PostgreSQL
 
-## Getting Started
+A clean Next.js application with PostgreSQL backend integration.
 
-First, run the development server:
+## 🏗️ Project Structure
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+### Frontend (Next.js)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Pages**: `src/pages/` - Your React components that become routes
+- **Components**: Can be added in `src/components/` for reusable UI
+- **Styles**: `src/styles/` - CSS and styling files
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+### Backend (API Routes)
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+- **API Routes**: `src/pages/api/` - Your backend endpoints
+- **Database**: `src/lib/db.ts` - PostgreSQL connection utilities
+- **Current Endpoints**:
+  - `GET /api/users` - Fetch all users
+  - `POST /api/users` - Create a new user
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+## 🗄️ Database Setup
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Install PostgreSQL** on your system
+2. **Create a database** called `exposaas_db`
+3. **Update database credentials** in `.env.local`:
+   ```
+   DATABASE_URL=postgresql://username:password@localhost:5432/exposaas_db
+   ```
+4. **Initialize the database**:
+   ```bash
+   npm run init-db
+   ```
 
-## Learn More
+## 🚀 Getting Started
 
-To learn more about Next.js, take a look at the following resources:
+1. **Install dependencies**:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+   ```bash
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. **Set up environment variables**:
 
-## Deploy on Vercel
+   - Copy `.env.local` and update with your PostgreSQL credentials
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. **Initialize database**:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+   ```bash
+   npm run init-db
+   ```
+
+4. **Start development server**:
+
+   ```bash
+   npm run dev
+   ```
+
+5. **Open your browser** to [http://localhost:3000](http://localhost:3000)
+
+6. **Test the database** by visiting [http://localhost:3000/users](http://localhost:3000/users)
+
+## 📁 File Explanations
+
+- **`src/pages/_app.tsx`** - Root component that wraps all pages
+- **`src/pages/index.tsx`** - Home page
+- **`src/pages/users.tsx`** - User management page (frontend)
+- **`src/pages/api/users.ts`** - User API endpoints (backend)
+- **`src/lib/db.ts`** - Database connection and query utilities
+- **`scripts/init-db.ts`** - Database initialization script
+
+## 🛠️ Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+- `npm run init-db` - Initialize database tables and sample data
+
+## 📚 Next Steps
+
+1. **Learn Next.js fundamentals**:
+
+   - Pages and routing
+   - API routes
+   - Static and server-side rendering
+
+2. **Extend the database**:
+
+   - Add more tables in `scripts/init-db.ts`
+   - Create new API endpoints in `src/pages/api/`
+
+3. **Build features**:
+   - User authentication
+   - CRUD operations
+   - File uploads
+   - Email notifications
+
+## 🔗 Useful Resources
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
+- [React Documentation](https://reactjs.org/docs/)
+- [TypeScript Documentation](https://www.typescriptlang.org/docs/)

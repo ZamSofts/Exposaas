@@ -4,6 +4,10 @@
 /node_modules
 /.pnp
 .pnp.*
+.env
+.env.local
+.env.development
+.env.production
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
@@ -39,3 +43,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma

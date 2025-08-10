@@ -1,8 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: hsl(0, 0%, 13%); /* Main background */
+  --foreground: hsl(0, 0%, 100%); /* Primary text */
+
+  --surface: hsl(0, 0%, 17%); /* Cards, panels */
+  --border: hsl(0, 0%, 20%); /* Border lines */
+  --input: hsl(0, 0%, 18%); /* Input fields */
+
+  --primary: hsl(207, 90%, 54%); /* Telegram blue */
+  --primary-hover: hsl(207, 90%, 60%);
+  --primary-foreground: hsl(0, 0%, 100%);
+
+  --secondary: hsl(0, 0%, 23%); /* Muted backgrounds */
+  --secondary-foreground: hsl(0, 0%, 67%); /* Muted text */
+
+  --accent: hsl(207, 90%, 70%); /* Highlight elements */
+  --success: hsl(122, 39%, 49%);
+  --warning: hsl(36, 100%, 50%);
+  --error: hsl(0, 84.2%, 60.2%);
+
+  --radius: 8px;
 }
 
 @theme inline {
