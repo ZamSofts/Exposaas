@@ -1,6 +1,8 @@
 import { useAuth } from "@/hooks/useAuth";
 export { useAuth };
 export { default as Error } from "@/components/ui/Error";
+export { useConfirm } from "@/components/ui/ConfirmModal";
+export { default as Skeleton } from "@/components/ui/Skeleton";
 
 export const API = async (method: string, name: string, d = {}) => {
   if (method == "GET" || method == "DELETE") {

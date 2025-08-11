@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful";
 import { Pause } from "lucide-react";
+import Company from "../company";
+import { stat } from "fs";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getSession(req, res);
@@ -18,12 +20,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(company);
       }
 
-      const company = await prisma.company.findMany({
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-      res.status(200).json({ company });
+      const [company, total, inactive] = await Promise.all([
+        prisma.company.findMany({
+          orderBy: { createdAt: "desc" },
+          include: {
+            _count: { select: { users: true } },
+          },
+        }),
+        prisma.company.count(), // total companies
+        prisma.company.count({ where: { status: "inactive" } }), // inactive companies
+      ]);
+      // await new Promise((resolve) => setTimeout(resolve, 300));
+      res.status(200).json({ company, total, inactive });
     }
 
     if (req.method === "PUT") {
@@ -44,7 +52,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === "POST") {
-      const { id, name } = req.body;
+      const { id, name, status } = req.body;
+
       if (name === "") {
         return res.status(400).json({ error: "Name is required" });
       }
@@ -53,6 +62,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         where: { id },
         data: {
           name,
+          status,
         },
       });
       res.status(201).json({
