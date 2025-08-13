@@ -1,5 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 export { useAuth };
+export { useTheme };
 export { default as Error } from "@/components/ui/Error";
 export { useConfirm } from "@/components/ui/ConfirmModal";
 export { default as Skeleton } from "@/components/ui/Skeleton";

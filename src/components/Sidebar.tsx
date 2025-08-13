@@ -1,9 +1,10 @@
 import { signOut } from "next-auth/react";
 import { useState, createContext, useContext } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, LogOut, Menu, Building2 } from "lucide-react";
+import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2 } from "lucide-react";
 
 // Create context for sidebar state
 const SidebarContext = createContext<{
@@ -104,7 +105,7 @@ const getAllSidebarSections = (): SidebarSection[] => [
         id: "companies",
         label: "Manage Companies",
         icon: <Building2 size={20} />,
-        href: "/company",
+        href: "/company_example",
         roles: ["Sadmin"], // Only show to Sadmin
       },
       {
@@ -165,6 +166,7 @@ const getAllSidebarSections = (): SidebarSection[] => [
 
 function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }: { isMobileMenuOpen?: boolean; setIsMobileMenuOpen?: (open: boolean) => void }) {
   const { isCollapsed, setIsCollapsed } = useSidebar();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const session = useAuth();
 
@@ -298,6 +300,27 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }: { isMobileMen
 
       {/* Settings */}
       <div className="border-t border-[var(--border)] p-4">
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className={`
+            w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg 
+            text-[var(--secondary-foreground)] hover:text-[var(--foreground)] 
+            hover:bg-[var(--secondary)] transition-all duration-200
+            group
+          `}>
+          <div className="relative w-5 h-5">
+            {theme === "dark" ? (
+              <Sun size={20} className="group-hover:scale-110 transition-transform duration-200" />
+            ) : (
+              <Moon size={20} className="group-hover:scale-110 transition-transform duration-200" />
+            )}
+          </div>
+          <span className={`text-sm transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}`}>
+            {theme === "dark" ? "Light Mode" : "Dark Mode"}
+          </span>
+        </button>
+
         {/* Logout */}
         <button
           onClick={async () => {
@@ -305,7 +328,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }: { isMobileMen
             router.push("/");
           }}
           className={`
-          w-full mt-4 flex items-center space-x-3 px-3 py-2.5 rounded-lg 
+          w-full mt-2 flex items-center space-x-3 px-3 py-2.5 rounded-lg 
           text-[var(--secondary-foreground)] hover:text-[var(--error)] 
           hover:bg-[var(--secondary)] transition-all duration-200
         `}>

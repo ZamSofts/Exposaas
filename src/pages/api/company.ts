@@ -1,8 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful";
-import { Pause } from "lucide-react";
-import Company from "../company";
-import { stat } from "fs";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getSession(req, res);
@@ -11,6 +8,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const id = Number(req.query.id);
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const search = String(req.query.search || "")
+    .trim()
+    .toLowerCase();
+  const { sortBy = "id", sortOrder = "asc" } = req.query;
+
   try {
     if (req.method === "GET") {
       if (id) {
@@ -22,15 +26,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const [company, total, inactive] = await Promise.all([
         prisma.company.findMany({
-          orderBy: { createdAt: "desc" },
+          skip: (page - 1) * limit,
+          take: limit,
+          orderBy: { [sortBy]: sortOrder },
+          where: {
+            name: {
+              contains: search,
+              mode: "insensitive",
+            },
+          },
           include: {
             _count: { select: { users: true } },
           },
         }),
-        prisma.company.count(), // total companies
-        prisma.company.count({ where: { status: "inactive" } }), // inactive companies
+        prisma.company.count({ where: { name: { contains: search, mode: "insensitive" } } }), // total companies
+        prisma.company.count({ where: { status: "inactive", name: { contains: search, mode: "insensitive" } } }), // inactive companies
       ]);
-      // await new Promise((resolve) => setTimeout(resolve, 300));
+      // await new Promise((resolve) => setTimeout(resolve, 100));
       res.status(200).json({ company, total, inactive });
     }
 
@@ -38,6 +50,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { name } = req.body;
       if (name === "") {
         return res.status(400).json({ error: "Name is required" });
+      }
+      const d = await prisma.company.findFirst({
+        where: { name },
+        select: { name: true },
+      });
+      if (d) {
+        res.status(409).json({ error: "Company already exists" });
       }
       await prisma.company.create({
         data: {
@@ -58,7 +77,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Name is required" });
       }
 
-      const result = await prisma.company.update({
+      const d = await prisma.company.findFirst({
+        where: { name, id: { not: id } },
+      });
+      if (d) {
+        res.status(409).json({ error: "Company name already exists", d, id });
+      }
+
+      await prisma.company.update({
         where: { id },
         data: {
           name,

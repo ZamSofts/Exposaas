@@ -20,7 +20,7 @@ export default function LoginPage() {
   useEffect(() => {
     // Check if user is already authenticated
     getSession().then((session) => {
-      if (session?.user?.role === "Sadmin") {
+      if (session) {
         router.push("/dashboard");
       } else {
         setIsCheckingSession(false);
