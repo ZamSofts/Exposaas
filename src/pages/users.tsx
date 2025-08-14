@@ -23,7 +23,7 @@ type User = {
   createdAt: Date;
 };
 
-export default function Company() {
+export default function Userss() {
   const session = useAuth(["Sadmin", "Admin"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
@@ -58,7 +58,7 @@ export default function Company() {
   const [search, setSearch] = useState("");
 
   // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("");
+  const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const customStyles = {
     control: (provided, state) => ({
@@ -115,38 +115,42 @@ export default function Company() {
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
     loadData();
-    setTotal(users.length);
-  }, [currentPage, perPage, search, sortBy, sortOrder, users]);
+  }, [currentPage, perPage, search, sortBy, sortOrder]);
+
+  useEffect(() => {}, []);
+
+  const loadCompanies = async () => {
+    const data = await API("GET", "company?col=id,name");
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
+    setCompanies(data.companies);
+  };
 
   const loadData = async () => {
     setIsLoading(true);
-    /* const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      search: search,
-      sortBy: sortBy,
-      sortOrder: sortOrder,
-    }); */
-
     const params = new URLSearchParams({
       page: currentPage.toString(),
       limit: perPage.toString(),
-      ...(search && { search: search }),
-      ...(sortBy && { sortBy }),
-      ...(sortOrder && { sortOrder }),
+      search: search.toString(),
+      sortBy: sortBy.toString(),
+      sortOrder: sortOrder.toString(),
     });
 
-    const data = await API("GET", `company?${params}`);
+    const data = await API("GET", `user?${params}`);
     if (data.error) {
       setError(data.error);
       setIsLoading(false);
       return;
     }
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
     setError("");
-    console.log("Companies Data", data.company);
-    setCompanies(data.company);
-    //setTotal(data.total);
-
+    setUser(data.user);
+    setTotal(data.total);
     setIsLoading(false);
   };
 
@@ -172,20 +176,16 @@ export default function Company() {
     }
     if (edit === 0) {
       const newUser = {
-        id: Date.now(),
         name,
         password,
         companyId: Number(companyId),
         rolesId: rolesId,
-        createdAt: new Date(),
       };
 
-      setUser((prev) => [newUser, ...prev]);
-
-      // const data = await API("PUT", "company", { name });
-      // if (data.error) {
-      //   setError(data.error);
-      //}
+      const data = await API("PUT", "user", { newUser });
+      if (data.error) {
+        setError(data.error);
+      }
     } else {
       const user = users.find((u) => u.id === edit);
       if (!user) {
