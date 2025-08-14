@@ -32,7 +32,7 @@ export default function Company() {
   const [search, setSearch] = useState("");
 
   // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("");
+  const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
@@ -51,9 +51,9 @@ export default function Company() {
     const params = new URLSearchParams({
       page: currentPage.toString(),
       limit: perPage.toString(),
-      ...(search && { search: search }),
-      ...(sortBy && { sortBy }),
-      ...(sortOrder && { sortOrder }),
+      search: search,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
     });
 
     const data = await API("GET", `company?${params}`);

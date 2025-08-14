@@ -1,5 +1,6 @@
 import React, { useState, useEffect, cloneElement, ReactElement } from "react";
 import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 
 interface DataTableProps {
   children: React.ReactNode;
@@ -34,7 +35,7 @@ export default function DataTable({
   emptyMessage = "No data found",
   emptyIcon,
   emptyAction,
-  initialPerPage = 10,
+  initialPerPage = 5,
   showPagination = true,
   showSearch = true,
   sortBy = "",
@@ -193,11 +194,7 @@ export default function DataTable({
 
             return (
               <tbody className="divide-y divide-[var(--border)]">
-                <tr>
-                  <td colSpan={headerCount as number} className="text-center py-12">
-                    <div className="animate-pulse text-[var(--secondary-foreground)]">Loading...</div>
-                  </td>
-                </tr>
+                <Skeleton columns={headerCount as number} rows={perPage} />
               </tbody>
             );
           }

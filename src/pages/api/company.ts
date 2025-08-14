@@ -14,9 +14,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .trim()
     .toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
+  const col = req.query.col ? String(req.query.col).split(",") : null;
+  const selectFields = col && col.length > 0 ? Object.fromEntries(col.map((c) => [c, true])) : undefined;
 
   try {
     if (req.method === "GET") {
+      //LoadEdit
       if (id) {
         const company = await prisma.company.findUnique({
           where: { id },
@@ -24,6 +27,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(company);
       }
 
+      //specific
+      if (selectFields) {
+        const company = await prisma.company.findMany({
+          select: selectFields,
+          orderBy: { [sortBy]: sortOrder },
+        });
+        return res.status(200).json(company);
+      }
+
+      //All
       const [company, total, inactive] = await Promise.all([
         prisma.company.findMany({
           skip: (page - 1) * limit,
@@ -35,14 +48,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               mode: "insensitive",
             },
           },
-          include: {
-            _count: { select: { users: true } },
-          },
         }),
         prisma.company.count({ where: { name: { contains: search, mode: "insensitive" } } }), // total companies
         prisma.company.count({ where: { status: "inactive", name: { contains: search, mode: "insensitive" } } }), // inactive companies
       ]);
-      // await new Promise((resolve) => setTimeout(resolve, 100));
+      // await new Promise((resolve) => setTimeout(resolve, 4000));
       res.status(200).json({ company, total, inactive });
     }
 

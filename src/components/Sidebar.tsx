@@ -105,7 +105,7 @@ const getAllSidebarSections = (): SidebarSection[] => [
         id: "companies",
         label: "Manage Companies",
         icon: <Building2 size={20} />,
-        href: "/company_example",
+        href: "/company",
         roles: ["Sadmin"], // Only show to Sadmin
       },
       {

@@ -25,7 +25,7 @@ type User = {
 };
 
 export default function Company() {
-  const session = useAuth();
+  const session = useAuth(["Sadmin", "Admin"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
@@ -61,12 +61,6 @@ export default function Company() {
   const [sortBy, setSortBy] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
-  useEffect(() => {
-    if (session?.role !== "Sadmin") {
-      router.push("/");
-    }
-  }, []);
-
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
     loadData();
@@ -83,7 +77,7 @@ export default function Company() {
       sortOrder: sortOrder,
     });
 
-    const data = await API("GET", `company?${params}`);
+    const data = await API("GET", `user?${params}`);
     if (data.error) {
       setError(data.error);
       setIsLoading(false);

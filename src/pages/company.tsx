@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API, Skeleton } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import { Plus, Search, Building2, Edit, Trash2, MoreVertical, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
+import DataTable from "@/components/ui/DataTable";
+import { Plus, Building2, Edit, Trash2 } from "lucide-react";
 
 type Company = {
   id: number;
@@ -20,13 +21,17 @@ export default function Company() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [name, setName] = useState("");
   const [edit, setEdit] = useState<number | null>(null);
-  const [search, setSearch] = useState("");
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [inactive, setInactive] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [perPage, setPerPage] = useState(10);
+
+  // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(5);
+  const [search, setSearch] = useState("");
+
+  // Sorting state managed by parent
   const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
@@ -36,35 +41,49 @@ export default function Company() {
     }
   }, []);
 
+  // Reload data when pagination, search, or sorting changes
   useEffect(() => {
     loadData();
-  }, [currentPage, perPage, sortBy, sortOrder]);
+  }, [currentPage, perPage, search, sortBy, sortOrder]);
 
   const loadData = async () => {
     setIsLoading(true);
-    const data = await API("GET", `company?page=${currentPage}&limit=${perPage}&search=${search}&sortBy=${sortBy}&sortOrder=${sortOrder}`);
+    const params = new URLSearchParams({
+      page: currentPage.toString(),
+      limit: perPage.toString(),
+      search: search,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+    });
+
+    const data = await API("GET", `company?${params}`);
     if (data.error) {
       setError(data.error);
       setIsLoading(false);
       return;
     }
-    console.log(data);
+    setError("");
     setCompanies(data.company);
     setTotal(data.total);
     setInactive(data.inactive);
     setIsLoading(false);
   };
 
-  const handleSort = (column: string) => {
-    if (sortBy === column) {
-      // If same column, toggle order
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      // If different column, set new column and default to asc
-      setSortBy(column);
-      setSortOrder("asc");
-    }
+  const handleSort = (column: string, order: "asc" | "desc") => {
+    setSortBy(column);
+    setSortOrder(order);
   };
+
+  const handleSearch = (search: string) => {
+    setSearch(search);
+    setCurrentPage(1); // Reset to first page on search
+  };
+
+  const handlePageChange = (page: number, perPageValue: number) => {
+    setCurrentPage(page);
+    setPerPage(perPageValue);
+  };
+
   const editData = async () => {
     if (edit === 0) {
       const data = await API("PUT", "company", { name });
@@ -79,7 +98,7 @@ export default function Company() {
         return;
       }
     }
-    setError("");
+
     loadData();
     setName("");
     setEdit(null);
@@ -87,7 +106,10 @@ export default function Company() {
 
   const loadEdit = async (id: number) => {
     const data = await API("GET", `company?id=${id}`);
-    console.log(data);
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
     setName(data.name);
     setEdit(id);
   };
@@ -100,6 +122,7 @@ export default function Company() {
       type: "danger",
     });
     if (!confirmed) return;
+
     const data = await API("DELETE", `company?id=${id}`);
     if (data.error) {
       setError(data.error);
@@ -121,7 +144,7 @@ export default function Company() {
     });
     if (!confirmed) return;
 
-    const data = await API("POST", `company`, { id, status: newStatus });
+    const data = await API("POST", `company`, { id, status: newStatus, name: company.name });
     if (data.error) {
       setError(data.error);
       return;
@@ -187,11 +210,7 @@ export default function Company() {
                   <Error message={error} />
 
                   <div className="flex gap-3">
-                    <button
-                      onClick={editData}
-                      className="flex-1 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)]
-                               text-white rounded-lg font-medium transition-all duration-200
-                               disabled:opacity-50 disabled:cursor-not-allowed">
+                    <button onClick={editData} className="w-40 btn-primary">
                       {edit === 0 ? "Add Company" : "Save Changes"}
                     </button>
                     <button
@@ -246,288 +265,80 @@ export default function Company() {
               </div>
             </div>
           </div>
+          <Error message={error} />
+          {/* DataTable with JSX children */}
+          <DataTable
+            data={companies}
+            total={total}
+            isLoading={isLoading}
+            searchPlaceholder="Search companies..."
+            onSearch={handleSearch}
+            onSort={handleSort}
+            onPageChange={handlePageChange}
+            title="Companies"
+            sortBy={sortBy}
+            sortOrder={sortOrder}>
+            {/* Table Headers with sortable IDs */}
+            <thead className="bg-[var(--secondary)]">
+              <tr>
+                <th id="id">ID</th>
+                <th id="name">Company Name</th>
+                <th id="status">Status</th>
+                <th id="createdAt">Created Date</th>
+                <th className="text-right">Actions</th>
+              </tr>
+            </thead>
 
-          {/* Search Section */}
-          <div className="mb-6">
-            <div className="flex gap-0 max-w-md">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--secondary-foreground)]" />
-                <input
-                  type="text"
-                  placeholder="Search companies..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      loadData();
-                    }
-                  }}
-                  className="w-full pl-10 pr-4 py-3 bg-[var(--input)] border border-[var(--border)] 
-                           rounded-l-lg border-r-0 text-[var(--foreground)] placeholder-[var(--secondary-foreground)]
-                           focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent
-                           transition-all duration-200"
-                />
-              </div>
-              <button
-                onClick={loadData}
-                className="px-4 py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)]
-                         text-white rounded-r-lg font-medium transition-all duration-200
-                         border border-[var(--primary)] hover:border-[var(--primary-hover)]
-                         flex items-center justify-center">
-                <Search className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Companies Table */}
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden shadow-lg">
-            <div className="p-6 border-b border-[var(--border)]">
-              <h2 className="text-xl font-semibold text-[var(--foreground)]">Companies ({isLoading ? "..." : companies.length})</h2>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[var(--secondary)]">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">
-                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort("id")}>
-                        ID
-                        <div className="flex flex-col">
-                          <ChevronUp
-                            className={`w-3 h-3 ${
-                              sortBy === "id" && sortOrder === "asc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                          <ChevronDown
-                            className={`w-3 h-3 ${
-                              sortBy === "id" && sortOrder === "desc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                        </div>
+            {/* Table Body with data rows */}
+            <tbody>
+              {companies.map((company) => (
+                <tr key={company.id} className="hover:bg-[var(--input)] transition-colors duration-200">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{company.id.toString().padStart(3, "0")}</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
+                        <Building2 className="w-4 h-4 text-[var(--primary)]" />
                       </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">
-                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort("name")}>
-                        Company Name
-                        <div className="flex flex-col">
-                          <ChevronUp
-                            className={`w-3 h-3 ${
-                              sortBy === "name" && sortOrder === "asc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                          <ChevronDown
-                            className={`w-3 h-3 ${
-                              sortBy === "name" && sortOrder === "desc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">
-                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort("status")}>
-                        Status
-                        <div className="flex flex-col">
-                          <ChevronUp
-                            className={`w-3 h-3 ${
-                              sortBy === "status" && sortOrder === "asc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                          <ChevronDown
-                            className={`w-3 h-3 ${
-                              sortBy === "status" && sortOrder === "desc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">
-                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => handleSort("createdAt")}>
-                        Created Date
-                        <div className="flex flex-col">
-                          <ChevronUp
-                            className={`w-3 h-3 ${
-                              sortBy === "createdAt" && sortOrder === "asc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                          <ChevronDown
-                            className={`w-3 h-3 ${
-                              sortBy === "createdAt" && sortOrder === "desc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"
-                            }`}
-                          />
-                        </div>
-                      </div>
-                    </th>
-                    <th className="px-6 py-4 text-right text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {isLoading ? (
-                    <Skeleton columns={5} rows={5} />
-                  ) : (
-                    <>
-                      {companies.map((company) => (
-                        <tr key={company.id} className="hover:bg-[var(--input)] transition-colors duration-200">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{company.id.toString().padStart(3, "0")}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
-                                <Building2 className="w-4 h-4 text-[var(--primary)]" />
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium text-[var(--foreground)]">{company.name}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span
-                              onClick={() => toggleStatus(company.id)}
-                              className={`inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                              ${
-                                company.status === "active"
-                                  ? "bg-[var(--success)]/10 text-[var(--success)]"
-                                  : "bg-[var(--warning)]/10 text-[var(--warning)]"
-                              }`}>
-                              {company.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                            {new Date(company.createdAt).toLocaleString("en-GB")}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                onClick={() => loadEdit(company.id)}
-                                className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                               hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => deleteIt(company.id)}
-                                className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                                         hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-
-                      {companies.length === 0 && !isLoading && (
-                        <tr>
-                          <td colSpan={5} className="text-center py-12">
-                            <Building2 className="w-12 h-12 text-[var(--secondary-foreground)] mx-auto mb-4" />
-                            <p className="text-[var(--secondary-foreground)] text-lg">
-                              {search ? "No companies found matching your search." : "No companies registered yet."}
-                            </p>
-                            {!search && (
-                              <button
-                                onClick={() => setEdit(0)}
-                                className="mt-4 px-6 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)]
-                                         text-white rounded-lg font-medium transition-all duration-200">
-                                Add Your First Company
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Controls */}
-            <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--surface)]">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-[var(--secondary-foreground)]">Per Page:</label>
-                    <select
-                      value={perPage}
-                      onChange={(e) => {
-                        setPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                      className="px-3 py-1 bg-[var(--input)] border border-[var(--border)] rounded-lg
-                               text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 
-                               focus:ring-[var(--primary)] focus:border-transparent transition-all duration-200">
-                      <option value={5}>5</option>
-                      <option value={10}>10</option>
-                      <option value={20}>20</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                  </div>
-                  <div className="text-sm text-[var(--secondary-foreground)]">
-                    Showing {Math.min((currentPage - 1) * perPage + 1, total)} to {Math.min(currentPage * perPage, total)} of {total} entries
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      setCurrentPage(Math.max(1, currentPage - 1));
-                    }}
-                    disabled={currentPage === 1}
-                    className="p-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]
-                             text-[var(--secondary-foreground)] hover:text-[var(--foreground)]
-                             hover:bg-[var(--secondary)] transition-all duration-200
-                             disabled:opacity-50 disabled:cursor-not-allowed">
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-
-                  {/* Page Numbers */}
-                  <div className="flex items-center gap-1">
-                    {(() => {
-                      const totalPages = Math.ceil(total / perPage);
-                      const pages = [];
-                      const maxVisiblePages = 5;
-                      let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-                      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-                      if (endPage - startPage + 1 < maxVisiblePages) {
-                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
-                      }
-
-                      for (let i = startPage; i <= endPage; i++) {
-                        pages.push(
-                          <button
-                            key={i}
-                            onClick={() => {
-                              setCurrentPage(i);
-                            }}
-                            className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
-                              currentPage === i
-                                ? "bg-[var(--primary)] text-white"
-                                : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
-                            }`}>
-                            {i}
-                          </button>
-                        );
-                      }
-                      return pages;
-                    })()}
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      setCurrentPage(Math.min(Math.ceil(total / perPage), currentPage + 1));
-                    }}
-                    disabled={currentPage === Math.ceil(total / perPage)}
-                    className="p-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]
-                             text-[var(--secondary-foreground)] hover:text-[var(--foreground)]
-                             hover:bg-[var(--secondary)] transition-all duration-200
-                             disabled:opacity-50 disabled:cursor-not-allowed">
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{company.name}</div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span
+                      onClick={() => toggleStatus(company.id)}
+                      className={`inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        ${
+                          company.status === "active"
+                            ? "bg-[var(--success)]/10 text-[var(--success)]"
+                            : "bg-[var(--warning)]/10 text-[var(--warning)]"
+                        }`}>
+                      {company.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
+                    {new Date(company.createdAt).toLocaleString("en-GB")}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => loadEdit(company.id)}
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
+                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteIt(company.id)}
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
+                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
         </div>
       </Sidebar>
 
