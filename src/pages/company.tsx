@@ -170,11 +170,7 @@ export default function Company() {
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">Companies Management</h1>
               </div>
               {/* Add Company Button */}
-              <button
-                onClick={() => setEdit(0)}
-                className="flex items-center gap-2 px-6 py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)]
-                         text-white rounded-lg font-medium transition-all duration-200 hover:scale-105
-                         shadow-lg hover:shadow-xl">
+              <button onClick={() => setEdit(0)} className="btn-primary">
                 <Plus className="w-5 h-5" />
                 Add Company
               </button>

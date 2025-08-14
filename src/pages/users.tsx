@@ -61,65 +61,56 @@ export default function Company() {
   const [sortBy, setSortBy] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const customStyles = {
-  control: (provided, state) => ({
-    ...provided,
-    backgroundColor: "var(--input)",
-    borderColor: state.isFocused
-      ? "var(--primary)"
-      : "var(--border)",
-    borderRadius: "0.5rem", // rounded-lg
-    paddingLeft: "0.75rem", // px-4
-    paddingRight: "0.75rem",
-    minHeight: "3rem", // py-3 equivalent
-    color: "var(--foreground)",
-    boxShadow: state.isFocused
-      ? "0 0 0 2px var(--primary)"
-      : "none",
-    transition: "all 0.2s ease",
-    "&:hover": {
-      borderColor: "var(--primary)",
-    },
-  }),
-  menu: (provided) => ({
-    ...provided,
-    backgroundColor: "var(--input)",
-    borderRadius: "0.5rem",
-    border: `1px solid var(--border)`,
-  }),
-  option: (provided, state) => ({
-    ...provided,
-    backgroundColor: state.isFocused
-      ? "var(--primary)"
-      : "var(--input)",
-    color: state.isFocused
-      ? "#fff"
-      : "var(--foreground)",
-    cursor: "pointer",
-  }),
-  placeholder: (provided) => ({
-    ...provided,
-    color: "var(--foreground)",
-    opacity: 0.7,
-  }),
-  multiValue: (provided) => ({
-    ...provided,
-    backgroundColor: "var(--primary)",
-    color: "#fff",
-  }),
-  multiValueLabel: (provided) => ({
-    ...provided,
-    color: "#fff",
-  }),
-  multiValueRemove: (provided) => ({
-    ...provided,
-    color: "#fff",
-    ":hover": {
-      backgroundColor: "#DC2626",
+    control: (provided, state) => ({
+      ...provided,
+      backgroundColor: "var(--input)",
+      borderColor: state.isFocused ? "var(--primary)" : "var(--border)",
+      borderRadius: "0.5rem", // rounded-lg
+      paddingLeft: "0.75rem", // px-4
+      paddingRight: "0.75rem",
+      minHeight: "3rem", // py-3 equivalent
+      color: "var(--foreground)",
+      boxShadow: state.isFocused ? "0 0 0 2px var(--primary)" : "none",
+      transition: "all 0.2s ease",
+      "&:hover": {
+        borderColor: "var(--primary)",
+      },
+    }),
+    menu: (provided) => ({
+      ...provided,
+      backgroundColor: "var(--input)",
+      borderRadius: "0.5rem",
+      border: `1px solid var(--border)`,
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isFocused ? "var(--primary)" : "var(--input)",
+      color: state.isFocused ? "#fff" : "var(--foreground)",
+      cursor: "pointer",
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: "var(--foreground)",
+      opacity: 0.7,
+    }),
+    multiValue: (provided) => ({
+      ...provided,
+      backgroundColor: "var(--primary)",
       color: "#fff",
-    },
-  }),
-};
-
+    }),
+    multiValueLabel: (provided) => ({
+      ...provided,
+      color: "#fff",
+    }),
+    multiValueRemove: (provided) => ({
+      ...provided,
+      color: "#fff",
+      ":hover": {
+        backgroundColor: "#DC2626",
+        color: "#fff",
+      },
+    }),
+  };
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
@@ -145,7 +136,7 @@ export default function Company() {
       ...(sortOrder && { sortOrder }),
     });
 
-    const data = await API("GET", `user?${params}`);
+    const data = await API("GET", `company?${params}`);
     if (data.error) {
       setError(data.error);
       setIsLoading(false);
@@ -176,15 +167,7 @@ export default function Company() {
 
   const editData = async () => {
     if (!name || !password || !companyId || rolesId.length === 0) {
-      setError(
-        !name
-          ? "Name is required"
-          : !password
-          ? "Password is required"
-          : !companyId
-          ? "Please select a company"
-          : "Please select a role"
-      );
+      setError(!name ? "Name is required" : !password ? "Password is required" : !companyId ? "Please select a company" : "Please select a role");
       return;
     }
     if (edit === 0) {
@@ -253,8 +236,7 @@ export default function Company() {
   const deleteIt = async (id: number) => {
     const confirmed = await confirm({
       title: "Delete User",
-      message:
-        "Are you sure you want to delete this user? This action cannot be undone.",
+      message: "Are you sure you want to delete this user? This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
@@ -270,9 +252,7 @@ export default function Company() {
   };
 
   const togglePasswordVisibility = (id: number) => {
-    setVisiblePasswords((prev) =>
-      prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
-    );
+    setVisiblePasswords((prev) => (prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]));
   };
   const getRoleName = (roleId: number) => {
     const rolename = roles.find((r) => r.id === roleId);
@@ -300,38 +280,29 @@ export default function Company() {
                 <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                   <Users className="w-6 h-6 text-[var(--primary)]" />
                 </div>
-                <h1 className="text-3xl font-bold text-[var(--foreground)]">
-                  Users Management
-                </h1>
+                <h1 className="text-3xl font-bold text-[var(--foreground)]">Users Management</h1>
               </div>
               {/* Add Company Button */}
               <button
                 onClick={() => setEdit(0)}
                 className="flex items-center gap-2 px-6 py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)]
                          text-white rounded-lg font-medium transition-all duration-200 hover:scale-105
-                         shadow-lg hover:shadow-xl"
-              >
+                         shadow-lg hover:shadow-xl">
                 <Plus className="w-5 h-5" />
                 Add Users
               </button>
             </div>
-            <p className="text-[var(--secondary-foreground)]">
-              Manage and oversee all registered users in your platform
-            </p>
+            <p className="text-[var(--secondary-foreground)]">Manage and oversee all registered users in your platform</p>
           </div>
 
           {/* Add Company Modal/Form */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
-                  {edit === 0 ? "Add New User" : "Edit User"}
-                </h3>
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New User" : "Edit User"}</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">
-                      Name
-                    </label>
+                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">Name</label>
                     <input
                       type="text"
                       value={name}
@@ -349,16 +320,13 @@ export default function Company() {
                       autoFocus
                     />
 
-                    <label className="block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2">
-                      Select Company
-                    </label>
+                    <label className="block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2">Select Company</label>
                     <select
                       value={companyId}
                       onChange={(e) => setCompanyId(e.target.value)}
                       className="w-full px-4 py-3 bg-[var(--input)] border border-[var(--border)] rounded-lg
                  text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent
-                 transition-all duration-200"
-                    >
+                 transition-all duration-200">
                       <option value="">Select a company </option>
                       {companies.map((company) => (
                         <option key={company.id} value={company.id}>
@@ -366,9 +334,7 @@ export default function Company() {
                         </option>
                       ))}
                     </select>
-                    <label className="block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2">
-                      Select Roles
-                    </label>
+                    <label className="block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2">Select Roles</label>
                     <Select
                       isMulti
                       options={roles.map((role) => ({
@@ -379,17 +345,13 @@ export default function Company() {
                         const role = roles.find((r) => r.id === id);
                         return { value: id, label: role ? role.name : "" };
                       })}
-                      onChange={(selected) =>
-                        setRolesId(selected.map((s) => s.value))
-                      }
+                      onChange={(selected) => setRolesId(selected.map((s) => s.value))}
                       className="basic-multi-select"
                       classNamePrefix="select"
                       styles={customStyles}
                     />
 
-                    <label className="block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2">
-                      Password
-                    </label>
+                    <label className="block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2">Password</label>
                     <div className="relative w-full">
                       <input
                         type={showPassword ? "text" : "password"}
@@ -412,13 +374,8 @@ export default function Company() {
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300"
-                      >
-                        {showPassword ? (
-                          <EyeOff size={20} />
-                        ) : (
-                          <Eye size={20} />
-                        )}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300">
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                       </button>
                     </div>
                   </div>
@@ -433,8 +390,7 @@ export default function Company() {
                         setEdit(null);
                       }}
                       className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)]
-                               text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
-                    >
+                               text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200">
                       Cancel
                     </button>
                   </div>
@@ -448,12 +404,8 @@ export default function Company() {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">
-                    Total Users
-                  </p>
-                  <p className="text-2xl font-bold text-[var(--foreground)]">
-                    {isLoading ? "..." : total}
-                  </p>
+                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">Total Users</p>
+                  <p className="text-2xl font-bold text-[var(--foreground)]">{isLoading ? "..." : total}</p>
                 </div>
                 <div className="p-3 bg-[var(--primary)]/10 rounded-lg">
                   <Users className="w-6 h-6 text-[var(--primary)]" />
@@ -473,8 +425,7 @@ export default function Company() {
             onPageChange={handlePageChange}
             title="Users"
             sortBy={sortBy}
-            sortOrder={sortOrder}
-          >
+            sortOrder={sortOrder}>
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
@@ -491,36 +442,24 @@ export default function Company() {
             {/* Table Body with data rows */}
             <tbody>
               {users.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-[var(--input)] transition-colors duration-200"
-                >
+                <tr key={user.id} className="hover:bg-[var(--input)] transition-colors duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">
-                      #{user.id.toString().padStart(3, "0")}
-                    </span>
+                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{user.id.toString().padStart(3, "0")}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                         <User className="w-4 h-4 text-[var(--primary)]" />
                       </div>
-                      <div className="text-sm font-medium text-[var(--foreground)]">
-                        {user.name}
-                      </div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{user.name}</div>
                     </div>
                   </td>
                   <td className="px-6  py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-[var(--foreground)]">
-                      {getCompanyName(user.companyId)}
-                    </div>
+                    <div className="text-sm font-medium text-[var(--foreground)]">{getCompanyName(user.companyId)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {user.rolesId.map((role, index) => (
-                      <div
-                        key={index}
-                        className="text-sm font-medium text-[var(--foreground)]"
-                      >
+                      <div key={index} className="text-sm font-medium text-[var(--foreground)]">
                         {getRoleName(role)}
                       </div>
                     ))}
@@ -529,21 +468,12 @@ export default function Company() {
                   <td className="px-6  py-4  whitespace-nowrap">
                     <div className="flex flex-row gap-3 items-center justify-center">
                       <div className="text-sm font-medium text-[var(--foreground)]">
-                        {visiblePasswords.includes(user.id)
-                          ? user.password
-                          : "*******"}
+                        {visiblePasswords.includes(user.id) ? user.password : "*******"}
                       </div>
 
                       <div className="text-sm font-medium text-[var(--foreground)]">
-                        <button
-                          onClick={() => togglePasswordVisibility(user.id)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          {visiblePasswords.includes(user.id) ? (
-                            <Eye size={20} />
-                          ) : (
-                            <EyeOff size={20} />
-                          )}
+                        <button onClick={() => togglePasswordVisibility(user.id)} className="text-gray-500 hover:text-gray-700">
+                          {visiblePasswords.includes(user.id) ? <Eye size={20} /> : <EyeOff size={20} />}
                         </button>
                       </div>
                     </div>
@@ -557,15 +487,13 @@ export default function Company() {
                       <button
                         onClick={() => loadEdit(user.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
-                      >
+                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(user.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
-                      >
+                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
