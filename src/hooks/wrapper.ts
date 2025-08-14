@@ -5,6 +5,8 @@ export { useTheme };
 export { default as Error } from "@/components/ui/Error";
 export { useConfirm } from "@/components/ui/ConfirmModal";
 export { default as Skeleton } from "@/components/ui/Skeleton";
+export { MultiSelect } from "@/components/ui/MultiSelect";
+export { CustomButton } from "@/components/ui/CustomButton";
 
 export const API = async (method: string, name: string, d = {}) => {
   if (method == "GET" || method == "DELETE") {
