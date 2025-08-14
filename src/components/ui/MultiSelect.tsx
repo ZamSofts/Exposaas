@@ -16,6 +16,7 @@ export const MultiSelect=({ roles, rolesId, setRolesId })=> {
       transition: "all 0.2s ease",
       "&:hover": {
         borderColor: "var(--primary)",
+        
       },
     }),
     menu: (provided) => ({
@@ -30,6 +31,10 @@ export const MultiSelect=({ roles, rolesId, setRolesId })=> {
       color: state.isFocused ? "#fff" : "var(--foreground)",
       cursor: "pointer",
     }),
+    input: (provided) => ({
+    ...provided,
+    color: "var(--foreground)", // search input text will follow theme
+  }),
     placeholder: (provided) => ({
       ...provided,
       color: "var(--foreground)",
