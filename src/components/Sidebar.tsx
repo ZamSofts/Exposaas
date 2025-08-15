@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2 } from "lucide-react";
+import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2,Shield, } from "lucide-react";
 
 // Create context for sidebar state
 const SidebarContext = createContext<{
@@ -125,6 +125,13 @@ const getAllSidebarSections = (): SidebarSection[] => [
         label: "User Management",
         icon: <Users size={20} />,
         href: "/users",
+      },
+      {
+        id: "roles",
+        label: "Role Management",
+        icon: <Shield size={20} />,
+        href: "/roles",
+        roles: ["Sadmin"],
       },
     ],
   },
