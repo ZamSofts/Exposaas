@@ -205,7 +205,13 @@ export default function Role() {
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
+<<<<<<< HEAD
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New User" : "Edit User"}</h3>
+=======
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
+                  {edit === 0 ? "Add New Role" : "Edit Role"}
+                </h3>
+>>>>>>> d3f324e3ca650eb6d675758c7dd5e6bdcd6b84d8
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">Name</label>
@@ -229,7 +235,15 @@ export default function Role() {
                   <Error message={error} />
 
                   <div className="flex gap-3">
+<<<<<<< HEAD
                     <CustomButton title={edit === 0 ? "Add User" : "Save Changes"} onClick={editData} className="btn-primary" />
+=======
+                    <CustomButton
+                      title={edit === 0 ? "Add Role" : "Save Changes"}
+                      onClick={editData}
+                      className="btn-primary"
+                    />
+>>>>>>> d3f324e3ca650eb6d675758c7dd5e6bdcd6b84d8
 
                     <CustomButton
                       title="Cancel"
