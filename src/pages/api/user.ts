@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful";
+import { Console } from "console";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getSession(req, res);
@@ -20,6 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (req.method === "GET") {
+      console.log(id);
       //LoadEdit
       if (id) {
         const user = await prisma.user.findUnique({
@@ -64,6 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === "PUT") {
+      console.log(req.body);
       const { username, password, companyId } = req.body;
       if (username === "") {
         return res.status(400).json({ error: "Username is required" });

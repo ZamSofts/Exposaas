@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         select: { name: true },
       });
       if (d) {
-        res.status(409).json({ error: "Company already exists" });
+        return res.status(409).json({ error: "Company already exists" });
       }
       await prisma.company.create({
         data: {
@@ -75,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           createdAt: new Date(),
         },
       });
-      res.status(201).json({
+      return res.status(201).json({
         message: "Company created successfully",
       });
     }

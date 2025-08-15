@@ -17,7 +17,7 @@ type Company = {
 
 type User = {
   id: number;
-  name: string;
+  username: string;
   password: string;
   companyId: number;
   rolesId: number[];
@@ -40,7 +40,7 @@ export default function Userss() {
     { id: 5, name: "Guest" },
   ];
 
-  const [name, setName] = useState("");
+  const [username, setUserName] = useState("");
   const [companyId, setCompanyId] = useState("");
   const [rolesId, setRolesId] = useState<number[]>([]);
   const [password, setPassword] = useState("");
@@ -67,7 +67,9 @@ export default function Userss() {
     loadData();
   }, [currentPage, perPage, search, sortBy, sortOrder]);
 
-  useEffect(() => {}, []);
+  useEffect(() => {
+    loadCompanies();
+  }, []);
 
   const loadCompanies = async () => {
     const data = await API("GET", "company?col=id,name");
@@ -75,7 +77,8 @@ export default function Userss() {
       setError(data.error);
       return;
     }
-    setCompanies(data.companies);
+    setCompanies(data);
+    setError("");
   };
 
   const loadData = async () => {
@@ -92,10 +95,6 @@ export default function Userss() {
     if (data.error) {
       setError(data.error);
       setIsLoading(false);
-      return;
-    }
-    if (data.error) {
-      setError(data.error);
       return;
     }
     setError("");
@@ -120,100 +119,75 @@ export default function Userss() {
   };
 
   const editData = async () => {
-    if (!name || !password || !companyId || rolesId.length === 0) {
-      setError(
-        !name
-          ? "Name is required"
-          : !password
-          ? "Password is required"
-          : !companyId
-          ? "Please select a company"
-          : "Please select a role"
-      );
+    if (!username || !password || !companyId || rolesId.length === 0) {
+      setError(!username ? "Name is required" : !password ? "Password is required" : !companyId ? "Please select a company" : "Please select a role");
       return;
     }
     if (edit === 0) {
       const newUser = {
-        name,
+        username,
         password,
         companyId: Number(companyId),
         rolesId: rolesId,
       };
-
-      const data = await API("PUT", "user", { newUser });
+      const data = await API("PUT", "user", newUser);
       if (data.error) {
         setError(data.error);
-      }
-    } else {
-      const user = users.find((u) => u.id === edit);
-      if (!user) {
-        setError("User not found");
         return;
       }
-
-      const updatedUser: User = {
-        ...user,
-        name,
+    } else {
+      const updatedUser = {
+        username,
         password,
         companyId: Number(companyId),
         rolesId: rolesId,
       };
 
-      setUser((prev) => prev.map((u) => (u.id === edit ? updatedUser : u)));
-
-      // const data = await API("POST", `company`, { id: edit, name });
-      // if (data.error) {
-      //   setError(data.error);
-      //   return;
-      // }
+      const data = await API("POST", `company`, { updatedUser });
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
     }
 
     /*  loadData(); */
-    setName("");
+    setUserName("");
     setPassword("");
     setCompanyId("");
+    setError("");
     setRolesId([]);
     setEdit(null);
   };
 
   const loadEdit = async (id: number) => {
-    //const data = await API("GET", `company?id=${id}`);
-    const user = users.find((u) => u.id === id);
-    if (!user) {
-      setError("User not found");
-      return;
-    }
-
-    setName(user.name);
-    setPassword(user.password);
-    setCompanyId(user.companyId.toString());
-    setRolesId(user.rolesId); // <-- add this
+    const data = await API("GET", `user?id=${id}`);
+    console.log(data);
+    setUserName(data.username);
+    setPassword(data.password);
+    setCompanyId(data.companyId);
+    setRolesId(data.rolesId); // <-- add this
     setEdit(id);
   };
 
   const deleteIt = async (id: number) => {
     const confirmed = await confirm({
       title: "Delete User",
-      message:
-        "Are you sure you want to delete this user? This action cannot be undone.",
+      message: "Are you sure you want to delete this user? This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
     if (!confirmed) return;
-    const newusers = users.filter((u) => u.id !== id);
-    setUser([...newusers]);
-    /*  const data = await API("DELETE", `company?id=${id}`);
+
+    const data = await API("DELETE", `user?id=${id}`);
     if (data.error) {
       setError(data.error);
       return;
-    } */
-    /* loadData(); */
+    }
+    loadData();
   };
 
   const togglePasswordVisibility = (id: number) => {
-    setVisiblePasswords((prev) =>
-      prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
-    );
+    setVisiblePasswords((prev) => (prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]));
   };
   const getRoleName = (roleId: number) => {
     const rolename = roles.find((r) => r.id === roleId);
@@ -241,39 +215,26 @@ export default function Userss() {
                 <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                   <Users className="w-6 h-6 text-[var(--primary)]" />
                 </div>
-                <h1 className="text-3xl font-bold text-[var(--foreground)]">
-                  Users Management
-                </h1>
+                <h1 className="text-3xl font-bold text-[var(--foreground)]">Users Management</h1>
               </div>
               {/* Add Company Button */}
-              <CustomButton
-                title="Add Users"
-                onClick={() => setEdit(0)}
-                className="btn-primary"
-                icon={<Plus className="w-5 h-5" />}
-              />
+              <CustomButton title="Add Users" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
             </div>
-            <p className="text-[var(--secondary-foreground)]">
-              Manage and oversee all registered users in your platform
-            </p>
+            <p className="text-[var(--secondary-foreground)]">Manage and oversee all registered users in your platform</p>
           </div>
 
           {/* Add User Modal/Form */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
-                  {edit === 0 ? "Add New User" : "Edit User"}
-                </h3>
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New User" : "Edit User"}</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">
-                      Name
-                    </label>
+                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">Name</label>
                     <input
                       type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      value={username}
+                      onChange={(e) => setUserName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           editData();
@@ -285,11 +246,7 @@ export default function Userss() {
                     />
 
                     <label className="input-label">Select Company</label>
-                    <select
-                      value={companyId}
-                      onChange={(e) => setCompanyId(e.target.value)}
-                      className="input-style"
-                    >
+                    <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="input-style">
                       <option value="">Select a company </option>
                       {companies.map((company) => (
                         <option key={company.id} value={company.id}>
@@ -298,11 +255,7 @@ export default function Userss() {
                       ))}
                     </select>
                     <label className="input-label">Select Roles</label>
-                    <MultiSelect
-                      roles={roles}
-                      rolesId={rolesId}
-                      setRolesId={setRolesId}
-                    />
+                    <MultiSelect roles={roles} rolesId={rolesId} setRolesId={setRolesId} />
                     <label className="input-label">Password</label>
                     <div className="relative w-full">
                       <input
@@ -321,27 +274,16 @@ export default function Userss() {
 
                       {/* Eye Icon */}
                       <CustomButton
-                        title={
-                          showPassword ? (
-                            <EyeOff size={20} />
-                          ) : (
-                            <Eye size={20} />
-                          )
-                        }
+                        title={showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300"
                       />
-                    
                     </div>
                   </div>
                   <Error message={error} />
 
                   <div className="flex gap-3">
-                    <CustomButton
-                      title={edit === 0 ? "Add User" : "Save Changes"}
-                      onClick={editData}
-                      className="btn-primary"
-                    />
+                    <CustomButton title={edit === 0 ? "Add User" : "Save Changes"} onClick={editData} className="btn-primary" />
 
                     <CustomButton
                       title="Cancel"
@@ -359,12 +301,8 @@ export default function Userss() {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">
-                    Total Users
-                  </p>
-                  <p className="text-2xl font-bold text-[var(--foreground)]">
-                    {isLoading ? "..." : total}
-                  </p>
+                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">Total Users</p>
+                  <p className="text-2xl font-bold text-[var(--foreground)]">{isLoading ? "..." : total}</p>
                 </div>
                 <div className="p-3 bg-[var(--primary)]/10 rounded-lg">
                   <Users className="w-6 h-6 text-[var(--primary)]" />
@@ -384,16 +322,15 @@ export default function Userss() {
             onPageChange={handlePageChange}
             title="Users"
             sortBy={sortBy}
-            sortOrder={sortOrder}
-          >
+            sortOrder={sortOrder}>
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
                 <th id="id">ID</th>
-                <th id="name">Name</th>
-                <th id="status">Company</th>
-                <th id="status">Role</th>
-                <th id="status">Password</th>
+                <th id="username">Username</th>
+                <th id="companyId">Company</th>
+                <th id="role">Role</th>
+                <th id="password">Password</th>
                 <th id="createdAt">Created Date</th>
                 <th className="text-right">Actions</th>
               </tr>
@@ -402,59 +339,38 @@ export default function Userss() {
             {/* Table Body with data rows */}
             <tbody>
               {users.map((user) => (
-                <tr
-                  key={user.id}
-                  className="hover:bg-[var(--input)] transition-colors duration-200"
-                >
+                <tr key={user.id} className="hover:bg-[var(--input)] transition-colors duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">
-                      #{user.id.toString().padStart(3, "0")}
-                    </span>
+                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{user.id.toString().padStart(3, "0")}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                         <User className="w-4 h-4 text-[var(--primary)]" />
                       </div>
-                      <div className="text-sm font-medium text-[var(--foreground)]">
-                        {user.name}
-                      </div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{user.username}</div>
                     </div>
                   </td>
                   <td className="px-6  py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-[var(--foreground)]">
-                      {getCompanyName(user.companyId)}
-                    </div>
+                    <div className="text-sm font-medium text-[var(--foreground)]">{getCompanyName(user.companyId)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {user.rolesId.map((role, index) => (
-                      <div
-                        key={index}
-                        className="text-sm font-medium text-[var(--foreground)]"
-                      >
+                    {/* {user.rolesId.map((role, index) => (
+                      <div key={index} className="text-sm font-medium text-[var(--foreground)]">
                         {getRoleName(role)}
                       </div>
-                    ))}
+                    ))} */}
                   </td>
 
                   <td className="px-6  py-4  whitespace-nowrap">
                     <div className="flex flex-row gap-3 items-center justify-center">
                       <div className="text-sm font-medium text-[var(--foreground)]">
-                        {visiblePasswords.includes(user.id)
-                          ? user.password
-                          : "*******"}
+                        {visiblePasswords.includes(user.id) ? user.password : "*******"}
                       </div>
 
                       <div className="text-sm font-medium text-[var(--foreground)]">
-                        <button
-                          onClick={() => togglePasswordVisibility(user.id)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          {visiblePasswords.includes(user.id) ? (
-                            <Eye size={20} />
-                          ) : (
-                            <EyeOff size={20} />
-                          )}
+                        <button onClick={() => togglePasswordVisibility(user.id)} className="text-gray-500 hover:text-gray-700">
+                          {visiblePasswords.includes(user.id) ? <Eye size={20} /> : <EyeOff size={20} />}
                         </button>
                       </div>
                     </div>
@@ -468,15 +384,13 @@ export default function Userss() {
                       <button
                         onClick={() => loadEdit(user.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
-                      >
+                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(user.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
-                      >
+                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

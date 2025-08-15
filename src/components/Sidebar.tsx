@@ -224,7 +224,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }: { isMobileMen
         <div className="flex items-center justify-center">
           <div className="w-10 h-10 bg-[var(--primary)] rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">EH</div>
           <div className={`flex-1 ml-3 transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0 md:ml-0" : "opacity-100"}`}>
-            <div className="text-sm font-medium text-[var(--foreground)]">ExportHub User</div>
+            <div className="text-sm font-medium text-[var(--foreground)]">ExportHub {session?.role}</div>
             <div className="text-xs text-[var(--success)] flex items-center space-x-1">
               <div className="w-2 h-2 bg-[var(--success)] rounded-full"></div>
               <span>Online</span>
