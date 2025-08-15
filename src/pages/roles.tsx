@@ -6,47 +6,35 @@ import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { MultiSelect } from "@/hooks/wrapper";
 import { CustomButton } from "@/hooks/wrapper";
-import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Users, Shield } from "lucide-react";
 
-type Company = {
+type Role = {
   id: number;
   name: string;
-  createdAt: string;
-  status: "active" | "inactive";
-};
-
-type User = {
-  id: number;
-  name: string;
-  password: string;
-  companyId: number;
-  rolesId: number[];
+  permissions: number[];
   createdAt: Date;
 };
 
-export default function Userss() {
+export default function Role() {
   const session = useAuth(["Sadmin", "Admin"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [users, setUser] = useState<User[]>([]);
+  const [roles, setRole] = useState<Role[]>([]);
 
-  const roles = [
-    { id: 1, name: "Admin" },
-    { id: 2, name: "Manager" },
-    { id: 3, name: "Employee" },
-    { id: 4, name: "Supervisor" },
-    { id: 5, name: "Guest" },
-  ];
+  const [static_permissions, setStaticPermissions] = useState([
+    { id: 1, name: "vehicle:view" },
+    { id: 2, name: "vehicle:create" },
+    { id: 3, name: "vehicle:update" },
+    { id: 4, name: "vehicle:delete" },
+    { id: 5, name: "document:view" },
+    { id: 6, name: "document:create" },
+    { id: 7, name: "document:update" },
+    { id: 8, name: "document:delete" },
+  ]);
 
   const [name, setName] = useState("");
-  const [companyId, setCompanyId] = useState("");
-  const [rolesId, setRolesId] = useState<number[]>([]);
-  const [password, setPassword] = useState("");
-
-  const [showPassword, setShowPassword] = useState(false);
-  const [visiblePasswords, setVisiblePasswords] = useState<number[]>([]);
+  const [permissions, setPermission] = useState<number[]>([]);
 
   const [edit, setEdit] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -64,29 +52,20 @@ export default function Userss() {
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
-    loadData();
-    setTotal(users.length);
-  }, [currentPage, perPage, search, sortBy, sortOrder, users]);
+    loadPermissions();
+    setTotal(roles.length)
+  }, [currentPage, perPage, search, sortBy, sortOrder,roles]);
 
-  const loadData = async () => {
+  useEffect(() => {
+    loadPermissions();
+  }, []);
+
+  const  loadPermissions = async () => {
     setIsLoading(true);
-    /* const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      search: search,
-      sortBy: sortBy,
-      sortOrder: sortOrder,
-    }); */
 
-    const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      ...(search && { search: search }),
-      ...(sortBy && { sortBy }),
-      ...(sortOrder && { sortOrder }),
-    });
+    
 
-    const data = await API("GET", `company?${params}`);
+    /* const data = await API("GET", `permisssions?${params}`);
     if (data.error) {
       setError(data.error);
       setIsLoading(false);
@@ -95,7 +74,7 @@ export default function Userss() {
     setError("");
     console.log("Companies Data", data.company);
     setCompanies(data.company);
-    //setTotal(data.total);
+    //setTotal(data.total); */
 
     setIsLoading(false);
   };
@@ -116,50 +95,38 @@ export default function Userss() {
   };
 
   const editData = async () => {
-    if (!name || !password || !companyId || rolesId.length === 0) {
-      setError(
-        !name
-          ? "Name is required"
-          : !password
-          ? "Password is required"
-          : !companyId
-          ? "Please select a company"
-          : "Please select a role"
-      );
+    if (!name || permissions.length === 0) {
+      setError(!name ? "Name is required" : "Please select a Permission");
       return;
     }
     if (edit === 0) {
-      const newUser = {
+      const newRole = {
         id: Date.now(),
         name,
-        password,
-        companyId: Number(companyId),
-        rolesId: rolesId,
+        permissions,
         createdAt: new Date(),
       };
 
-      setUser((prev) => [newUser, ...prev]);
+      setRole((prev) => [newRole, ...prev]);
 
       // const data = await API("PUT", "company", { name });
       // if (data.error) {
       //   setError(data.error);
       //}
     } else {
-      const user = users.find((u) => u.id === edit);
-      if (!user) {
-        setError("User not found");
+      const role = roles.find((r) => r.id === edit);
+      if (!role) {
+        setError("Role not found");
         return;
       }
 
-      const updatedUser: User = {
-        ...user,
+      const updatedRole: Role = {
+        ...role,
         name,
-        password,
-        companyId: Number(companyId),
-        rolesId: rolesId,
+        permissions,
       };
 
-      setUser((prev) => prev.map((u) => (u.id === edit ? updatedUser : u)));
+      setRole((prev) => prev.map((r) => (r.id === edit ? updatedRole : r)));
 
       // const data = await API("POST", `company`, { id: edit, name });
       // if (data.error) {
@@ -170,38 +137,35 @@ export default function Userss() {
 
     /*  loadData(); */
     setName("");
-    setPassword("");
-    setCompanyId("");
-    setRolesId([]);
+    setPermission([]);
     setEdit(null);
   };
 
   const loadEdit = async (id: number) => {
     //const data = await API("GET", `company?id=${id}`);
-    const user = users.find((u) => u.id === id);
-    if (!user) {
+    const role = roles.find((r) => r.id === id);
+    if (!role) {
       setError("User not found");
       return;
     }
 
-    setName(user.name);
-    setPassword(user.password);
-    setCompanyId(user.companyId.toString());
-    setRolesId(user.rolesId); // <-- add this
+    setName(role.name);
+
+    setPermission(role.permissions); // <-- add this
     setEdit(id);
   };
 
   const deleteIt = async (id: number) => {
     const confirmed = await confirm({
-      title: "Delete User",
+      title: "Delete Role",
       message:
-        "Are you sure you want to delete this user? This action cannot be undone.",
+        "Are you sure you want to delete this role? This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
     if (!confirmed) return;
-    const newusers = users.filter((u) => u.id !== id);
-    setUser([...newusers]);
+    const newRole = roles.filter((u) => u.id !== id);
+    setRole([...newRole]);
     /*  const data = await API("DELETE", `company?id=${id}`);
     if (data.error) {
       setError(data.error);
@@ -210,22 +174,14 @@ export default function Userss() {
     /* loadData(); */
   };
 
-  const togglePasswordVisibility = (id: number) => {
-    setVisiblePasswords((prev) =>
-      prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
-    );
+  const getPermissionNames = (permissionId: number) => {
+        const permission = static_permissions.find((p) => p.id === permissionId);
+        if(!permission){
+             return "Unknown";
+        }
+        return permission.name
+   
   };
-  const getRoleName = (roleId: number) => {
-    const rolename = roles.find((r) => r.id === roleId);
-    if (!rolename) return "Unknown";
-    return rolename.name;
-  };
-  const getCompanyName = (CompanyId: number) => {
-    const companyName = companies.find((c) => c.id === CompanyId);
-    if (!companyName) return "Unknown";
-    return companyName.name;
-  };
-
   return (
     <>
       <Head>
@@ -239,27 +195,27 @@ export default function Userss() {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
-                  <Users className="w-6 h-6 text-[var(--primary)]" />
+                  <Shield className="w-6 h-6 text-[var(--primary)]" />
                 </div>
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">
-                  Users Management
+                  Roles Management
                 </h1>
               </div>
               {/* Add Company Button */}
               <CustomButton
-                title="Add Users"
+                title="Add Roles"
                 onClick={() => setEdit(0)}
                 className="btn-primary"
                 icon={<Plus className="w-5 h-5" />}
               />
             </div>
             <p className="text-[var(--secondary-foreground)]">
-              Manage and oversee all registered users in your platform
+              Manage and oversee all registered roles in your platform
             </p>
           </div>
 
           {/* Add User Modal/Form */}
-          {edit != null && (
+       {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
@@ -279,60 +235,19 @@ export default function Userss() {
                           editData();
                         }
                       }}
-                      placeholder="Enter User name..."
+                      placeholder="Enter Role name..."
                       className="input-style"
                       autoFocus
                     />
 
-                    <label className="input-label">Select Company</label>
-                    <select
-                      value={companyId}
-                      onChange={(e) => setCompanyId(e.target.value)}
-                      className="input-style"
-                    >
-                      <option value="">Select a company </option>
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
+                    
                     <label className="input-label">Select Roles</label>
                     <MultiSelect
-                      roles={roles}
-                      rolesId={rolesId}
-                      setRolesId={setRolesId}
+                      roles={static_permissions}
+                      rolesId={permissions}
+                      setRolesId={setPermission}
                     />
-                    <label className="input-label">Password</label>
-                    <div className="relative w-full">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            editData();
-                          }
-                        }}
-                        placeholder="Enter Password..."
-                        className="input-style"
-                        autoFocus
-                      />
-
-                      {/* Eye Icon */}
-                      <CustomButton
-                        title={
-                          showPassword ? (
-                            <EyeOff size={20} />
-                          ) : (
-                            <Eye size={20} />
-                          )
-                        }
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300"
-                      />
-                    
-                    </div>
+                 
                   </div>
                   <Error message={error} />
 
@@ -360,14 +275,14 @@ export default function Userss() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[var(--secondary-foreground)] text-sm font-medium">
-                    Total Users
+                    Total Roles
                   </p>
                   <p className="text-2xl font-bold text-[var(--foreground)]">
                     {isLoading ? "..." : total}
                   </p>
                 </div>
                 <div className="p-3 bg-[var(--primary)]/10 rounded-lg">
-                  <Users className="w-6 h-6 text-[var(--primary)]" />
+                  <Shield className="w-6 h-6 text-[var(--primary)]" />
                 </div>
               </div>
             </div>
@@ -375,14 +290,14 @@ export default function Userss() {
 
           {/* DataTable with JSX children */}
           <DataTable
-            data={users}
+            data={roles}
             total={total}
             isLoading={isLoading}
-            searchPlaceholder="Search Users..."
+            searchPlaceholder="Search Roles..."
             onSearch={handleSearch}
             onSort={handleSort}
             onPageChange={handlePageChange}
-            title="Users"
+            title="Roles"
             sortBy={sortBy}
             sortOrder={sortOrder}
           >
@@ -391,9 +306,7 @@ export default function Userss() {
               <tr>
                 <th id="id">ID</th>
                 <th id="name">Name</th>
-                <th id="status">Company</th>
-                <th id="status">Role</th>
-                <th id="status">Password</th>
+                <th id="permissions">Permissions</th>
                 <th id="createdAt">Created Date</th>
                 <th className="text-right">Actions</th>
               </tr>
@@ -401,79 +314,56 @@ export default function Userss() {
 
             {/* Table Body with data rows */}
             <tbody>
-              {users.map((user) => (
+              {roles.map((role) => (
                 <tr
-                  key={user.id}
+                  key={role.id}
                   className="hover:bg-[var(--input)] transition-colors duration-200"
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-mono text-[var(--secondary-foreground)]">
-                      #{user.id.toString().padStart(3, "0")}
+                      #{role.id.toString().padStart(3, "0")}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
-                        <User className="w-4 h-4 text-[var(--primary)]" />
+                        <Shield className="w-4 h-4 text-[var(--primary)]" />
                       </div>
                       <div className="text-sm font-medium text-[var(--foreground)]">
-                        {user.name}
+                        {role.name}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6  py-4 whitespace-nowrap">
+                  {/* <td className="px-6  py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-[var(--foreground)]">
-                      {getCompanyName(user.companyId)}
+                      {getPermissionNames(role.permissions)}
                     </div>
-                  </td>
+                  </td> */}
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {user.rolesId.map((role, index) => (
+                    {role.permissions.map((permissionid, index) => (
                       <div
                         key={index}
                         className="text-sm font-medium text-[var(--foreground)]"
                       >
-                        {getRoleName(role)}
+                       {getPermissionNames(permissionid)}
                       </div>
                     ))}
                   </td>
 
-                  <td className="px-6  py-4  whitespace-nowrap">
-                    <div className="flex flex-row gap-3 items-center justify-center">
-                      <div className="text-sm font-medium text-[var(--foreground)]">
-                        {visiblePasswords.includes(user.id)
-                          ? user.password
-                          : "*******"}
-                      </div>
-
-                      <div className="text-sm font-medium text-[var(--foreground)]">
-                        <button
-                          onClick={() => togglePasswordVisibility(user.id)}
-                          className="text-gray-500 hover:text-gray-700"
-                        >
-                          {visiblePasswords.includes(user.id) ? (
-                            <Eye size={20} />
-                          ) : (
-                            <EyeOff size={20} />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </td>
-
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                    {new Date(user.createdAt).toLocaleString("en-GB")}
+                    {new Date(role.createdAt).toLocaleString("en-GB")}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => loadEdit(user.id)}
+                        onClick={() => loadEdit(role.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
                                  hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => deleteIt(user.id)}
+                        onClick={() => deleteIt(role.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
                                hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
                       >
