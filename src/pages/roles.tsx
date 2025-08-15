@@ -47,7 +47,7 @@ export default function Role() {
   const [search, setSearch] = useState("");
 
   // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("");
+  const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Reload data when pagination, search, or sorting changes
@@ -219,7 +219,7 @@ export default function Role() {
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
-                  {edit === 0 ? "Add New User" : "Edit User"}
+                  {edit === 0 ? "Add New Role" : "Edit Role"}
                 </h3>
                 <div className="space-y-4">
                   <div>
@@ -253,7 +253,7 @@ export default function Role() {
 
                   <div className="flex gap-3">
                     <CustomButton
-                      title={edit === 0 ? "Add User" : "Save Changes"}
+                      title={edit === 0 ? "Add Role" : "Save Changes"}
                       onClick={editData}
                       className="btn-primary"
                     />
