@@ -47,23 +47,21 @@ export default function Role() {
   const [search, setSearch] = useState("");
 
   // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("");
+  const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
     loadPermissions();
-    setTotal(roles.length)
-  }, [currentPage, perPage, search, sortBy, sortOrder,roles]);
+    setTotal(roles.length);
+  }, [currentPage, perPage, search, sortBy, sortOrder, roles]);
 
   useEffect(() => {
     loadPermissions();
   }, []);
 
-  const  loadPermissions = async () => {
+  const loadPermissions = async () => {
     setIsLoading(true);
-
-    
 
     /* const data = await API("GET", `permisssions?${params}`);
     if (data.error) {
@@ -158,8 +156,7 @@ export default function Role() {
   const deleteIt = async (id: number) => {
     const confirmed = await confirm({
       title: "Delete Role",
-      message:
-        "Are you sure you want to delete this role? This action cannot be undone.",
+      message: "Are you sure you want to delete this role? This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
@@ -175,12 +172,11 @@ export default function Role() {
   };
 
   const getPermissionNames = (permissionId: number) => {
-        const permission = static_permissions.find((p) => p.id === permissionId);
-        if(!permission){
-             return "Unknown";
-        }
-        return permission.name
-   
+    const permission = static_permissions.find((p) => p.id === permissionId);
+    if (!permission) {
+      return "Unknown";
+    }
+    return permission.name;
   };
   return (
     <>
@@ -197,35 +193,22 @@ export default function Role() {
                 <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                   <Shield className="w-6 h-6 text-[var(--primary)]" />
                 </div>
-                <h1 className="text-3xl font-bold text-[var(--foreground)]">
-                  Roles Management
-                </h1>
+                <h1 className="text-3xl font-bold text-[var(--foreground)]">Roles Management</h1>
               </div>
               {/* Add Company Button */}
-              <CustomButton
-                title="Add Roles"
-                onClick={() => setEdit(0)}
-                className="btn-primary"
-                icon={<Plus className="w-5 h-5" />}
-              />
+              <CustomButton title="Add Roles" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
             </div>
-            <p className="text-[var(--secondary-foreground)]">
-              Manage and oversee all registered roles in your platform
-            </p>
+            <p className="text-[var(--secondary-foreground)]">Manage and oversee all registered roles in your platform</p>
           </div>
 
           {/* Add User Modal/Form */}
-       {edit != null && (
+          {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
-                  {edit === 0 ? "Add New User" : "Edit User"}
-                </h3>
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New User" : "Edit User"}</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">
-                      Name
-                    </label>
+                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">Name</label>
                     <input
                       type="text"
                       value={name}
@@ -240,23 +223,13 @@ export default function Role() {
                       autoFocus
                     />
 
-                    
                     <label className="input-label">Select Roles</label>
-                    <MultiSelect
-                      roles={static_permissions}
-                      rolesId={permissions}
-                      setRolesId={setPermission}
-                    />
-                 
+                    <MultiSelect roles={static_permissions} rolesId={permissions} setRolesId={setPermission} />
                   </div>
                   <Error message={error} />
 
                   <div className="flex gap-3">
-                    <CustomButton
-                      title={edit === 0 ? "Add User" : "Save Changes"}
-                      onClick={editData}
-                      className="btn-primary"
-                    />
+                    <CustomButton title={edit === 0 ? "Add User" : "Save Changes"} onClick={editData} className="btn-primary" />
 
                     <CustomButton
                       title="Cancel"
@@ -274,12 +247,8 @@ export default function Role() {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">
-                    Total Roles
-                  </p>
-                  <p className="text-2xl font-bold text-[var(--foreground)]">
-                    {isLoading ? "..." : total}
-                  </p>
+                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">Total Roles</p>
+                  <p className="text-2xl font-bold text-[var(--foreground)]">{isLoading ? "..." : total}</p>
                 </div>
                 <div className="p-3 bg-[var(--primary)]/10 rounded-lg">
                   <Shield className="w-6 h-6 text-[var(--primary)]" />
@@ -299,8 +268,7 @@ export default function Role() {
             onPageChange={handlePageChange}
             title="Roles"
             sortBy={sortBy}
-            sortOrder={sortOrder}
-          >
+            sortOrder={sortOrder}>
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
@@ -315,23 +283,16 @@ export default function Role() {
             {/* Table Body with data rows */}
             <tbody>
               {roles.map((role) => (
-                <tr
-                  key={role.id}
-                  className="hover:bg-[var(--input)] transition-colors duration-200"
-                >
+                <tr key={role.id} className="hover:bg-[var(--input)] transition-colors duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">
-                      #{role.id.toString().padStart(3, "0")}
-                    </span>
+                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{role.id.toString().padStart(3, "0")}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                         <Shield className="w-4 h-4 text-[var(--primary)]" />
                       </div>
-                      <div className="text-sm font-medium text-[var(--foreground)]">
-                        {role.name}
-                      </div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{role.name}</div>
                     </div>
                   </td>
                   {/* <td className="px-6  py-4 whitespace-nowrap">
@@ -341,11 +302,8 @@ export default function Role() {
                   </td> */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     {role.permissions.map((permissionid, index) => (
-                      <div
-                        key={index}
-                        className="text-sm font-medium text-[var(--foreground)]"
-                      >
-                       {getPermissionNames(permissionid)}
+                      <div key={index} className="text-sm font-medium text-[var(--foreground)]">
+                        {getPermissionNames(permissionid)}
                       </div>
                     ))}
                   </td>
@@ -358,15 +316,13 @@ export default function Role() {
                       <button
                         onClick={() => loadEdit(role.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
-                      >
+                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(role.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
-                      >
+                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
