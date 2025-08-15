@@ -16,12 +16,10 @@ type Company = {
 };
 
 type User = {
-  id: number;
   username: string;
   password: string;
   companyId: number;
   rolesId: number[];
-  createdAt: Date;
 };
 
 export default function Userss() {
@@ -32,13 +30,7 @@ export default function Userss() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUser] = useState<User[]>([]);
 
-  const roles = [
-    { id: 1, name: "Admin" },
-    { id: 2, name: "Manager" },
-    { id: 3, name: "Employee" },
-    { id: 4, name: "Supervisor" },
-    { id: 5, name: "Guest" },
-  ];
+  const [roles, setRoles] = useState([]);
 
   const [username, setUserName] = useState("");
   const [companyId, setCompanyId] = useState("");
@@ -68,17 +60,29 @@ export default function Userss() {
   }, [currentPage, perPage, search, sortBy, sortOrder]);
 
   useEffect(() => {
-    loadCompanies();
+    loadInitialData();
   }, []);
 
-  const loadCompanies = async () => {
-    const data = await API("GET", "company?col=id,name");
-    if (data.error) {
-      setError(data.error);
-      return;
+  const loadInitialData = async () => {
+    try {
+      setIsLoading(true);
+      setError("");
+
+      const [companyData, roleData] = await Promise.all([
+        API("GET", "company?col=id,name"),
+        API("GET", "role"),
+      ]);
+
+      if (companyData.error) return setError(companyData.error);
+      if (roleData.error) return setError(roleData.error);
+
+      setCompanies(companyData);
+      setRoles(roleData.role);
+    } catch (err) {
+      setError("Something went wrong");
+    } finally {
+      setIsLoading(false);
     }
-    setCompanies(data);
-    setError("");
   };
 
   const loadData = async () => {
@@ -120,7 +124,15 @@ export default function Userss() {
 
   const editData = async () => {
     if (!username || !password || !companyId || rolesId.length === 0) {
-      setError(!username ? "Name is required" : !password ? "Password is required" : !companyId ? "Please select a company" : "Please select a role");
+      setError(
+        !username
+          ? "Name is required"
+          : !password
+          ? "Password is required"
+          : !companyId
+          ? "Please select a company"
+          : "Please select a role"
+      );
       return;
     }
     if (edit === 0) {
@@ -128,7 +140,7 @@ export default function Userss() {
         username,
         password,
         companyId: Number(companyId),
-        rolesId: rolesId,
+        roleIds: rolesId,
       };
       const data = await API("PUT", "user", newUser);
       if (data.error) {
@@ -137,20 +149,20 @@ export default function Userss() {
       }
     } else {
       const updatedUser = {
+        id: edit,
         username,
         password,
         companyId: Number(companyId),
         rolesId: rolesId,
       };
-
-      const data = await API("POST", `company`, { updatedUser });
+      const data = await API("POST", `user`,updatedUser);
       if (data.error) {
         setError(data.error);
         return;
       }
     }
 
-    /*  loadData(); */
+    loadData();
     setUserName("");
     setPassword("");
     setCompanyId("");
@@ -161,6 +173,7 @@ export default function Userss() {
 
   const loadEdit = async (id: number) => {
     const data = await API("GET", `user?id=${id}`);
+    setIsLoading;
     console.log(data);
     setUserName(data.username);
     setPassword(data.password);
@@ -172,7 +185,8 @@ export default function Userss() {
   const deleteIt = async (id: number) => {
     const confirmed = await confirm({
       title: "Delete User",
-      message: "Are you sure you want to delete this user? This action cannot be undone.",
+      message:
+        "Are you sure you want to delete this user? This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
@@ -183,11 +197,14 @@ export default function Userss() {
       setError(data.error);
       return;
     }
+    console.log('user detelete')
     loadData();
   };
 
   const togglePasswordVisibility = (id: number) => {
-    setVisiblePasswords((prev) => (prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]));
+    setVisiblePasswords((prev) =>
+      prev.includes(id) ? prev.filter((uid) => uid !== id) : [...prev, id]
+    );
   };
   const getRoleName = (roleId: number) => {
     const rolename = roles.find((r) => r.id === roleId);
@@ -215,22 +232,35 @@ export default function Userss() {
                 <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                   <Users className="w-6 h-6 text-[var(--primary)]" />
                 </div>
-                <h1 className="text-3xl font-bold text-[var(--foreground)]">Users Management</h1>
+                <h1 className="text-3xl font-bold text-[var(--foreground)]">
+                  Users Management
+                </h1>
               </div>
               {/* Add Company Button */}
-              <CustomButton title="Add Users" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
+              <CustomButton
+                title="Add Users"
+                onClick={() => setEdit(0)}
+                className="btn-primary"
+                icon={<Plus className="w-5 h-5" />}
+              />
             </div>
-            <p className="text-[var(--secondary-foreground)]">Manage and oversee all registered users in your platform</p>
+            <p className="text-[var(--secondary-foreground)]">
+              Manage and oversee all registered users in your platform
+            </p>
           </div>
 
           {/* Add User Modal/Form */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New User" : "Edit User"}</h3>
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
+                  {edit === 0 ? "Add New User" : "Edit User"}
+                </h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">Name</label>
+                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">
+                      Name
+                    </label>
                     <input
                       type="text"
                       value={username}
@@ -246,7 +276,11 @@ export default function Userss() {
                     />
 
                     <label className="input-label">Select Company</label>
-                    <select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="input-style">
+                    <select
+                      value={companyId}
+                      onChange={(e) => setCompanyId(e.target.value)}
+                      className="input-style"
+                    >
                       <option value="">Select a company </option>
                       {companies.map((company) => (
                         <option key={company.id} value={company.id}>
@@ -255,7 +289,11 @@ export default function Userss() {
                       ))}
                     </select>
                     <label className="input-label">Select Roles</label>
-                    <MultiSelect roles={roles} rolesId={rolesId} setRolesId={setRolesId} />
+                    <MultiSelect
+                      roles={roles}
+                      rolesId={rolesId}
+                      setRolesId={setRolesId}
+                    />
                     <label className="input-label">Password</label>
                     <div className="relative w-full">
                       <input
@@ -274,7 +312,13 @@ export default function Userss() {
 
                       {/* Eye Icon */}
                       <CustomButton
-                        title={showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        title={
+                          showPassword ? (
+                            <EyeOff size={20} />
+                          ) : (
+                            <Eye size={20} />
+                          )
+                        }
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300"
                       />
@@ -283,7 +327,11 @@ export default function Userss() {
                   <Error message={error} />
 
                   <div className="flex gap-3">
-                    <CustomButton title={edit === 0 ? "Add User" : "Save Changes"} onClick={editData} className="btn-primary" />
+                    <CustomButton
+                      title={edit === 0 ? "Add User" : "Save Changes"}
+                      onClick={editData}
+                      className="btn-primary"
+                    />
 
                     <CustomButton
                       title="Cancel"
@@ -301,8 +349,12 @@ export default function Userss() {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">Total Users</p>
-                  <p className="text-2xl font-bold text-[var(--foreground)]">{isLoading ? "..." : total}</p>
+                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">
+                    Total Users
+                  </p>
+                  <p className="text-2xl font-bold text-[var(--foreground)]">
+                    {isLoading ? "..." : total}
+                  </p>
                 </div>
                 <div className="p-3 bg-[var(--primary)]/10 rounded-lg">
                   <Users className="w-6 h-6 text-[var(--primary)]" />
@@ -322,7 +374,8 @@ export default function Userss() {
             onPageChange={handlePageChange}
             title="Users"
             sortBy={sortBy}
-            sortOrder={sortOrder}>
+            sortOrder={sortOrder}
+          >
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
@@ -339,38 +392,59 @@ export default function Userss() {
             {/* Table Body with data rows */}
             <tbody>
               {users.map((user) => (
-                <tr key={user.id} className="hover:bg-[var(--input)] transition-colors duration-200">
+                <tr
+                  key={user.id}
+                  className="hover:bg-[var(--input)] transition-colors duration-200"
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{user.id.toString().padStart(3, "0")}</span>
+                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">
+                      #{user.id.toString().padStart(3, "0")}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                         <User className="w-4 h-4 text-[var(--primary)]" />
                       </div>
-                      <div className="text-sm font-medium text-[var(--foreground)]">{user.username}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">
+                        {user.username}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6  py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-[var(--foreground)]">{getCompanyName(user.companyId)}</div>
+                    <div className="text-sm font-medium text-[var(--foreground)]">
+                      {getCompanyName(user.companyId)}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {/* {user.rolesId.map((role, index) => (
-                      <div key={index} className="text-sm font-medium text-[var(--foreground)]">
+                    {user.rolesId.map((role, index) => (
+                      <div
+                        key={index}
+                        className="text-sm font-medium text-[var(--foreground)]"
+                      >
                         {getRoleName(role)}
                       </div>
-                    ))} */}
+                    ))}
                   </td>
 
                   <td className="px-6  py-4  whitespace-nowrap">
                     <div className="flex flex-row gap-3 items-center justify-center">
                       <div className="text-sm font-medium text-[var(--foreground)]">
-                        {visiblePasswords.includes(user.id) ? user.password : "*******"}
+                        {visiblePasswords.includes(user.id)
+                          ? user.password
+                          : "*******"}
                       </div>
 
                       <div className="text-sm font-medium text-[var(--foreground)]">
-                        <button onClick={() => togglePasswordVisibility(user.id)} className="text-gray-500 hover:text-gray-700">
-                          {visiblePasswords.includes(user.id) ? <Eye size={20} /> : <EyeOff size={20} />}
+                        <button
+                          onClick={() => togglePasswordVisibility(user.id)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          {visiblePasswords.includes(user.id) ? (
+                            <Eye size={20} />
+                          ) : (
+                            <EyeOff size={20} />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -384,13 +458,15 @@ export default function Userss() {
                       <button
                         onClick={() => loadEdit(user.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
+                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
+                      >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(user.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
+                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

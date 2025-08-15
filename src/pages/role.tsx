@@ -7,12 +7,11 @@ import DataTable from "@/components/ui/DataTable";
 import { MultiSelect } from "@/hooks/wrapper";
 import { CustomButton } from "@/hooks/wrapper";
 import { Plus, Edit, Trash2, Users, Shield } from "lucide-react";
+import { get } from "http";
 
 type Role = {
-  id: number;
   name: string;
   permissions: number[];
-  createdAt: Date;
 };
 
 export default function Role() {
@@ -22,16 +21,7 @@ export default function Role() {
 
   const [roles, setRole] = useState<Role[]>([]);
 
-  const [static_permissions, setStaticPermissions] = useState([
-    { id: 1, name: "vehicle:view" },
-    { id: 2, name: "vehicle:create" },
-    { id: 3, name: "vehicle:update" },
-    { id: 4, name: "vehicle:delete" },
-    { id: 5, name: "document:view" },
-    { id: 6, name: "document:create" },
-    { id: 7, name: "document:update" },
-    { id: 8, name: "document:delete" },
-  ]);
+  const [static_permissions, setStaticPermissions] = useState([]);
 
   const [name, setName] = useState("");
   const [permissions, setPermission] = useState<number[]>([]);
@@ -52,29 +42,58 @@ export default function Role() {
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
-    loadPermissions();
-    setTotal(roles.length);
-  }, [currentPage, perPage, search, sortBy, sortOrder, roles]);
+
+   getRoleData();
+    
+  }, [currentPage, perPage, search, sortBy, sortOrder,]);
 
   useEffect(() => {
-    loadPermissions();
+
+    loadInitialData();
+
   }, []);
+  
+  const loadInitialData = async () => {
+    try {
+      setIsLoading(true);
 
-  const loadPermissions = async () => {
-    setIsLoading(true);
-
-    /* const data = await API("GET", `permisssions?${params}`);
-    if (data.error) {
-      setError(data.error);
+      const Data = await API("GET", "permission");
+      if (Data.error) {
+        setError(Data.error);
+        return;
+      }
+      setError("");
+      setStaticPermissions(Data.permissions);
+    } catch (err) {
+      setError("Failed to load data");
+    } finally {
       setIsLoading(false);
-      return;
     }
-    setError("");
-    console.log("Companies Data", data.company);
-    setCompanies(data.company);
-    //setTotal(data.total); */
+  };
 
-    setIsLoading(false);
+  const getRoleData = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams({
+      page: currentPage.toString(),
+      limit: perPage.toString(),
+      search: search,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+    });
+
+      const data = await API("GET", `role?${params}`);
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+      setRole(data.role);
+      setTotal(data.total);
+    } catch (err) {
+      setError("Failed to load roles");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSort = (column: string, order: "asc" | "desc") => {
@@ -98,77 +117,61 @@ export default function Role() {
       return;
     }
     if (edit === 0) {
-      const newRole = {
-        id: Date.now(),
+      const newRole={
         name,
-        permissions,
-        createdAt: new Date(),
-      };
-
-      setRole((prev) => [newRole, ...prev]);
-
-      // const data = await API("PUT", "company", { name });
-      // if (data.error) {
-      //   setError(data.error);
-      //}
-    } else {
-      const role = roles.find((r) => r.id === edit);
-      if (!role) {
-        setError("Role not found");
+        permissions
+      }
+      const data = await API("PUT", `role`,newRole);
+      if (data.error) {
+        setError(data.error);
         return;
       }
+    } else {
+      const updatedRole={id: edit, name, permissions }
 
-      const updatedRole: Role = {
-        ...role,
-        name,
-        permissions,
-      };
-
-      setRole((prev) => prev.map((r) => (r.id === edit ? updatedRole : r)));
-
-      // const data = await API("POST", `company`, { id: edit, name });
-      // if (data.error) {
-      //   setError(data.error);
-      //   return;
-      // }
+      const data = await API("POST", `role`, updatedRole);
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
     }
 
-    /*  loadData(); */
+    getRoleData(); 
     setName("");
     setPermission([]);
     setEdit(null);
   };
 
   const loadEdit = async (id: number) => {
-    //const data = await API("GET", `company?id=${id}`);
-    const role = roles.find((r) => r.id === id);
+    const role = await API("GET", `role?id=${id}`);
+   
     if (!role) {
       setError("User not found");
       return;
     }
 
     setName(role.name);
-
-    setPermission(role.permissions); // <-- add this
+    setPermission(role.permissions);
     setEdit(id);
   };
 
   const deleteIt = async (id: number) => {
     const confirmed = await confirm({
       title: "Delete Role",
-      message: "Are you sure you want to delete this role? This action cannot be undone.",
+      message:
+        "Are you sure you want to delete this role? This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
     if (!confirmed) return;
     const newRole = roles.filter((u) => u.id !== id);
     setRole([...newRole]);
-    /*  const data = await API("DELETE", `company?id=${id}`);
+    const data = await API("DELETE", `role?id=${id}`);
     if (data.error) {
       setError(data.error);
       return;
-    } */
-    /* loadData(); */
+    }
+    getRoleData();
   };
 
   const getPermissionNames = (permissionId: number) => {
@@ -193,28 +196,35 @@ export default function Role() {
                 <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                   <Shield className="w-6 h-6 text-[var(--primary)]" />
                 </div>
-                <h1 className="text-3xl font-bold text-[var(--foreground)]">Roles Management</h1>
+                <h1 className="text-3xl font-bold text-[var(--foreground)]">
+                  Roles Management
+                </h1>
               </div>
               {/* Add Company Button */}
-              <CustomButton title="Add Roles" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
+              <CustomButton
+                title="Add Roles"
+                onClick={() => setEdit(0)}
+                className="btn-primary"
+                icon={<Plus className="w-5 h-5" />}
+              />
             </div>
-            <p className="text-[var(--secondary-foreground)]">Manage and oversee all registered roles in your platform</p>
+            <p className="text-[var(--secondary-foreground)]">
+              Manage and oversee all registered roles in your platform
+            </p>
           </div>
 
           {/* Add User Modal/Form */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-<<<<<<< HEAD
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New User" : "Edit User"}</h3>
-=======
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
                   {edit === 0 ? "Add New Role" : "Edit Role"}
                 </h3>
->>>>>>> d3f324e3ca650eb6d675758c7dd5e6bdcd6b84d8
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">Name</label>
+                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">
+                      Name
+                    </label>
                     <input
                       type="text"
                       value={name}
@@ -230,20 +240,20 @@ export default function Role() {
                     />
 
                     <label className="input-label">Select Roles</label>
-                    <MultiSelect roles={static_permissions} rolesId={permissions} setRolesId={setPermission} />
+                    <MultiSelect
+                      roles={static_permissions}
+                      rolesId={permissions}
+                      setRolesId={setPermission}
+                    />
                   </div>
                   <Error message={error} />
 
                   <div className="flex gap-3">
-<<<<<<< HEAD
-                    <CustomButton title={edit === 0 ? "Add User" : "Save Changes"} onClick={editData} className="btn-primary" />
-=======
                     <CustomButton
                       title={edit === 0 ? "Add Role" : "Save Changes"}
                       onClick={editData}
                       className="btn-primary"
                     />
->>>>>>> d3f324e3ca650eb6d675758c7dd5e6bdcd6b84d8
 
                     <CustomButton
                       title="Cancel"
@@ -261,8 +271,12 @@ export default function Role() {
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">Total Roles</p>
-                  <p className="text-2xl font-bold text-[var(--foreground)]">{isLoading ? "..." : total}</p>
+                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">
+                    Total Roles
+                  </p>
+                  <p className="text-2xl font-bold text-[var(--foreground)]">
+                    {isLoading ? "..." : total}
+                  </p>
                 </div>
                 <div className="p-3 bg-[var(--primary)]/10 rounded-lg">
                   <Shield className="w-6 h-6 text-[var(--primary)]" />
@@ -282,14 +296,14 @@ export default function Role() {
             onPageChange={handlePageChange}
             title="Roles"
             sortBy={sortBy}
-            sortOrder={sortOrder}>
+            sortOrder={sortOrder}
+          >
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
                 <th id="id">ID</th>
                 <th id="name">Name</th>
                 <th id="permissions">Permissions</th>
-                <th id="createdAt">Created Date</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
@@ -297,46 +311,51 @@ export default function Role() {
             {/* Table Body with data rows */}
             <tbody>
               {roles.map((role) => (
-                <tr key={role.id} className="hover:bg-[var(--input)] transition-colors duration-200">
+                <tr
+                  key={role.id}
+                  className="hover:bg-[var(--input)] transition-colors duration-200"
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{role.id.toString().padStart(3, "0")}</span>
+                    <span className="text-sm font-mono text-[var(--secondary-foreground)]">
+                      #{role.id.toString().padStart(3, "0")}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                         <Shield className="w-4 h-4 text-[var(--primary)]" />
                       </div>
-                      <div className="text-sm font-medium text-[var(--foreground)]">{role.name}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">
+                        {role.name}
+                      </div>
                     </div>
                   </td>
-                  {/* <td className="px-6  py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-[var(--foreground)]">
-                      {getPermissionNames(role.permissions)}
-                    </div>
-                  </td> */}
+
                   <td className="px-6 py-4 whitespace-nowrap">
                     {role.permissions.map((permissionid, index) => (
-                      <div key={index} className="text-sm font-medium text-[var(--foreground)]">
+                      <div
+                        key={index}
+                        className="text-sm font-medium text-[var(--foreground)]"
+                      >
                         {getPermissionNames(permissionid)}
                       </div>
                     ))}
                   </td>
 
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                    {new Date(role.createdAt).toLocaleString("en-GB")}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => loadEdit(role.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
+                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
+                      >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(role.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
+                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
