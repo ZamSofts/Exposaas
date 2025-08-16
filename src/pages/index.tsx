@@ -45,6 +45,7 @@ export default function LoginPage() {
         password,
         redirect: false,
       });
+    console.log("SignIn result:", result);
 
       if (result?.error) {
         setError("Invalid username or password");

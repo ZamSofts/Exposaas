@@ -270,7 +270,7 @@ export default function Userss() {
                           editData();
                         }
                       }}
-                      placeholder="Enter User name..."
+                      placeholder="Enter user name..."
                       className="input-style"
                       autoFocus
                     />
@@ -305,7 +305,7 @@ export default function Userss() {
                             editData();
                           }
                         }}
-                        placeholder="Enter Password..."
+                        placeholder="Enter password..."
                         className="input-style"
                         autoFocus
                       />
@@ -416,15 +416,17 @@ export default function Userss() {
                       {getCompanyName(user.companyId)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {user.rolesId.map((role, index) => (
-                      <div
-                        key={index}
-                        className="text-sm font-medium text-[var(--foreground)]"
-                      >
-                        {getRoleName(role)}
-                      </div>
-                    ))}
+
+             
+                  <td className="px-6 py-4  min-w-[100px] max-w-[200px] whitespace-normal">
+                       {user.rolesId.map((role, index) => (
+                        <div
+                           key={index}
+                           className="inline-block w-fit px-3 mr-3 mt-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg"
+                        >
+                             {getRoleName(role)}
+                        </div>
+                      ))}
                   </td>
 
                   <td className="px-6  py-4  whitespace-nowrap">

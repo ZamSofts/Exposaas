@@ -98,6 +98,7 @@ export default async function handler(
         username: u.username,
         password: u.password,
         companyId: u.companyId,
+        createdAt: u.createdAt,
         rolesId: u.roles.map((r) => r.roleId),
         company: u.company, // keep this if you still want company info
       }));

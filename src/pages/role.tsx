@@ -234,12 +234,12 @@ export default function Role() {
                           editData();
                         }
                       }}
-                      placeholder="Enter Role name..."
+                      placeholder="Enter role name..."
                       className="input-style"
                       autoFocus
                     />
 
-                    <label className="input-label">Select Roles</label>
+                    <label className="input-label">Select Permissions</label>
                     <MultiSelect
                       roles={static_permissions}
                       rolesId={permissions}
@@ -330,18 +330,18 @@ export default function Role() {
                       </div>
                     </div>
                   </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {role.permissions.map((permissionid, index) => (
-                      <div
-                        key={index}
-                        className="text-sm font-medium text-[var(--foreground)]"
-                      >
-                        {getPermissionNames(permissionid)}
-                      </div>
-                    ))}
+                  <td className="px-6 py-4  min-w-[100px] max-w-[200px] whitespace-wrap">
+                     {role.permissions.map((permissionid, index) => (
+                        <div
+                           key={index}
+                           className="inline-block w-fit px-3 mr-3 mt-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg"
+                        >
+                             {getPermissionNames(permissionid)}
+                        </div>
+                      ))}
                   </td>
-
+                  
+                  
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
                       <button
