@@ -6,11 +6,9 @@ export default async function handler(
   res: NextApiResponse
 ) {
   const session = await getSession(req, res);
-  if (session.role !== "Sadmin") {
-    return res
-      .status(403)
-      .json({ error: "Only administrators can view roles" });
-  }
+/*   if (!["Sadmin", "Admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Only administrators can view users" });
+  } */
 
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;
@@ -27,6 +25,9 @@ export default async function handler(
 
   try {
     if (req.method === "GET") {
+      if(!session.permissions.includes("view:user")) {
+        return res.status(403).json({ error: "You do not have permission to view roles" });
+      }
       // LoadEdit
       if (id) {
         const role = await prisma.role.findUnique({
@@ -183,18 +184,18 @@ export default async function handler(
     }
 
     if (req.method === "DELETE") {
-  const { id } = req.query;
+      const { id } = req.query;
 
-  await prisma.rolePermission.deleteMany({ where: { roleId: Number(id) } });
+      await prisma.rolePermission.deleteMany({ where: { roleId: Number(id) } });
 
-  await prisma.role.delete({
-    where: { id: Number(id) },
-  });
+      await prisma.role.delete({
+        where: { id: Number(id) },
+      });
 
-  res.status(200).json({
-    message: "Role deleted successfully",
-  });
-}
+      res.status(200).json({
+        message: "Role deleted successfully",
+      });
+    }
   } catch (error) {
     console.error("API error:", error);
     res.status(500).json({ error: "Internal server error" });

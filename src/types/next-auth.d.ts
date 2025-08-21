@@ -1,25 +1,35 @@
-import "next-auth";
+import NextAuth, { DefaultSession, DefaultUser } from "next-auth";
 
 declare module "next-auth" {
-  interface User {
-    id?: string;
-    role?: string;
+  interface Session {
+    user: {
+      id: string;
+      name: string; // required so you can rely on it
+      email?: string; // optional if Super Admin may not have one
+      image?: string; // optional if Super Admin may not have one
+      companyId?: number; // optional if Super Admin may not have one
+      role?: string;
+      permissions?: string[];
+    } & DefaultSession["user"]; // keeps name/email/image optional as before
   }
 
-  interface Session {
-    user?: {
-      id?: string;
-      name?: string | null;
-      email?: string | null;
-      image?: string | null;
-      role?: string;
-    };
+  interface User extends DefaultUser {
+    id: string;
+    name: string; // yaou return a string id in authorize()
+    companyId?: number;
+    role?: string;
+    permissions?: string[];
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    id?: string;
+    id: string;
+    name: string; // required so you can rely on it
+    email?: string; // optional if Super Admin may not have one
+    image?: string; // optional if Super Admin may not have one
+    companyId?: number;
     role?: string;
+    permissions?: string[];
   }
 }

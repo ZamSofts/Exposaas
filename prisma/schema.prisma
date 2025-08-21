@@ -14,6 +14,7 @@ model Company {
   createdAt DateTime      @default(now())
   status    CompanyStatus @default(active)
   users     User[]
+  vehicles  Vehicle[]
 }
 
 model User {
@@ -57,6 +58,32 @@ model UserRole {
   user   User @relation(fields: [userId], references: [id])
 
   @@unique([userId, roleId])
+}
+model Vehicle {
+  id            Int            @id @default(autoincrement())
+  name          String
+  chassisNumber String         @unique
+  remarks       String?        // optional remarks/notes
+  status        VehicleStatus  @default(active)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  companyId     Int
+  brandId       Int
+  brand         Brand          @relation(fields: [brandId], references: [id])
+  company       Company        @relation(fields: [companyId], references: [id])
+}
+
+model Brand {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  vehicles Vehicle[]
+}
+
+
+enum VehicleStatus {
+  active
+  inactive
 }
 
 enum CompanyStatus {

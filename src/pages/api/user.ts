@@ -9,60 +9,75 @@ export default async function handler(
   const session = await getSession(req, res);
   const roles = ["Sadmin", "Admin"];
   if (!roles.includes(session.role)) {
-    return res
-      .status(403)
-      .json({ error: "Only administrators can view users" });
+    return res.status(403).json({ error: "Only administrators can view users" });
   }
 
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
-  const search = String(req.query.search || "")
-    .trim()
-    .toLowerCase();
+  const search = String(req.query.search || "").trim().toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
   const col = req.query.col ? String(req.query.col).split(",") : null;
-  const selectFields =
-    col && col.length > 0
-      ? Object.fromEntries(col.map((c) => [c, true]))
-      : undefined;
+  const selectFields =col && col.length > 0? Object.fromEntries(col.map((c) => [c, true])): undefined;
 
   try {
     if (req.method === "GET") {
-      console.log(id);
 
-      // LoadEdit: single user
+
+      const userCompanyId = session?.companyId;
+
+      // filter depends on role
+      const filterByCompany =
+        session.role === "Sadmin" ? {} : { companyId: userCompanyId };
+
+      // ---- Load single user ----
       if (id) {
         const user = await prisma.user.findUnique({
           where: { id },
           include: {
             roles: { select: { roleId: true } },
+            company: { select: { name: true } },
           },
         });
 
-        if (!user) {
+        if (
+          !user ||
+          (session.role !== "Sadmin" && user.companyId !== userCompanyId)
+        ) {
           return res.status(404).json({ error: "User not found" });
         }
-
+        const rolesnames = await prisma.role.findMany({
+          where: { id: { in: user.roles.map((r) => r.roleId) } },
+          select: {id:true, name: true },
+        });
         return res.status(200).json({
           id: user.id,
           username: user.username,
           password: user.password,
           companyId: user.companyId,
+          createdAt: user.createdAt,
           rolesId: user.roles.map((r) => r.roleId),
+          rolesnames: user.roles.map( (r) =>rolesnames.find((role) => role.id === r.roleId)?.name || "Unknown" ),
+          company: user.company,
         });
       }
 
-      // specific fields
+      // ---- Specific fields ----
       if (selectFields) {
         const users = await prisma.user.findMany({
           select: {
             ...selectFields,
             roles: { select: { roleId: true } },
           },
+          where: {
+            ...filterByCompany,
+            username: { not: session.name },
+            
+          },
           orderBy: { [sortBy]: sortOrder },
         });
 
+      
         const formatted = users.map((u) => ({
           ...u,
           rolesId: u.roles.map((r) => r.roleId),
@@ -71,16 +86,18 @@ export default async function handler(
         return res.status(200).json(formatted);
       }
 
-      // All with pagination
+      // ---- All with pagination ----
       const [users, total] = await Promise.all([
         prisma.user.findMany({
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { [sortBy]: sortOrder },
           where: {
+            ...filterByCompany,
             username: {
               contains: search,
               mode: "insensitive",
+              not: session.name
             },
           },
           include: {
@@ -89,10 +106,18 @@ export default async function handler(
           },
         }),
         prisma.user.count({
-          where: { username: { contains: search, mode: "insensitive" } },
+          where: {
+            ...filterByCompany,
+            username: { contains: search, mode: "insensitive" ,not: session.name},
+          },
         }),
       ]);
-
+      const rolesnames = await prisma.role.findMany({
+        where: {
+          id: { in: users.flatMap((u) => u.roles.map((r) => r.roleId)) },
+        },
+        select: { id: true, name: true },
+      });
       const formatted = users.map((u) => ({
         id: u.id,
         username: u.username,
@@ -100,10 +125,14 @@ export default async function handler(
         companyId: u.companyId,
         createdAt: u.createdAt,
         rolesId: u.roles.map((r) => r.roleId),
-        company: u.company, // keep this if you still want company info
+        rolesnames: u.roles.map(
+          (r) =>
+            rolesnames.find((role) => role.id === r.roleId)?.name || "Unknown"
+        ),
+        company: u.company,
       }));
 
-      res.status(200).json({ user: formatted, total });
+      return res.status(200).json({ user: formatted, total });
     }
     if (req.method === "PUT") {
       console.log(req.body);
@@ -209,7 +238,7 @@ export default async function handler(
       const { id } = req.query;
       await prisma.userRole.deleteMany({ where: { userId: Number(id) } });
       await prisma.user.delete({
-         where: { id: Number(id) },
+        where: { id: Number(id) },
       });
       res.status(200).json({
         message: "User deleted successfully",

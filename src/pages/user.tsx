@@ -72,12 +72,13 @@ export default function Userss() {
         API("GET", "company?col=id,name"),
         API("GET", "role"),
       ]);
+    
+     
 
-      if (companyData.error) return setError(companyData.error);
       if (roleData.error) return setError(roleData.error);
-
-      setCompanies(companyData);
       setRoles(roleData.role);
+       if (companyData.error) return  setError(companyData.error);
+      setCompanies(companyData);
     } catch (err) {
       setError("Something went wrong");
     } finally {
@@ -103,6 +104,7 @@ export default function Userss() {
     }
     setError("");
     setUser(data.user);
+    console.log('User data',data.user);
     setTotal(data.total);
     setIsLoading(false);
   };
@@ -123,25 +125,38 @@ export default function Userss() {
   };
 
   const editData = async () => {
-    if (!username || !password || !companyId || rolesId.length === 0) {
-      setError(
-        !username
-          ? "Name is required"
-          : !password
-          ? "Password is required"
-          : !companyId
-          ? "Please select a company"
-          : "Please select a role"
-      );
-      return;
-    }
     if (edit === 0) {
       const newUser = {
         username,
         password,
-        companyId: Number(companyId),
+        companyId:
+          session?.role == "Admin"
+            ? Number(session?.companyId)
+            : Number(companyId),
         roleIds: rolesId,
       };
+      if (
+        !newUser.username ||
+        !newUser.password ||
+        !newUser.companyId ||
+        newUser.roleIds.length === 0
+      ) {
+        setError(
+          !newUser.username
+            ? "Name is required"
+            : !newUser.password
+            ? "Password is required"
+            : !newUser.companyId
+            ? "Please select a company"
+            : "Please select a role"
+        );
+        return;
+      }
+      if (username == "ad") {
+        setError("Username cannot be 'ad'");
+        return;
+      }
+
       const data = await API("PUT", "user", newUser);
       if (data.error) {
         setError(data.error);
@@ -155,7 +170,7 @@ export default function Userss() {
         companyId: Number(companyId),
         rolesId: rolesId,
       };
-      const data = await API("POST", `user`,updatedUser);
+      const data = await API("POST", `user`, updatedUser);
       if (data.error) {
         setError(data.error);
         return;
@@ -178,7 +193,7 @@ export default function Userss() {
     setUserName(data.username);
     setPassword(data.password);
     setCompanyId(data.companyId);
-    setRolesId(data.rolesId); // <-- add this
+    setRolesId(data.rolesId); 
     setEdit(id);
   };
 
@@ -197,7 +212,7 @@ export default function Userss() {
       setError(data.error);
       return;
     }
-    console.log('user detelete')
+    console.log("user detelete");
     loadData();
   };
 
@@ -274,20 +289,23 @@ export default function Userss() {
                       className="input-style"
                       autoFocus
                     />
-
-                    <label className="input-label">Select Company</label>
-                    <select
-                      value={companyId}
-                      onChange={(e) => setCompanyId(e.target.value)}
-                      className="input-style"
-                    >
-                      <option value="">Select a company </option>
-                      {companies.map((company) => (
-                        <option key={company.id} value={company.id}>
-                          {company.name}
-                        </option>
-                      ))}
-                    </select>
+                    {session.role === "Sadmin" && (
+                      <>
+                        <label className="input-label">Select Company</label>
+                        <select
+                          value={companyId}
+                          onChange={(e) => setCompanyId(e.target.value)}
+                          className="input-style"
+                        >
+                          <option value="">Select a company </option>
+                          {companies.map((company) => (
+                            <option key={company.id} value={company.id}>
+                              {company.name}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
                     <label className="input-label">Select Roles</label>
                     <MultiSelect
                       roles={roles}
@@ -362,6 +380,7 @@ export default function Userss() {
               </div>
             </div>
           </div>
+          <Error message={error} />
 
           {/* DataTable with JSX children */}
           <DataTable
@@ -413,20 +432,21 @@ export default function Userss() {
                   </td>
                   <td className="px-6  py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-[var(--foreground)]">
-                      {getCompanyName(user.companyId)}
+                      {user.company?.name}
                     </div>
                   </td>
 
-             
-                  <td className="px-6 py-4  min-w-[100px] max-w-[200px] whitespace-normal">
-                       {user.rolesId.map((role, index) => (
-                        <div
-                           key={index}
-                           className="inline-block w-fit px-3 mr-3 mt-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg"
+                  <td className="px-6 py-4 min-w-[100px] max-w-[200px] whitespace-normal">
+                    <div className="flex flex-wrap gap-2">
+                      {user.rolesnames.map((role, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg"
                         >
-                             {getRoleName(role)}
-                        </div>
+                          {role || "Unknown"}
+                        </span>
                       ))}
+                    </div>
                   </td>
 
                   <td className="px-6  py-4  whitespace-nowrap">

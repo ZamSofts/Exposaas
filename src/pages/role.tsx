@@ -42,17 +42,13 @@ export default function Role() {
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
-
-   getRoleData();
-    
-  }, [currentPage, perPage, search, sortBy, sortOrder,]);
+    getRoleData();
+  }, [currentPage, perPage, search, sortBy, sortOrder]);
 
   useEffect(() => {
-
     loadInitialData();
-
   }, []);
-  
+
   const loadInitialData = async () => {
     try {
       setIsLoading(true);
@@ -75,12 +71,12 @@ export default function Role() {
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      search: search,
-      sortBy: sortBy,
-      sortOrder: sortOrder,
-    });
+        page: currentPage.toString(),
+        limit: perPage.toString(),
+        search: search,
+        sortBy: sortBy,
+        sortOrder: sortOrder,
+      });
 
       const data = await API("GET", `role?${params}`);
       if (data.error) {
@@ -117,17 +113,17 @@ export default function Role() {
       return;
     }
     if (edit === 0) {
-      const newRole={
+      const newRole = {
         name,
-        permissions
-      }
-      const data = await API("PUT", `role`,newRole);
+        permissions,
+      };
+      const data = await API("PUT", `role`, newRole);
       if (data.error) {
         setError(data.error);
         return;
       }
     } else {
-      const updatedRole={id: edit, name, permissions }
+      const updatedRole = { id: edit, name, permissions };
 
       const data = await API("POST", `role`, updatedRole);
       if (data.error) {
@@ -136,7 +132,7 @@ export default function Role() {
       }
     }
 
-    getRoleData(); 
+    getRoleData();
     setName("");
     setPermission([]);
     setEdit(null);
@@ -144,7 +140,7 @@ export default function Role() {
 
   const loadEdit = async (id: number) => {
     const role = await API("GET", `role?id=${id}`);
-   
+
     if (!role) {
       setError("User not found");
       return;
@@ -284,7 +280,7 @@ export default function Role() {
               </div>
             </div>
           </div>
-
+          <Error message={error} />
           {/* DataTable with JSX children */}
           <DataTable
             data={roles}
@@ -330,18 +326,19 @@ export default function Role() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4  min-w-[100px] max-w-[200px] whitespace-wrap">
-                     {role.permissions.map((permissionid, index) => (
-                        <div
-                           key={index}
-                           className="inline-block w-fit px-3 mr-3 mt-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg"
+                  <td className="px-6 py-4 min-w-[100px] max-w-[200px] whitespace-normal">
+                    <div className="flex flex-wrap gap-2">
+                      {role.permissions.map((permissionId, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg"
                         >
-                             {getPermissionNames(permissionid)}
-                        </div>
+                          {getPermissionNames(permissionId)}
+                        </span>
                       ))}
+                    </div>
                   </td>
-                  
-                  
+
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
                       <button

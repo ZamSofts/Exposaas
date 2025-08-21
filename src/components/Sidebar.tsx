@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2,Shield, } from "lucide-react";
+import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2,Shield,Car } from "lucide-react";
 
 // Create context for sidebar state
 const SidebarContext = createContext<{
@@ -132,6 +132,13 @@ const getAllSidebarSections = (): SidebarSection[] => [
         icon: <Shield size={20} />,
         href: "/role",
         roles: ["Sadmin"],
+      },
+      {
+        id: "vehicle",
+        label: "Vehicle Management",
+        icon: <Car size={20} />,
+        href: "/vehicle",
+        roles: ["Admin"],
       },
     ],
   },
