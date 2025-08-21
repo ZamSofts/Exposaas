@@ -93,7 +93,7 @@ A clean Next.js application with PostgreSQL backend integration.
    - User authentication
    - CRUD operations
    - File uploads
-   - Email notifications
+   - Email notificationss
 
 ## 🔗 Useful Resources
 
