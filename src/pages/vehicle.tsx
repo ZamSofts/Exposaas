@@ -134,7 +134,7 @@ export default function VehiclesPage() {
         brandId,
         chassisNumber,
         companyId: Number(companyId),
-        status,
+        statusId,
         remarks,
       });
     }
@@ -229,30 +229,90 @@ export default function VehiclesPage() {
           </div>
 
           {/* Add/Edit Vehicle Modal */}
-          {edit != null && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold mb-4">{edit === 0 ? "Add New Vehicle" : "Edit Vehicle"}</h3>
-                <div className="space-y-4">
-                  <label className="input-label">Vehicle Name</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} className="input-style" placeholder="Enter vehicle name..." />
-                  <label className="input-label">Brand</label>
-                  <CustomSelect data={brand} selectedId={brandId} setSelectedId={setBrandId} />
-                   <label className="input-label">Current Status</label>
-                  <CustomSelect data={vehicleStatus} selectedId={statusId} setSelectedId={setStatusId} />
-                  <label className="input-label">Chassis Number</label>
-                  <input type="text" value={chassisNumber} onChange={e => setChassisNumber(e.target.value)} className="input-style" placeholder="Enter chassis number..." />
-                  <label className="input-label">Remarks</label>
-                  <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="input-style" placeholder="Enter remarks..." />
-                  <Error message={error} />
-                  <div className="flex gap-3">
-                    <CustomButton title={edit === 0 ? "Add Vehicle" : "Save Changes"} onClick={saveVehicle} className="btn-primary" />
-                    <CustomButton title="Cancel" onClick={resetForm} className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+         {edit != null && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-3xl">
+      <h3 className="text-xl font-semibold mb-6">
+        {edit === 0 ? "Add New Vehicle" : "Edit Vehicle"}
+      </h3>
+
+      {/* Use grid for horizontal layout */}
+      <div className="grid grid-cols-2 gap-6">
+        {/* Vehicle Name */}
+        <div>
+          <label className="input-label">Vehicle Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="input-style"
+            placeholder="Enter vehicle name..."
+          />
+        </div>
+
+        {/* Brand */}
+        <div>
+          <label className="input-label">Brand</label>
+          <CustomSelect
+            data={brand}
+            selectedId={brandId}
+            setSelectedId={setBrandId}
+          />
+        </div>
+
+        {/* Status */}
+        <div>
+          <label className="input-label">Current Status</label>
+          <CustomSelect
+            data={vehicleStatus}
+            selectedId={statusId}
+            setSelectedId={setStatusId}
+          />
+        </div>
+
+        {/* Chassis Number */}
+        <div>
+          <label className="input-label">Chassis Number</label>
+          <input
+            type="text"
+            value={chassisNumber}
+            onChange={e => setChassisNumber(e.target.value)}
+            className="input-style"
+            placeholder="Enter chassis number..."
+          />
+        </div>
+
+        {/* Remarks - full width */}
+        <div className="col-span-2">
+          <label className="input-label">Remarks</label>
+          <textarea
+            value={remarks}
+            onChange={e => setRemarks(e.target.value)}
+            className="input-style"
+            placeholder="Enter remarks..."
+          />
+        </div>
+      </div>
+
+      {/* Error message */}
+      <Error message={error} />
+
+      {/* Buttons */}
+      <div className="flex gap-3 justify-end mt-6">
+        <CustomButton
+          title={edit === 0 ? "Add Vehicle" : "Save Changes"}
+          onClick={saveVehicle}
+          className="btn-primary"
+        />
+        <CustomButton
+          title="Cancel"
+          onClick={resetForm}
+          className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg"
+        />
+      </div>
+    </div>
+  </div>
+)}
 
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
