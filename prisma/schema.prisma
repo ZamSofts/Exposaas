@@ -64,26 +64,28 @@ model Vehicle {
   name          String
   chassisNumber String         @unique
   remarks       String?        // optional remarks/notes
-  status        VehicleStatus  @default(active)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
   companyId     Int
   brandId       Int
+  statusId      Int
   brand         Brand          @relation(fields: [brandId], references: [id])
   company       Company        @relation(fields: [companyId], references: [id])
+  status        VehicleStatus   @relation(fields: [statusId], references: [id])
+
+}
+
+model VehicleStatus {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique   // e.g. "Packing", "Shipped", "Delivered"
+  vehicles Vehicle[]
 }
 
 model Brand {
   id       Int       @id @default(autoincrement())
   name     String    @unique
   vehicles Vehicle[]
-}
-
-
-enum VehicleStatus {
-  active
-  inactive
 }
 
 enum CompanyStatus {

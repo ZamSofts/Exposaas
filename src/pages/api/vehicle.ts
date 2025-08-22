@@ -20,11 +20,10 @@ export default async function handler(
   const col = req.query.col ? String(req.query.col).split(",") : null;
   const selectFields =col && col.length > 0? Object.fromEntries(col.map((c) => [c, true])) : undefined;
 
-  try {
+try {
     if (req.method === "GET") {
       const userCompanyId = session?.companyId;
-      const filterByCompany =
-        session.role === "Sadmin" ? {} : { companyId: userCompanyId };
+      const filterByCompany = session.role === "Sadmin" ? {} : { companyId: userCompanyId };
 
       // ---- Load single vehicle ----
       if (id) {
@@ -33,13 +32,11 @@ export default async function handler(
           include: {
             company: { select: { name: true } },
             brand: { select: { name: true } },
+            status: { select: { name: true } },
           },
         });
 
-        if (
-          !vehicle ||
-          (session.role !== "Sadmin" && vehicle.companyId !== userCompanyId)
-        ) {
+        if (!vehicle || (session.role !== "Sadmin" && vehicle.companyId !== userCompanyId)) {
           return res.status(404).json({ error: "Vehicle not found" });
         }
 
@@ -53,6 +50,7 @@ export default async function handler(
             ...selectFields,
             company: { select: { name: true } },
             brand: { select: { name: true } },
+            status: { select: { name: true } },
           },
           where: {
             ...filterByCompany,
@@ -77,6 +75,7 @@ export default async function handler(
           include: {
             company: { select: { name: true } },
             brand: { select: { name: true } },
+            status: { select: { name: true } },
           },
         }),
         prisma.vehicle.count({
@@ -91,30 +90,24 @@ export default async function handler(
     }
 
     if (req.method === "PUT") {
-      const { name, chassisNumber, brandId, remarks, companyId } = req.body;
+      const { name, chassisNumber, brandId, remarks, companyId, statusId } = req.body;
 
-      if (!name)
-        return res.status(400).json({ error: "Vehicle name is required" });
-      if (!chassisNumber)
-        return res.status(400).json({ error: "Chassis number is required" });
+      if (!name) return res.status(400).json({ error: "Vehicle name is required" });
+      if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
       if (!brandId) return res.status(400).json({ error: "Brand is required" });
-      if (!companyId)
-        return res.status(400).json({ error: "Company is required" });
+      if (!companyId) return res.status(400).json({ error: "Company is required" });
+      if (!statusId) return res.status(400).json({ error: "Status is required" });
 
       // ensure brand exists
-      const brandExists = await prisma.brand.findUnique({
-        where: { id: Number(brandId) },
-      });
-      if (!brandExists) {
-        return res.status(404).json({ error: "Brand not found" });
-      }
+      const brandExists = await prisma.brand.findUnique({ where: { id: Number(brandId) } });
+      if (!brandExists) return res.status(404).json({ error: "Brand not found" });
 
-      const exists = await prisma.vehicle.findUnique({
-        where: { chassisNumber },
-      });
-      if (exists) {
-        return res.status(409).json({ error: "Chassis number already exists" });
-      }
+      // ensure status exists
+      const statusExists = await prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } });
+      if (!statusExists) return res.status(404).json({ error: "Status not found" });
+
+      const exists = await prisma.vehicle.findUnique({ where: { chassisNumber } });
+      if (exists) return res.status(409).json({ error: "Chassis number already exists" });
 
       await prisma.vehicle.create({
         data: {
@@ -123,6 +116,7 @@ export default async function handler(
           brandId: Number(brandId),
           remarks,
           companyId: Number(companyId),
+          statusId: Number(statusId),
         },
       });
 
@@ -130,32 +124,27 @@ export default async function handler(
     }
 
     if (req.method === "POST") {
-      const { id, name, chassisNumber, brandId, remarks, companyId, status } =
-        req.body;
+      const { id, name, chassisNumber, brandId, remarks, companyId, statusId } = req.body;
 
       if (!id) return res.status(400).json({ error: "Vehicle ID is required" });
-      if (!name)
-        return res.status(400).json({ error: "Vehicle name is required" });
-      if (!chassisNumber)
-        return res.status(400).json({ error: "Chassis number is required" });
+      if (!name) return res.status(400).json({ error: "Vehicle name is required" });
+      if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
       if (!brandId) return res.status(400).json({ error: "Brand is required" });
-      if (!companyId)
-        return res.status(400).json({ error: "Company is required" });
+      if (!companyId) return res.status(400).json({ error: "Company is required" });
+      if (!statusId) return res.status(400).json({ error: "Status is required" });
 
       // ensure brand exists
-      const brandExists = await prisma.brand.findUnique({
-        where: { id: Number(brandId) },
-      });
-      if (!brandExists) {
-        return res.status(404).json({ error: "Brand not found" });
-      }
+      const brandExists = await prisma.brand.findUnique({ where: { id: Number(brandId) } });
+      if (!brandExists) return res.status(404).json({ error: "Brand not found" });
+
+      // ensure status exists
+      const statusExists = await prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } });
+      if (!statusExists) return res.status(404).json({ error: "Status not found" });
 
       const exists = await prisma.vehicle.findFirst({
         where: { chassisNumber, id: { not: id } },
       });
-      if (exists) {
-        return res.status(409).json({ error: "Chassis number already exists" });
-      }
+      if (exists) return res.status(409).json({ error: "Chassis number already exists" });
 
       await prisma.vehicle.update({
         where: { id },
@@ -165,7 +154,7 @@ export default async function handler(
           brandId: Number(brandId),
           remarks,
           companyId: Number(companyId),
-          status,
+          statusId: Number(statusId),
         },
       });
 
@@ -173,16 +162,13 @@ export default async function handler(
     }
 
     if (req.method === "DELETE") {
-        
       if (!id) return res.status(400).json({ error: "Vehicle ID is required" });
 
-      await prisma.vehicle.delete({
-        where: { id: Number(id) },
-      });
+      await prisma.vehicle.delete({ where: { id: Number(id) } });
 
       res.status(200).json({ message: "Vehicle deleted successfully" });
     }
-  } catch (error) {
+  }  catch (error) {
     console.error("API error:", error);
     res.status(500).json({ error: "Internal server error" });
   }

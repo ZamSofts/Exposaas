@@ -17,5 +17,5 @@ export const useAuth = (roles: string[] = []) => {
     }
   }, [status, session, router]);
 
-  return session?.user;
+  return { session: session?.user, status }; 
 };
