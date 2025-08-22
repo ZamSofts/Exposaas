@@ -1,0 +1,19 @@
+import { PrismaClient } from "../src/generated/prisma";
+const prisma = new PrismaClient();
+
+async function main() {
+  const permissions = ["add:user", "edit:user", "delete:user", "view:user", "add:role"];
+
+  for (const p of permissions) {
+    await prisma.permission.upsert({
+      where: { name: p },
+      update: {}, // do nothing if already exists
+      create: { name: p },
+    });
+  }
+}
+
+main()
+  .then(() => console.log("Seed completed ✅"))
+  .catch((e) => console.error(e))
+  .finally(() => prisma.$disconnect());

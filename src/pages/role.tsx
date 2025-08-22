@@ -15,7 +15,7 @@ type Role = {
 };
 
 export default function Role() {
-  const session = useAuth(["Sadmin", "Admin"]);
+  const {session,status} = useAuth(["Sadmin", "Admin"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
@@ -42,7 +42,7 @@ export default function Role() {
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
-    getRoleData();
+    loadData();
   }, [currentPage, perPage, search, sortBy, sortOrder]);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function Role() {
     }
   };
 
-  const getRoleData = async () => {
+  const loadData = async () => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams({
@@ -132,7 +132,7 @@ export default function Role() {
       }
     }
 
-    getRoleData();
+    loadData();
     setName("");
     setPermission([]);
     setEdit(null);
@@ -166,7 +166,7 @@ export default function Role() {
       setError(data.error);
       return;
     }
-    getRoleData();
+    loadData();
   };
 
   const getPermissionNames = (permissionId: number) => {

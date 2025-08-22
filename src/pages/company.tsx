@@ -14,7 +14,7 @@ type Company = {
 };
 
 export default function Company() {
-  const session = useAuth();
+  const {session} = useAuth();
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
