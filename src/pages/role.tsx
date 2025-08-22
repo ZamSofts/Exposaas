@@ -140,7 +140,6 @@ export default function Role() {
 
   const loadEdit = async (id: number) => {
     const role = await API("GET", `role?id=${id}`);
-
     if (!role) {
       setError("User not found");
       return;

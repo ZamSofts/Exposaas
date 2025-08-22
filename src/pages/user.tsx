@@ -33,7 +33,7 @@ export default function Userss() {
   const [roles, setRoles] = useState([]);
 
   const [username, setUserName] = useState("");
-  const [companyId, setCompanyId] = useState("");
+  const [companyId, setCompanyId] = useState();
   const [rolesId, setRolesId] = useState<number[]>([]);
   const [password, setPassword] = useState("");
 
@@ -104,7 +104,6 @@ export default function Userss() {
     }
     setError("");
     setUser(data.user);
-    console.log('User data',data.user);
     setTotal(data.total);
     setIsLoading(false);
   };
@@ -130,11 +129,11 @@ export default function Userss() {
         username,
         password,
         companyId:
-          session?.role == "Admin"
+          session?.role != "Sadmin"
             ? Number(session?.companyId)
             : Number(companyId),
         roleIds: rolesId,
-      };
+      };      
       if (
         !newUser.username ||
         !newUser.password ||
@@ -152,6 +151,7 @@ export default function Userss() {
         );
         return;
       }
+
       if (username == "ad") {
         setError("Username cannot be 'ad'");
         return;
@@ -189,7 +189,6 @@ export default function Userss() {
   const loadEdit = async (id: number) => {
     const data = await API("GET", `user?id=${id}`);
     setIsLoading;
-    console.log(data);
     setUserName(data.username);
     setPassword(data.password);
     setCompanyId(data.companyId);
@@ -212,7 +211,6 @@ export default function Userss() {
       setError(data.error);
       return;
     }
-    console.log("user detelete");
     loadData();
   };
 

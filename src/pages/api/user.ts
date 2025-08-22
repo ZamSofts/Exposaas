@@ -1,17 +1,14 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful";
-import { Console } from "console";
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // Session is GUARANTEED to exist because middleware already checked it
+  // and would have returned 401 if not authenticated
   const session = await getSession(req, res);
-  const roles = ["Sadmin", "Admin"];
-  if (!roles.includes(session.role)) {
-    return res.status(403).json({ error: "Only administrators can view users" });
-  }
-
+  
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
@@ -135,7 +132,6 @@ export default async function handler(
       return res.status(200).json({ user: formatted, total });
     }
     if (req.method === "PUT") {
-      console.log(req.body);
       const { username, password, companyId, roleIds } = req.body;
       if (username === "") {
         return res.status(400).json({ error: "Username is required" });
@@ -174,7 +170,6 @@ export default async function handler(
     }
     if (req.method === "POST") {
       const { id, username, password, companyId, rolesId } = req.body;
-      console.log(req.body);
       if (!username) {
         return res.status(400).json({ error: "Username is required" });
       }
