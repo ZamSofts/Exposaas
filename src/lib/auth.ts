@@ -80,7 +80,7 @@ export const authOptions: NextAuthOptions = {
         token.company = user.company;
         token.permissions = user.permissions;
       }
-      console.log("jwt token:", token);
+      // console.log("jwt token:", token);
 
       return token;
     },
@@ -93,7 +93,7 @@ export const authOptions: NextAuthOptions = {
         session.user.companyId = token.companyId as number | undefined;
         session.user.permissions = token.permissions as string[] | undefined;
       }
-      console.log("session data:", session);
+      // console.log("session data:", session);
       return session;
     },
   },

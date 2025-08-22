@@ -102,7 +102,6 @@ export default function Userss() {
     }
     setError("");
     setUser(data.user);
-    console.log('User data',data.user);
     setTotal(data.total);
     setIsLoading(false);
   };
@@ -123,13 +122,6 @@ export default function Userss() {
   };
 
   const editData = async () => {
-    console.log("Editing user data", {
-      username,
-      password,
-      companyId,
-      rolesId,
-      edit,
-    });
     if (!username || !password || rolesId.length === 0) {
       setError(!username ? "Name is required" : !password ? "Password is required" : "Please select a role");
       return;
@@ -147,7 +139,7 @@ export default function Userss() {
             ? Number(session?.companyId)
             : Number(companyId),
         roleIds: rolesId,
-      };
+      };      
       if (
         !newUser.username ||
         !newUser.password ||
@@ -165,6 +157,7 @@ export default function Userss() {
         );
         return;
       }
+
       if (username == "ad") {
         setError("Username cannot be 'ad'");
         return;

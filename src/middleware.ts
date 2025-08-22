@@ -10,42 +10,42 @@ const PERMISSIONS: Record<string, Record<string, string>> = {
     PUT: "add:user",
     DELETE: "delete:user"
   },
-  "/api/role": {
-    GET: "view:role",
-    POST: "edit:role",
-    PUT: "edit:role", 
-    DELETE: "delete:role"
-  },
-  "/api/company": {
-    GET: "view:company",
-    POST: "edit:company",
-    PUT: "edit:company",
-    DELETE: "delete:company"
-  },
-  "/api/example": {
-    GET: "view:user",
-    POST: "edit:company",
-    PUT: "edit:company",
-    DELETE: "delete:company"
-  },
-  "/api/vehicle": {
-    GET: "view:vehicle",
-    POST: "edit:vehicle",
-    PUT: "edit:vehicle",
-    DELETE: "delete:vehicle"
-  },
-  "/api/brand": {
-    GET: "view:brand",
-    POST: "edit:brand",
-    PUT: "edit:brand",
-    DELETE: "delete:brand"
-  },
-  "/api/permission": {
-    GET: "view:permission",
-    POST: "edit:permission",
-    PUT: "edit:permission",
-    DELETE: "delete:permission"
-  }
+  // "/api/role": {
+  //   GET: "view:role",
+  //   POST: "edit:role",
+  //   PUT: "edit:role", 
+  //   DELETE: "delete:role"
+  // },
+  // "/api/company": {
+  //   GET: "view:company",
+  //   POST: "edit:company",
+  //   PUT: "edit:company",
+  //   DELETE: "delete:company"
+  // },
+  // "/api/example": {
+  //   GET: "view:user",
+  //   POST: "edit:company",
+  //   PUT: "edit:company",
+  //   DELETE: "delete:company"
+  // },
+  // "/api/vehicle": {
+  //   GET: "view:vehicle",
+  //   POST: "edit:vehicle",
+  //   PUT: "edit:vehicle",
+  //   DELETE: "delete:vehicle"
+  // },
+  // "/api/brand": {
+  //   GET: "view:brand",
+  //   POST: "edit:brand",
+  //   PUT: "edit:brand",
+  //   DELETE: "delete:brand"
+  // },
+  // "/api/permission": {
+  //   GET: "view:permission",
+  //   POST: "edit:permission",
+  //   PUT: "edit:permission",
+  //   DELETE: "delete:permission"
+  // }
 };
 
 // Routes that don't require authentication

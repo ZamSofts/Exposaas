@@ -116,7 +116,6 @@ export default function VehiclesPage() {
       return;
     }
    
-    console.log("companyId", session?.companyId);
     let response;
     if (edit === 0) {
       response = await API("PUT", "vehicle", {
@@ -238,6 +237,16 @@ export default function VehiclesPage() {
 
       {/* Use grid for horizontal layout */}
       <div className="grid grid-cols-2 gap-6">
+         {/* Brand */}
+        <div>
+          <label className="input-label">Brand</label>
+          <CustomSelect
+            data={brand}
+            selectedId={brandId}
+            setSelectedId={setBrandId}
+          />
+        </div>
+        
         {/* Vehicle Name */}
         <div>
           <label className="input-label">Vehicle Name</label>
@@ -250,15 +259,7 @@ export default function VehiclesPage() {
           />
         </div>
 
-        {/* Brand */}
-        <div>
-          <label className="input-label">Brand</label>
-          <CustomSelect
-            data={brand}
-            selectedId={brandId}
-            setSelectedId={setBrandId}
-          />
-        </div>
+       
 
         {/* Status */}
         <div>
