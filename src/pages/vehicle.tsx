@@ -63,8 +63,8 @@ export default function VehiclesPage() {
       setError("");
 
       const [brandData, statusData] = await Promise.all([API("GET", "brand"), API("GET", "vehicleStatus")]);
-      setBrand(!brandData.error && session?.permissions?.includes("view:user") ? brandData : []);
-      setVehicleStatus(!statusData.error && session?.permissions?.includes("view:user") ? statusData : []);
+      setBrand(!brandData.error ? brandData : []);
+      setVehicleStatus(!statusData.error ? statusData : []);
 
     } catch (err) {
       setError("Something went wrong");
@@ -188,25 +188,7 @@ export default function VehiclesPage() {
     setEdit(null);
   };
 
-  const toggleStatus = async (id: number) => {
-    const vehicle = vehicles.find(v => v.id === id);
-    if (!vehicle) return;
 
-    const newStatus = vehicle.status === "active" ? "inactive" : "active";
-    const confirmed = await confirm({
-      title: "Change vehicle Status",
-      message: `Are you sure you want to change "${vehicle.name}" status to ${newStatus}?`,
-      confirmText: "Change Status",
-      type: "warning",
-    });
-    if (!confirmed) return;
-   /*  const data = await API("POST", `vehicle`, vehicle);
-    if (data.error) {
-      setError(data.error);
-      return;
-    } */
-    loadData();
-  };
 
   return (
     <>
@@ -381,7 +363,6 @@ export default function VehiclesPage() {
 
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
-                      onClick={() => toggleStatus(v.id)}
                       className="inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]"
                     >
                       {v?.status?.name}

@@ -24,10 +24,7 @@ export default async function handler(
       : undefined;
 
   try {
-    if (req.method === "GET") {
-      if(!session.permissions.includes("view:user")) {
-        return res.status(403).json({ error: "You do not have permission to view roles" });
-      }
+    if (req.method === "GET") {      
       // LoadEdit
       if (id) {
         const role = await prisma.role.findUnique({
