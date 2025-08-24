@@ -100,4 +100,3 @@ A clean Next.js application with PostgreSQL backend integration.
 - [Next.js Documentation](https://nextjs.org/docs)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [React Documentation](https://reactjs.org/docs/)
-- [TypeScript Documentation](https://www.typescriptlang.org/docs/)

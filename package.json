@@ -6,14 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "init-db": "npx tsx scripts/init-db.ts",
-    "test-db": "npx tsx scripts/test-db.ts"
+    "lint": "next lint"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",
     "@prisma/client": "^6.13.0",
-    "@types/pg": "^8.15.4",
     "lucide-react": "^0.539.0",
     "next": "15.4.4",
     "next-auth": "^4.24.11",
@@ -29,11 +26,9 @@
     "dotenv": "^17.2.1",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
-    "tailwindcss": "^4",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.20.3"
+    "tailwindcss": "^4"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "node prisma/seed.js"
   }
 }
