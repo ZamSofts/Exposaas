@@ -5,10 +5,10 @@ import { Session } from "next-auth";
 import { ThemeContext, useThemeState } from "@/hooks/useTheme";
 
 type AppPropsWithAuth = AppProps<{
-  session: Session;
+  session?: Session;
 }>;
 
-function AppContent({ Component, pageProps }: AppPropsWithAuth) {
+function AppContent({ Component, pageProps }: AppProps) {
   const themeState = useThemeState();
 
   return (
@@ -18,10 +18,10 @@ function AppContent({ Component, pageProps }: AppPropsWithAuth) {
   );
 }
 
-export default function App({ Component, pageProps: { session, ...pageProps } }: AppPropsWithAuth) {
+export default function App({ Component, pageProps: { session, ...pageProps }, router }: AppPropsWithAuth) {
   return (
     <SessionProvider session={session}>
-      <AppContent Component={Component} pageProps={pageProps} />
+      <AppContent Component={Component} pageProps={pageProps} router={router} />
     </SessionProvider>
   );
 }
