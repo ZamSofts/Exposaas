@@ -1,13 +1,10 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, MultiSelect, CustomButton } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
-import { MultiSelect } from "@/hooks/wrapper";
-import { CustomButton } from "@/hooks/wrapper";
-import { Plus, Edit, Trash2, Users, Shield } from "lucide-react";
-import { get } from "http";
+import { Plus, Edit, Trash2, Shield } from "lucide-react";
 
 export default function Role() {
   const {session,status} = useAuth(["Sadmin", "Admin"]);

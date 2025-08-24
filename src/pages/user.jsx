@@ -1,26 +1,11 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API, CustomSelect } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomSelect, MultiSelect, CustomButton } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
-import { MultiSelect } from "@/hooks/wrapper";
-import { CustomButton } from "@/hooks/wrapper";
 import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
 
-// type Company = {
-//   id: number;
-//   name: string;
-//   createdAt: string;
-//   status: "active" | "inactive";
-// };
-
-// type User = {
-//   username: string;
-//   password: string;
-//   companyId: number;
-//   rolesId: number[];
-// };
 
 export default function Userss() {
   const { session, status } = useAuth(["Sadmin", "Admin"]);
@@ -72,7 +57,7 @@ export default function Userss() {
       const [companyData, roleData] = await Promise.all([API("GET", "company?col=id,name"), API("GET", "role")]);
       setRoles(!roleData.error && session?.permissions?.includes("view:user") ? roleData.role : []);
       if (!companyData.error && session?.permissions?.includes("view:user")) {
-        setCompanies(companyData.company ?? []);
+        setCompanies(companyData ?? []);
       } else {
         setCompanies([]);
         setCompanyId(session?.companyId ?? "");
