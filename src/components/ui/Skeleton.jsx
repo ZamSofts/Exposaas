@@ -1,11 +1,7 @@
 import React from "react";
 
-interface SkeletonRowProps {
-  columns: number;
-  rows?: number;
-}
 
-export default function Skeleton({ columns, rows = 3 }: SkeletonRowProps) {
+export default function Skeleton({ columns, rows = 3 }) {
   return (
     <>
       {Array.from({ length: rows }).map((_, rowIndex) => (

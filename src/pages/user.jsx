@@ -8,39 +8,39 @@ import { MultiSelect } from "@/hooks/wrapper";
 import { CustomButton } from "@/hooks/wrapper";
 import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
 
-type Company = {
-  id: number;
-  name: string;
-  createdAt: string;
-  status: "active" | "inactive";
-};
+// type Company = {
+//   id: number;
+//   name: string;
+//   createdAt: string;
+//   status: "active" | "inactive";
+// };
 
-type User = {
-  username: string;
-  password: string;
-  companyId: number;
-  rolesId: number[];
-};
+// type User = {
+//   username: string;
+//   password: string;
+//   companyId: number;
+//   rolesId: number[];
+// };
 
 export default function Userss() {
   const { session, status } = useAuth(["Sadmin", "Admin"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [users, setUser] = useState<User[]>([]);
+  const [companies, setCompanies] = useState([]);
+  const [users, setUser] = useState([]);
 
   const [roles, setRoles] = useState([]);
 
   const [username, setUserName] = useState("");
   const [companyId, setCompanyId] = useState();
-  const [rolesId, setRolesId] = useState<number[]>([]);
+  const [rolesId, setRolesId] = useState([]);
   const [password, setPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
-  const [visiblePasswords, setVisiblePasswords] = useState<number[]>([]);
+  const [visiblePasswords, setVisiblePasswords] = useState([]);
 
-  const [edit, setEdit] = useState<number | null>(null);
+  const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +52,7 @@ export default function Userss() {
 
   // Sorting state managed by parent
   const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortOrder, setSortOrder] = useState("asc");
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
@@ -106,17 +106,17 @@ export default function Userss() {
     setIsLoading(false);
   };
 
-  const handleSort = (column: string, order: "asc" | "desc") => {
+  const handleSort = (column, order) => {
     setSortBy(column);
     setSortOrder(order);
   };
 
-  const handleSearch = (search: string) => {
+  const handleSearch = (search) => {
     setSearch(search);
     setCurrentPage(1); // Reset to first page on search
   };
 
-  const handlePageChange = (page: number, perPageValue: number) => {
+  const handlePageChange = (page, perPageValue) => {
     setCurrentPage(page);
     setPerPage(perPageValue);
   };
@@ -192,7 +192,7 @@ export default function Userss() {
     setEdit(null);
   };
 
-  const loadEdit = async (id: number) => {
+  const loadEdit = async (id) => {
     const data = await API("GET", `user?id=${id}`);
     setIsLoading;
     setUserName(data.username);
@@ -202,7 +202,7 @@ export default function Userss() {
     setEdit(id);
   };
 
-  const deleteIt = async (id: number) => {
+  const deleteIt = async (id) => {
     const confirmed = await confirm({
       title: "Delete User",
       message: "Are you sure you want to delete this user? This action cannot be undone.",
@@ -219,15 +219,15 @@ export default function Userss() {
     loadData();
   };
 
-  const togglePasswordVisibility = (id: number) => {
+  const togglePasswordVisibility = (id) => {
     setVisiblePasswords(prev => (prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]));
   };
-  const getRoleName = (roleId: number) => {
+  const getRoleName = (roleId) => {
     const rolename = roles.find(r => r.id === roleId);
     if (!rolename) return "Unknown";
     return rolename.name;
   };
-  const getCompanyName = (CompanyId: number) => {
+  const getCompanyName = (CompanyId) => {
     const companyName = companies.find(c => c.id === CompanyId);
     if (!companyName) return "Unknown";
     return companyName.name;

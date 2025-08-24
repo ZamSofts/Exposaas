@@ -1,14 +1,8 @@
 import "@/styles/globals.css";
-import type { AppProps } from "next/app";
 import { SessionProvider } from "next-auth/react";
-import { Session } from "next-auth";
 import { ThemeContext, useThemeState } from "@/hooks/useTheme";
 
-type AppPropsWithAuth = AppProps<{
-  session?: Session;
-}>;
-
-function AppContent({ Component, pageProps }: AppProps) {
+function AppContent({ Component, pageProps }) {
   const themeState = useThemeState();
 
   return (
@@ -18,7 +12,7 @@ function AppContent({ Component, pageProps }: AppProps) {
   );
 }
 
-export default function App({ Component, pageProps: { session, ...pageProps }, router }: AppPropsWithAuth) {
+export default function App({ Component, pageProps: { session, ...pageProps }, router }) {
   return (
     <SessionProvider session={session}>
       <AppContent Component={Component} pageProps={pageProps} router={router} />

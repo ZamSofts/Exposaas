@@ -9,24 +9,19 @@ import { CustomButton } from "@/hooks/wrapper";
 import { Plus, Edit, Trash2, Users, Shield } from "lucide-react";
 import { get } from "http";
 
-type Role = {
-  name: string;
-  permissions: number[];
-};
-
 export default function Role() {
   const {session,status} = useAuth(["Sadmin", "Admin"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
-  const [roles, setRole] = useState<Role[]>([]);
+  const [roles, setRole] = useState([]);
 
   const [static_permissions, setStaticPermissions] = useState([]);
 
   const [name, setName] = useState("");
-  const [permissions, setPermission] = useState<number[]>([]);
+  const [permissions, setPermission] = useState([]);
 
-  const [edit, setEdit] = useState<number | null>(null);
+  const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +33,7 @@ export default function Role() {
 
   // Sorting state managed by parent
   const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortOrder, setSortOrder] = useState("asc");
 
   // Reload data when pagination, search, or sorting changes
   useEffect(() => {
@@ -92,17 +87,17 @@ export default function Role() {
     }
   };
 
-  const handleSort = (column: string, order: "asc" | "desc") => {
+  const handleSort = (column, order) => {
     setSortBy(column);
     setSortOrder(order);
   };
 
-  const handleSearch = (search: string) => {
+  const handleSearch = (search) => {
     setSearch(search);
     setCurrentPage(1); // Reset to first page on search
   };
 
-  const handlePageChange = (page: number, perPageValue: number) => {
+  const handlePageChange = (page, perPageValue) => {
     setCurrentPage(page);
     setPerPage(perPageValue);
   };
@@ -138,7 +133,7 @@ export default function Role() {
     setEdit(null);
   };
 
-  const loadEdit = async (id: number) => {
+  const loadEdit = async (id) => {
     const role = await API("GET", `role?id=${id}`);
     if (!role) {
       setError("User not found");
@@ -150,7 +145,7 @@ export default function Role() {
     setEdit(id);
   };
 
-  const deleteIt = async (id: number) => {
+  const deleteIt = async (id) => {
     const confirmed = await confirm({
       title: "Delete Role",
       message:
@@ -169,7 +164,7 @@ export default function Role() {
     loadData();
   };
 
-  const getPermissionNames = (permissionId: number) => {
+  const getPermissionNames = (permissionId) => {
     const permission = static_permissions.find((p) => p.id === permissionId);
     if (!permission) {
       return "Unknown";

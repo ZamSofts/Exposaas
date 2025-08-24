@@ -1,26 +1,6 @@
-import React, { useState, useEffect, cloneElement, ReactElement } from "react";
+import React, { useState, useEffect, cloneElement } from "react";
 import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
-
-interface DataTableProps {
-  children: React.ReactNode;
-  data: any[];
-  total: number;
-  isLoading: boolean;
-  searchPlaceholder?: string;
-  onSearch: (searchTerm: string) => void;
-  onSort?: (sortBy: string, sortOrder: "asc" | "desc") => void;
-  onPageChange?: (page: number, perPage: number) => void;
-  title?: string;
-  emptyMessage?: string;
-  emptyIcon?: React.ReactNode;
-  emptyAction?: React.ReactNode;
-  initialPerPage?: number;
-  showPagination?: boolean;
-  showSearch?: boolean;
-  sortBy?: string;
-  sortOrder?: "asc" | "desc";
-}
 
 export default function DataTable({
   children,
@@ -40,7 +20,7 @@ export default function DataTable({
   showSearch = true,
   sortBy = "",
   sortOrder = "asc",
-}: DataTableProps) {
+}) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(initialPerPage);
@@ -59,10 +39,10 @@ export default function DataTable({
     onSearch(search);
   };
 
-  const handleSort = (column: string) => {
+  const handleSort = (column) => {
     if (!onSort) return;
 
-    let newSortOrder: "asc" | "desc" = "asc";
+    let newSortOrder = "asc";
 
     if (sortBy === column) {
       // If same column, toggle order
@@ -72,7 +52,7 @@ export default function DataTable({
     onSort(column, newSortOrder);
   };
 
-  const handlePerPageChange = (newPerPage: number) => {
+  const handlePerPageChange = (newPerPage) => {
     setPerPage(newPerPage);
     setCurrentPage(1);
     if (onPageChange) {
@@ -80,14 +60,14 @@ export default function DataTable({
     }
   };
 
-  const handlePageChange = (newPage: number) => {
+  const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
     if (onPageChange) {
       onPageChange(newPage, perPage);
     }
   };
 
-  const renderSortArrows = (columnId: string) => {
+  const renderSortArrows = (columnId) => {
     if (!onSort) return null;
 
     return (
@@ -131,41 +111,41 @@ export default function DataTable({
   };
 
   // Process children to add sorting functionality to headers
-  const processChildren = (children: React.ReactNode) => {
+  const processChildren = (children) => {
     return React.Children.map(children, (child) => {
       if (React.isValidElement(child)) {
         if (child.type === "thead") {
           return cloneElement(
             child,
             {},
-            React.Children.map((child.props as any).children, (row: any) => {
+            React.Children.map(child.props.children, (row) => {
               if (React.isValidElement(row) && row.type === "tr") {
                 return cloneElement(
                   row,
                   {},
-                  React.Children.map((row.props as any).children, (header: any) => {
+                  React.Children.map(row.props.children, (header) => {
                     if (React.isValidElement(header) && header.type === "th") {
-                      const columnId = (header.props as any).id;
+                      const columnId = header.props.id;
                       const defaultHeaderClasses =
                         "px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider";
-                      const existingClasses = (header.props as any).className || "";
+                      const existingClasses = header.props.className || "";
 
                       if (columnId && onSort) {
                         return cloneElement(
                           header,
                           {
-                            ...(header.props as any),
+                            ...header.props,
                             className: `${defaultHeaderClasses} ${existingClasses} cursor-pointer`.trim(),
                           },
                           <div className="flex items-center gap-2" onClick={() => handleSort(columnId)}>
-                            {(header.props as any).children}
+                            {header.props.children}
                             {renderSortArrows(columnId)}
                           </div>
                         );
                       } else {
                         // For non-sortable headers, just add the default styling
                         return cloneElement(header, {
-                          ...(header.props as any),
+                          ...header.props,
                           className: `${defaultHeaderClasses} ${existingClasses}`.trim(),
                         });
                       }
@@ -184,9 +164,9 @@ export default function DataTable({
             // Count columns for loading colspan
             const headerCount = React.Children.toArray(children).reduce((count, c) => {
               if (React.isValidElement(c) && c.type === "thead") {
-                const firstRow = React.Children.toArray((c.props as any).children)[0];
+                const firstRow = React.Children.toArray(c.props.children)[0];
                 if (React.isValidElement(firstRow) && firstRow.type === "tr") {
-                  return React.Children.count((firstRow.props as any).children);
+                  return React.Children.count(firstRow.props.children);
                 }
               }
               return count;
@@ -194,7 +174,7 @@ export default function DataTable({
 
             return (
               <tbody className="divide-y divide-[var(--border)]">
-                <Skeleton columns={headerCount as number} rows={perPage} />
+                <Skeleton columns={headerCount} rows={perPage} />
               </tbody>
             );
           }
@@ -203,9 +183,9 @@ export default function DataTable({
             // Count columns for empty colspan
             const headerCount = React.Children.toArray(children).reduce((count, c) => {
               if (React.isValidElement(c) && c.type === "thead") {
-                const firstRow = React.Children.toArray((c.props as any).children)[0];
+                const firstRow = React.Children.toArray(c.props.children)[0];
                 if (React.isValidElement(firstRow) && firstRow.type === "tr") {
-                  return React.Children.count((firstRow.props as any).children);
+                  return React.Children.count(firstRow.props.children);
                 }
               }
               return count;
@@ -214,7 +194,7 @@ export default function DataTable({
             return (
               <tbody className="divide-y divide-[var(--border)]">
                 <tr>
-                  <td colSpan={headerCount as number} className="text-center py-12">
+                  <td colSpan={headerCount} className="text-center py-12">
                     {emptyIcon && <div className="mx-auto mb-4">{emptyIcon}</div>}
                     <p className="text-[var(--secondary-foreground)] text-lg">No results found</p>
                     {emptyAction && <div className="mt-4">{emptyAction}</div>}
@@ -225,7 +205,7 @@ export default function DataTable({
           }
 
           return cloneElement(child, {
-            ...(child.props as any),
+            ...child.props,
             className: "divide-y divide-[var(--border)]",
           });
         }

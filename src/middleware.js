@@ -3,7 +3,7 @@ import { getToken } from 'next-auth/jwt'
 
 
 // Permission mapping for each endpoint and method
-const PERMISSIONS: Record<string, Record<string, string>> = {
+const PERMISSIONS = {
   "/api/user": {
     GET: "view:user",
     POST: "edit:user", 
@@ -50,7 +50,7 @@ const PUBLIC_ROUTES = [
   '/public'
 ];
 
-export async function middleware(request: NextRequest) {
+export async function middleware(request) {
   const { pathname } = request.nextUrl;
   const method = request.method;
   
@@ -85,8 +85,8 @@ export async function middleware(request: NextRequest) {
     // Check if permission is required for this endpoint
     if (PERMISSIONS[basePath] && PERMISSIONS[basePath][method]) {
       const requiredPermission = PERMISSIONS[basePath][method];
-      const userPermissions = token.permissions as string[] || [];
-      
+      const userPermissions = token.permissions || [];
+
       // Skip permission check if user is Sadmin (has all permissions)
       if (token.role === 'Sadmin') {
         // Sadmin has all permissions, continue

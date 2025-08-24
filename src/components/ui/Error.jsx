@@ -1,11 +1,7 @@
 import React from "react";
 
-interface ErrorProps {
-  message: string;
-  className?: string;
-}
 
-export default function Error({ message, className = "" }: ErrorProps) {
+export default function Error({ message, className = "" }) {
   if (!message) return null;
 
   return (

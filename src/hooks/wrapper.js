@@ -10,7 +10,7 @@ export {CustomSelect} from "@/components/ui/SingleSelecter";
 export {customStyles} from "@/utils/reactSelectStyles";
 export { CustomButton } from "@/components/ui/CustomButton";
 
-export const API = async (method: string, name: string, d = {}) => {
+export const API = async (method, name, d = {}) => {
   if (method == "GET" || method == "DELETE") {
     const data = await fetch("/api/" + name, {
       method: method,

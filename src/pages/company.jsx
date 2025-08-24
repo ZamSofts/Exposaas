@@ -6,21 +6,15 @@ import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Building2, Edit, Trash2 } from "lucide-react";
 
-type Company = {
-  id: number;
-  name: string;
-  createdAt: string;
-  status: "active" | "inactive";
-};
 
 export default function Company() {
   const {session} = useAuth();
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState([]);
   const [name, setName] = useState("");
-  const [edit, setEdit] = useState<number | null>(null);
+  const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [inactive, setInactive] = useState(0);
@@ -33,7 +27,7 @@ export default function Company() {
 
   // Sorting state managed by parent
   const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   useEffect(() => {
     if (session?.role !== "Sadmin") {
@@ -69,17 +63,17 @@ export default function Company() {
     setIsLoading(false);
   };
 
-  const handleSort = (column: string, order: "asc" | "desc") => {
+  const handleSort = (column, order) => {
     setSortBy(column);
     setSortOrder(order);
   };
 
-  const handleSearch = (search: string) => {
+  const handleSearch = (search) => {
     setSearch(search);
     setCurrentPage(1); // Reset to first page on search
   };
 
-  const handlePageChange = (page: number, perPageValue: number) => {
+  const handlePageChange = (page, perPageValue) => {
     setCurrentPage(page);
     setPerPage(perPageValue);
   };
@@ -104,7 +98,7 @@ export default function Company() {
     setEdit(null);
   };
 
-  const loadEdit = async (id: number) => {
+  const loadEdit = async (id) => {
     const data = await API("GET", `company?id=${id}`);
     if (data.error) {
       setError(data.error);
@@ -114,7 +108,7 @@ export default function Company() {
     setEdit(id);
   };
 
-  const deleteIt = async (id: number) => {
+  const deleteIt = async (id) => {
     const confirmed = await confirm({
       title: "Delete Company",
       message: "Are you sure you want to delete this company? This action cannot be undone.",
@@ -131,7 +125,7 @@ export default function Company() {
     loadData();
   };
 
-  const toggleStatus = async (id: number) => {
+  const toggleStatus = async (id) => {
     const company = companies.find((c) => c.id === id);
     if (!company) return;
 

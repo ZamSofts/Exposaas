@@ -1,10 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req, res) {
   const session = await getSession(req, res);
   const roles = ["Sadmin", "Admin"];
 

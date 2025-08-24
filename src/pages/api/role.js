@@ -1,10 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req, res) {
   const session = await getSession(req, res);
 /*   if (!["Sadmin", "Admin"].includes(session.role)) {
     return res.status(403).json({ error: "Only administrators can view users" });
@@ -107,7 +103,7 @@ export default async function handler(
         data: {
           name,
           permissions: {
-            create: permissions.map((permissionId: number) => ({
+            create: permissions.map((permissionId) => ({
               permissionId,
             })),
           },

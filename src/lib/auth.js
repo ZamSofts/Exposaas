@@ -1,10 +1,9 @@
-import type { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 //import { prisma } from "@/lib/db";
 import { prisma } from "@/lib/useful";
 import Select from "react-select/base";
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -86,12 +85,12 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       if (session?.user) {
-        session.user.id = token.id as string;
-        session.user.name = token.name as string;
-        session.user.role = token.role as string | undefined;
-        session.user.company = token.company as string | undefined;
-        session.user.companyId = token.companyId as number | undefined;
-        session.user.permissions = token.permissions as string[] | undefined;
+        session.user.id = token.id;
+        session.user.name = token.name;
+        session.user.role = token.role;
+        session.user.company = token.company;
+        session.user.companyId = token.companyId;
+        session.user.permissions = token.permissions;
       }
       // console.log("session data:", session);
       return session;

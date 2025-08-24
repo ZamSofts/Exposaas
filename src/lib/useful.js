@@ -1,9 +1,8 @@
 import prismaClient from "@/lib/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { NextApiRequest, NextApiResponse } from "next";
 
-const getSession = async (req: NextApiRequest, res: NextApiResponse) => {
+const getSession = async (req, res) => {
   const session = await getServerSession(req, res, authOptions);
 
   if (!session || !session.user) {

@@ -1,17 +1,6 @@
 import React from "react";
 import { AlertTriangle, X, Check } from "lucide-react";
 
-interface ConfirmModalProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmText?: string;
-  cancelText?: string;
-  type?: "warning" | "danger" | "info";
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
 export default function ConfirmModal({
   isOpen,
   title,
@@ -21,7 +10,7 @@ export default function ConfirmModal({
   type = "warning",
   onConfirm,
   onCancel,
-}: ConfirmModalProps) {
+}) {
   const [isVisible, setIsVisible] = React.useState(false);
   const [shouldRender, setShouldRender] = React.useState(false);
 
@@ -63,7 +52,7 @@ export default function ConfirmModal({
 
   const styles = getTypeStyles();
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e) => {
     if (e.target === e.currentTarget) {
       onCancel();
     }
@@ -173,16 +162,7 @@ export default function ConfirmModal({
 
 // Hook for easier usage
 export function useConfirm() {
-  const [confirmState, setConfirmState] = React.useState<{
-    isOpen: boolean;
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    type?: "warning" | "danger" | "info";
-    onConfirm: () => void;
-    onCancel: () => void;
-  }>({
+  const [confirmState, setConfirmState] = React.useState({
     isOpen: false,
     title: "",
     message: "",
@@ -190,13 +170,7 @@ export function useConfirm() {
     onCancel: () => {},
   });
 
-  const confirm = (options: {
-    title: string;
-    message: string;
-    confirmText?: string;
-    cancelText?: string;
-    type?: "warning" | "danger" | "info";
-  }): Promise<boolean> => {
+  const confirm = (options) => {
     return new Promise((resolve) => {
       setConfirmState({
         isOpen: true,

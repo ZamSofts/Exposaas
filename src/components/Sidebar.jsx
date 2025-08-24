@@ -7,34 +7,14 @@ import { useRouter } from "next/router";
 import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2,Shield,Car } from "lucide-react";
 
 // Create context for sidebar state
-const SidebarContext = createContext<{
-  isCollapsed: boolean;
-  setIsCollapsed: (collapsed: boolean) => void;
-}>({
+const SidebarContext = createContext({
   isCollapsed: false,
   setIsCollapsed: () => {},
 });
 
 export const useSidebar = () => useContext(SidebarContext);
 
-interface SidebarProviderProps {
-  children: React.ReactNode;
-}
-
-interface SidebarItem {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  href: string;
-  badge?: number;
-}
-
-interface SidebarSection {
-  title: string;
-  items: SidebarItem[];
-}
-
-export default function Sidebar({ children }: SidebarProviderProps) {
+export default function Sidebar({ children }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -64,22 +44,8 @@ export default function Sidebar({ children }: SidebarProviderProps) {
   );
 }
 
-interface SidebarItem {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  href: string;
-  badge?: number;
-  roles?: string[]; // Add roles field for permission control
-}
-
-interface SidebarSection {
-  title: string;
-  items: SidebarItem[];
-}
-
 // Helper function to filter items based on user role
-const filterItemsByRole = (items: SidebarItem[], userRole: string | undefined): SidebarItem[] => {
+const filterItemsByRole = (items, userRole) => {
   return items.filter((item) => {
     // If no roles specified, show to everyone
     if (!item.roles || item.roles.length === 0) return true;
@@ -91,7 +57,7 @@ const filterItemsByRole = (items: SidebarItem[], userRole: string | undefined): 
 };
 
 // Define all sidebar items with their role requirements
-const getAllSidebarSections = (): SidebarSection[] => [
+const getAllSidebarSections = () => [
   {
     title: "MAIN NAVIGATION",
     items: [
@@ -178,7 +144,7 @@ const getAllSidebarSections = (): SidebarSection[] => [
   },
 ];
 
-function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }: { isMobileMenuOpen?: boolean; setIsMobileMenuOpen?: (open: boolean) => void }) {
+function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
@@ -192,7 +158,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }: { isMobileMen
     }))
     .filter((section) => section.items.length > 0); // Remove empty sections
 
-  const isActiveRoute = (href: string) => {
+  const isActiveRoute = (href) => {
     return router.pathname === href;
   };
 

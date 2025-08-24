@@ -1,13 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
-
-interface ThemeContextType {
-  theme: Theme;
-  toggleTheme: () => void;
-}
-
-export const ThemeContext = createContext<ThemeContextType>({
+export const ThemeContext = createContext({
   theme: "dark",
   toggleTheme: () => {},
 });
@@ -21,11 +14,11 @@ export const useTheme = () => {
 };
 
 export const useThemeState = () => {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState("dark");
 
   useEffect(() => {
     // Check for saved theme preference or default to 'dark'
-    const savedTheme = localStorage.getItem("theme") as Theme | null;
+    const savedTheme = localStorage.getItem("theme");
     if (savedTheme) {
       setTheme(savedTheme);
     }

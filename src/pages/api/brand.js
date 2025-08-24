@@ -1,8 +1,7 @@
 // src/pages/api/permissions.ts
-import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful"; // adjust path if needed
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req, res) {
   const session = await getSession(req, res);
 
   // Restrict to super admins for now
@@ -12,8 +11,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (req.method === "GET") {
-      const status=await prisma.vehicleStatus.findMany()
-      return res.status(200).json(status);
+      const brands=await prisma.brand.findMany({orderBy: { name: 'asc' }})
+      return res.status(200).json(brands);
     }
 
   

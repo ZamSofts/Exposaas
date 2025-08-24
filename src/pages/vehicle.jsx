@@ -7,23 +7,12 @@ import DataTable from "@/components/ui/DataTable";
 import { CustomButton } from "@/hooks/wrapper";
 import { Plus, Edit, Trash2, Car } from "lucide-react";
 
-type Vehicle = {
-  id: number;
-  name: string;
-  chassisNumber: string;
-  companyId: number;
-  status: "active" | "inactive";
-  remarks?: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export default function VehiclesPage() {
   const {session,status} = useAuth(["Admin"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicles, setVehicles] = useState([]);
   const [brand, setBrand] = useState([]);
   const[vehicleStatus,setVehicleStatus]=useState([])
 
@@ -33,20 +22,20 @@ export default function VehiclesPage() {
 
   // form states
   const [name, setName] = useState("");
-  const [brandId, setBrandId] = useState<number | null>(null);
+  const [brandId, setBrandId] = useState(null);
   const [chassisNumber, setChassisNumber] = useState("");
   const [companyId, setCompanyId] = useState(Number(session?.companyId));
   const [statusId, setStatusId] = useState(Number);
   const [remarks, setRemarks] = useState("");
 
-  const [edit, setEdit] = useState<number | null>(null);
+  const [edit, setEdit] = useState(null);
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [sortOrder, setSortOrder] = useState("asc");
 
   useEffect(() => {
     loadData();
@@ -95,17 +84,17 @@ export default function VehiclesPage() {
     setIsLoading(false);
   };
 
-  const handleSort = (column: string, order: "asc" | "desc") => {
+  const handleSort = (column, order) => {
     setSortBy(column);
     setSortOrder(order);
   };
 
-  const handleSearch = (search: string) => {
+  const handleSearch = (search) => {
     setSearch(search);
     setCurrentPage(1);
   };
 
-  const handlePageChange = (page: number, perPageValue: number) => {
+  const handlePageChange = (page, perPageValue) => {
     setCurrentPage(page);
     setPerPage(perPageValue);
   };
@@ -147,7 +136,7 @@ export default function VehiclesPage() {
     resetForm();
   };
 
-  const loadEdit = async (id: number) => {
+  const loadEdit = async (id) => {
     const data = await API("GET", `vehicle?id=${id}`);
     if (data.error) return setError(data.error);
 
@@ -160,7 +149,7 @@ export default function VehiclesPage() {
     setEdit(id);
   };
 
-  const deleteIt = async (id: number) => {
+  const deleteIt = async (id) => {
     const confirmed = await confirm({
       title: "Delete Vehicle",
       message: "Are you sure you want to delete this vehicle? This action cannot be undone.",

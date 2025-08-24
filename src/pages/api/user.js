@@ -1,10 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma, getSession } from "@/lib/useful";
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+export default async function handler(req, res) {
   // Session is GUARANTEED to exist because middleware already checked it
   // and would have returned 401 if not authenticated
   const session = await getSession(req, res);
@@ -188,7 +184,7 @@ export default async function handler(
       }
 
       // Start transaction array
-      const transactionOps: any[] = [];
+      const transactionOps = [];
 
       // 1️⃣ Always update basic info
       transactionOps.push(
@@ -216,7 +212,7 @@ export default async function handler(
           transactionOps.push(
             prisma.userRole.deleteMany({ where: { userId: id } }),
             prisma.userRole.createMany({
-              data: rolesId.map((roleId: number) => ({
+              data: rolesId.map((roleId) => ({
                 userId: id,
                 roleId,
               })),

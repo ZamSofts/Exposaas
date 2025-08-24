@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Head from "next/head";
-import { Search, Hash, Circle, AlertTriangle, Clock, Send } from "lucide-react";
+import { Search, Hash, Send } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 
 export default function Dashboard() {
