@@ -18,7 +18,7 @@ export const authOptions = {
             const permissions=await prisma.permission.findMany({
               select: { name: true },
             });
-            console.log("Permissions fetched:", permissions.map((p) => p.name));
+            // console.log("Permissions fetched:", permissions.map((p) => p.name));
 
             return {
               id: "1",
