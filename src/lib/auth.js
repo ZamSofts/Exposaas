@@ -1,7 +1,6 @@
 import CredentialsProvider from "next-auth/providers/credentials";
 //import { prisma } from "@/lib/db";
 import { prisma } from "@/lib/useful";
-import Select from "react-select/base";
 
 export const authOptions = {
   providers: [
