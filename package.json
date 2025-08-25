@@ -12,7 +12,9 @@
   "dependencies": {
     "@auth/core": "^0.34.2",
     "@prisma/client": "^6.13.0",
+    "csv-parser": "^3.2.0",
     "lucide-react": "^0.539.0",
+    "multer": "^2.0.2",
     "next": "15.4.4",
     "next-auth": "^4.24.11",
     "pg": "^8.16.3",
