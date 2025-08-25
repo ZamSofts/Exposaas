@@ -6,14 +6,22 @@ export { default as Error } from "@/components/ui/Error";
 export { useConfirm } from "@/components/ui/ConfirmModal";
 export { default as Skeleton } from "@/components/ui/Skeleton";
 export { MultiSelect } from "@/components/ui/MultiSelect";
-export {CustomSelect} from "@/components/ui/SingleSelecter";
-export {customStyles} from "@/utils/reactSelectStyles";
+export { CustomSelect } from "@/components/ui/SingleSelecter";
+export { customStyles } from "@/utils/reactSelectStyles";
 export { CustomButton } from "@/components/ui/CustomButton";
 
-export const API = async (method, name, d = {}) => {
+export const API = async (method, name, d = {}, isFile= false) => {
   if (method == "GET" || method == "DELETE") {
     const data = await fetch("/api/" + name, {
       method: method,
+    });
+    return await data.json();
+  }
+
+  if (isFile && d instanceof FormData) {
+    const data = await fetch("/api/" + name, {
+      method,
+      body: d,
     });
     return await data.json();
   }
