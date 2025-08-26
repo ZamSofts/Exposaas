@@ -53,6 +53,9 @@ export default async function handler(req, res) {
         })
         .on("end", async () => {
           try {
+            let createdCount = 0;
+            let updatedCount = 0;
+
             for (const row of results) {
               const lotNumber = row["lot_number"] || null;
               const auction = row["auction"] || null;
@@ -73,30 +76,43 @@ export default async function handler(req, res) {
                 }
               }
 
-              // --- Upsert Vehicle ---
-              await prisma.vehicle.upsert({
-                where: { chassisNumber }, // must be unique in schema
-                update: {
-                  lotNumber,
-                  auction,
-                  brandId: brand.id,
-                  companyId: session.companyId,
-                  statusId: 1,
-                },
-                create: {
-                  lotNumber,
-                  auction,
-                  chassisNumber,
-                  brandId: brand.id,
-                  companyId: session.companyId,
-                  statusId: 1,
-                },
+              // --- Check existing vehicle ---
+              const existing = await prisma.vehicle.findUnique({
+                where: { chassisNumber },
               });
+
+              if (existing) {
+                await prisma.vehicle.update({
+                  where: { chassisNumber },
+                  data: {
+                    lotNumber,
+                    auction,
+                    brandId:  brand.id ,
+                    companyId: session.companyId,
+                    statusId: 1,
+                  },
+                });
+                updatedCount++;
+              } else {
+                await prisma.vehicle.create({
+                  data: {
+                    lotNumber,
+                    auction,
+                    chassisNumber,
+                    brandId: brand.id ,
+                    companyId: session.companyId,
+                    statusId: 1,
+                  },
+                });
+                createdCount++;
+              }
             }
 
             res.status(200).json({
-              message: "CSV imported successfully)",
-              rows: results.length,
+              message: "CSV imported successfully",
+              created: createdCount,
+              updated: updatedCount,
+              totalAffected: createdCount + updatedCount,
             });
           } catch (error) {
             console.error(error);

@@ -1,5 +1,16 @@
 import { prisma, getSession } from "@/lib/useful";
 
+const getOrderBy = (sortBy, sortOrder) => {
+  if (sortBy === "brand") {
+    return { brand: { name: sortOrder } };
+  }
+  if (sortBy === "status") {
+    return { status: { name: sortOrder } };
+  }
+  // Add other relation-based sorting if needed
+  return { [String(sortBy)]: String(sortOrder) };
+};
+
 export default async function handler(req, res) {
   const session = await getSession(req, res);
 
@@ -47,45 +58,66 @@ export default async function handler(req, res) {
           },
           where: {
             ...filterByCompany,
-            ...(search? { name: { contains: search, mode: "insensitive" } }: {}), // only add search filter if not empty
+            ...(search
+              ? {
+                  OR: [
+                    { name: { contains: search, mode: "insensitive" } },
+                    { chassisNumber: { contains: search, mode: "insensitive" } },
+                    { auction: { contains: search, mode: "insensitive" } },
+                    { lotNumber: { contains: search, mode: "insensitive" } },
+                    { remarks: { contains: search, mode: "insensitive" } },
+                    { brand: { name: { contains: search, mode: "insensitive" } } },
+                  ],
+                }
+              : {}),
           },
-          orderBy: { [String(sortBy)]: String(sortOrder) },
+          orderBy: getOrderBy(sortBy, sortOrder),
         });
 
         return res.status(200).json(vehicles);
       }
 
       // ---- All with pagination ----
+      const searchFilter = search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { chassisNumber: { contains: search, mode: "insensitive" } },
+              { auction: { contains: search, mode: "insensitive" } },
+              { lotNumber: { contains: search, mode: "insensitive" } },
+              { remarks: { contains: search, mode: "insensitive" } },
+              { brand: { name: { contains: search, mode: "insensitive" } } },
+              { status: { name: { contains: search, mode: "insensitive" } } }, // <-- Add this line
+            ],
+          }
+        : {};
+
+      const where = {
+        ...filterByCompany,
+        ...searchFilter,
+      };
+
       const [vehicles, total] = await Promise.all([
         prisma.vehicle.findMany({
           skip: (page - 1) * limit,
           take: limit,
-          orderBy: { [String(sortBy)]: String(sortOrder) },
-          where: {
-            ...filterByCompany,
-            ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
-          },
+          orderBy: getOrderBy(sortBy, sortOrder),
+          where,
           include: {
             company: { select: { name: true } },
             brand: { select: { name: true } },
             status: { select: { name: true } },
           },
         }),
-        prisma.vehicle.count({
-          where: {
-            ...filterByCompany,
-            ...(search ? { name: { contains: search, mode: "insensitive" } } : {}), // only add search filter if not empty
-          },
-        }),
+        prisma.vehicle.count({ where }),
       ]);
 
       return res.status(200).json({ vehicles, total });
     }
 
     if (req.method === "PUT") {
-      const { name, chassisNumber, brandId, remarks, companyId, statusId } = req.body;
+      const { name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
 
-      
       if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
       if (!brandId) return res.status(400).json({ error: "Brand is required" });
       if (!companyId) return res.status(400).json({ error: "Company is required" });
@@ -110,6 +142,8 @@ export default async function handler(req, res) {
           remarks,
           companyId: Number(companyId),
           statusId: Number(statusId),
+          auction,
+          lotNumber,
         },
       });
 
@@ -117,14 +151,16 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { id, name, chassisNumber, brandId, remarks, companyId, statusId } = req.body;
+      const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
 
       if (!id) return res.status(400).json({ error: "Vehicle ID is required" });
-     
+
       if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
       if (!brandId) return res.status(400).json({ error: "Brand is required" });
       if (!companyId) return res.status(400).json({ error: "Company is required" });
       if (!statusId) return res.status(400).json({ error: "Status is required" });
+      if (!auction) return res.status(400).json({ error: "Auction is required" });
+      if (!lotNumber) return res.status(400).json({ error: "Lot number is required" });
 
       // ensure brand exists
       const brandExists = await prisma.brand.findUnique({ where: { id: Number(brandId) } });
@@ -144,6 +180,8 @@ export default async function handler(req, res) {
         data: {
           name,
           chassisNumber,
+          auction,
+          lotNumber,
           brandId: Number(brandId),
           remarks,
           companyId: Number(companyId),

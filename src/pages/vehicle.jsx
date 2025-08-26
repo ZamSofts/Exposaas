@@ -1,14 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useRouter } from "next/router";
 import { useConfirm, useAuth, Error, API, CustomSelect, CustomButton } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
+import { Toast } from "../hooks/wrapper";
 
 export default function VehiclesPage() {
   const { session, status } = useAuth(["Admin"]);
-  const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [vehicles, setVehicles] = useState([]);
@@ -24,7 +23,7 @@ export default function VehiclesPage() {
   const [chassisNumber, setChassisNumber] = useState("");
   const [lotNumber, setLotNumber] = useState("");
   const [auction, setAuction] = useState("");
-  const [companyId, setCompanyId] = useState(Number(session?.companyId));
+  const [companyId, setCompanyId] = useState(session?.companyId || null);
   const [statusId, setStatusId] = useState(0);
   const [remarks, setRemarks] = useState("");
   const [csvFile, setCsvFile] = useState(null);
@@ -35,13 +34,18 @@ export default function VehiclesPage() {
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
+  const [perPage, setPerPage] = useState(5);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState("asc");
 
+  // Toast state
+  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const toastTimeout = useRef(null);
+
   useEffect(() => {
     if (status === "authenticated" && session) {
+      setCompanyId(Number(session.companyId));
       loadInitialData();
     }
   }, [status, session]);
@@ -50,13 +54,19 @@ export default function VehiclesPage() {
     loadData();
   }, [currentPage, perPage, search, sortBy, sortOrder]);
 
+  const showToast = (message, type = "success") => {
+    setToast({ show: true, message, type });
+    if (toastTimeout.current) clearTimeout(toastTimeout.current);
+    toastTimeout.current = setTimeout(() => setToast({ show: false, message: "", type }), 3000);
+  };
+
   const loadInitialData = async () => {
     setIsLoading(true);
     setError("");
     try {
       const [brandData, statusData] = await Promise.all([API("GET", "brand"), API("GET", "vehicleStatus")]);
-      setBrand(!brandData.error && session?.permissions?.includes("view:user") ? brandData : []);
-      setVehicleStatus(!statusData.error && session?.permissions?.includes("view:user") ? statusData : []);
+      setBrand(!brandData.error ? brandData : []);
+      setVehicleStatus(!statusData.error ? statusData : []);
     } catch {
       setError("Something went wrong");
     } finally {
@@ -75,7 +85,6 @@ export default function VehiclesPage() {
       sortOrder,
     });
     const data = await API("GET", `vehicle?${params}`);
-    console.log("Fetched vehicles data:", data);
     if (data.error) {
       setError(data.error);
       setIsLoading(false);
@@ -112,7 +121,7 @@ export default function VehiclesPage() {
         name,
         brandId,
         chassisNumber,
-        companyId: Number(session?.companyId),
+        companyId: Number(session.companyId),
         statusId,
         lotNumber,
         auction,
@@ -124,7 +133,7 @@ export default function VehiclesPage() {
         name,
         brandId,
         chassisNumber,
-        companyId: Number(companyId),
+        companyId: Number(session.companyId),
         statusId,
         lotNumber,
         auction,
@@ -133,8 +142,10 @@ export default function VehiclesPage() {
     }
     if (response.error) {
       setError(response.error);
+      showToast(response.error, "error");
       return;
     }
+    showToast(edit === 0 ? "Vehicle added successfully!" : "Vehicle updated successfully!", "success");
     loadData();
     resetForm();
   };
@@ -152,9 +163,11 @@ export default function VehiclesPage() {
     setError("");
   };
 
+  // Fake progress bar for CSV upload
   const uploadCsv = async () => {
     if (!csvFile) {
       setError("Please select a valid CSV file first.");
+      showToast("Please select a valid CSV file first.", "error");
       return;
     }
     setUploadProgress(1);
@@ -177,18 +190,21 @@ export default function VehiclesPage() {
 
     if (response.error) {
       setError(response.error);
+      showToast(response.error, "error");
       return;
     }
-    alert(`CSV uploaded successfully! ${response.rows} rows processed.`);
+    showToast(`CSV uploaded successfully! ${response.totalAffected} rows processed.`, "success");
     setCsvFileModal(false);
     setCsvFile(null);
     setError("");
+    loadData();
   };
 
   const loadEdit = async id => {
     const data = await API("GET", `vehicle?id=${id}`);
     if (data.error) {
       setError(data.error);
+      showToast(data.error, "error");
       return;
     }
     setName(data.name);
@@ -213,8 +229,10 @@ export default function VehiclesPage() {
     const data = await API("DELETE", `vehicle?id=${id}`);
     if (data.error) {
       setError(data.error);
+      showToast(data.error, "error");
       return;
     }
+    showToast("Vehicle deleted successfully!", "success");
     loadData();
   };
 
@@ -233,18 +251,33 @@ export default function VehiclesPage() {
     setCsvFileModal(false);
   };
 
+  // Toggle vehicle status with API call
   const toggleStatus = async id => {
     const vehicle = vehicles.find(v => v.id === id);
     if (!vehicle) return;
-    const newStatus = vehicle.status === "active" ? "inactive" : "active";
+    const currentStatusName = vehicle.status?.name?.toLowerCase();
+    const newStatusObj = vehicleStatus.find(s => s.name?.toLowerCase() !== currentStatusName);
+    if (!newStatusObj) {
+      showToast("No alternate status found.", "error");
+      return;
+    }
     const confirmed = await confirm({
       title: "Change vehicle Status",
-      message: `Are you sure you want to change "${vehicle.name}" status to ${newStatus}?`,
+      message: `Are you sure you want to change "${vehicle.name}" status to ${newStatusObj.name}?`,
       confirmText: "Change Status",
       type: "warning",
     });
     if (!confirmed) return;
-    // Add API call to update status if needed
+    const response = await API("POST", "vehicle", {
+      id: vehicle.id,
+      statusId: newStatusObj.id,
+    });
+    if (response.error) {
+      setError(response.error);
+      showToast(response.error, "error");
+      return;
+    }
+    showToast(`Status changed to ${newStatusObj.name}`, "success");
     loadData();
   };
 
@@ -406,20 +439,20 @@ export default function VehiclesPage() {
                         <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                           <Car className="w-4 h-4 text-[var(--primary)]" />
                         </div>
-                        <div className="text-sm font-medium text-[var(--foreground)]">{v.name || "Unknown"}</div>
+                        <div className="text-sm font-medium text-[var(--foreground)]">{v.name || "-"}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.brand.name}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{v.brand?.name || "-"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-[var(--foreground)]">{v.chassisNumber}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.lotNumber || "Unknown"}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{v.lotNumber || "-"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.auction || "Unknown"}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{v.auction || "-"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -431,7 +464,7 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-6 py-4 min-w-[100px] max-w-[200px] whitespace-normal">
                       <div className="flex flex-wrap gap-2">
-                        <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "Unknown"}</span>
+                        <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "-"}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(v.createdAt).toLocaleString()}</td>
@@ -460,6 +493,7 @@ export default function VehiclesPage() {
       </Sidebar>
 
       <ConfirmComponent />
+      {toast.show && <Toast type={toast.type} message={toast.message} />}
     </>
   );
 }

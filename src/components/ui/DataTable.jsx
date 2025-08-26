@@ -69,9 +69,11 @@ export default function DataTable({
 
   const renderSortArrows = (columnId) => {
     if (!onSort) return null;
-
+    if(columnId==='role') return null; // Disable sorting for role column
+    if(columnId==='permissions') return null; // Disable sorting for col column
     return (
       <div className="flex flex-col">
+
         <ChevronUp
           className={`w-3 h-3 ${sortBy === columnId && sortOrder === "asc" ? "text-[var(--primary)]" : "text-[var(--secondary-foreground)]"}`}
         />

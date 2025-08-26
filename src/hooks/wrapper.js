@@ -9,6 +9,7 @@ export { MultiSelect } from "@/components/ui/MultiSelect";
 export { CustomSelect } from "@/components/ui/SingleSelecter";
 export { customStyles } from "@/utils/reactSelectStyles";
 export { CustomButton } from "@/components/ui/CustomButton";
+export { Toast } from "@/components/ui/CustomToast";
 
 export const API = async (method, name, d = {}, isFile= false) => {
   if (method == "GET" || method == "DELETE") {
