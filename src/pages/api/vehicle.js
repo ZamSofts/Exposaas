@@ -2,21 +2,18 @@ import { prisma, getSession } from "@/lib/useful";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
-  const roles = ["Sadmin", "Admin"];
-
-  if (!roles.includes(session.role)) {
-    return res.status(403).json({ error: "Only administrators can manage vehicles" });
-  }
 
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
-  const search = String(req.query.search || "").trim().toLowerCase();
+  const search = String(req.query.search || "")
+    .trim()
+    .toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
   const col = req.query.col ? String(req.query.col).split(",") : null;
-  const selectFields =col && col.length > 0? Object.fromEntries(col.map((c) => [c, true])) : undefined;
+  const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
 
-try {
+  try {
     if (req.method === "GET") {
       const userCompanyId = session?.companyId;
       const filterByCompany = session.role === "Sadmin" ? {} : { companyId: userCompanyId };
@@ -50,7 +47,7 @@ try {
           },
           where: {
             ...filterByCompany,
-            name: { contains: search, mode: "insensitive" },
+            ...(search? { name: { contains: search, mode: "insensitive" } }: {}), // only add search filter if not empty
           },
           orderBy: { [String(sortBy)]: String(sortOrder) },
         });
@@ -66,7 +63,7 @@ try {
           orderBy: { [String(sortBy)]: String(sortOrder) },
           where: {
             ...filterByCompany,
-            name: { contains: search, mode: "insensitive" },
+            ...(search ? { name: { contains: search, mode: "insensitive" } } : {}),
           },
           include: {
             company: { select: { name: true } },
@@ -77,7 +74,7 @@ try {
         prisma.vehicle.count({
           where: {
             ...filterByCompany,
-            name: { contains: search, mode: "insensitive" },
+            ...(search ? { name: { contains: search, mode: "insensitive" } } : {}), // only add search filter if not empty
           },
         }),
       ]);
@@ -88,7 +85,7 @@ try {
     if (req.method === "PUT") {
       const { name, chassisNumber, brandId, remarks, companyId, statusId } = req.body;
 
-      if (!name) return res.status(400).json({ error: "Vehicle name is required" });
+      
       if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
       if (!brandId) return res.status(400).json({ error: "Brand is required" });
       if (!companyId) return res.status(400).json({ error: "Company is required" });
@@ -123,7 +120,7 @@ try {
       const { id, name, chassisNumber, brandId, remarks, companyId, statusId } = req.body;
 
       if (!id) return res.status(400).json({ error: "Vehicle ID is required" });
-      if (!name) return res.status(400).json({ error: "Vehicle name is required" });
+     
       if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
       if (!brandId) return res.status(400).json({ error: "Brand is required" });
       if (!companyId) return res.status(400).json({ error: "Company is required" });
@@ -164,7 +161,7 @@ try {
 
       res.status(200).json({ message: "Vehicle deleted successfully" });
     }
-  }  catch (error) {
+  } catch (error) {
     console.error("API error:", error);
     res.status(500).json({ error: "Internal server error" });
   }

@@ -61,8 +61,10 @@ model UserRole {
 }
 model Vehicle {
   id            Int            @id @default(autoincrement())
-  name          String
+  name          String?
   chassisNumber String         @unique
+  lotNumber     String?         
+  auction       String?         
   remarks       String?        // optional remarks/notes
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
