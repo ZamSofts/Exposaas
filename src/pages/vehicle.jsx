@@ -102,7 +102,7 @@ export default function VehiclesPage() {
   };
 
   const saveVehicle = async () => {
-    if ( !brandId || !chassisNumber || !statusId) {
+    if (!brandId || !chassisNumber || !statusId) {
       setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
       return;
     }
@@ -333,7 +333,7 @@ export default function VehiclesPage() {
                     </div>
                   )}
                   <div className="flex gap-3">
-                    <CustomButton title="Upload CSV" onClick={uploadCsv} className="btn-primary" />
+                    <CustomButton title="Upload & Sync" onClick={uploadCsv} className="btn-primary" />
                     <CustomButton
                       title="Cancel"
                       onClick={resetForm}
@@ -416,7 +416,7 @@ export default function VehiclesPage() {
                       <div className="text-sm font-medium text-[var(--foreground)]">{v.chassisNumber}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.lotNumber  || "Unknown"}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">{v.lotNumber || "Unknown"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-[var(--foreground)]">{v.auction || "Unknown"}</div>

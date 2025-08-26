@@ -1,7 +1,7 @@
 import multer from "multer";
 import csv from "csv-parser";
 import fs from "fs";
-import { prisma } from "@/lib/useful";
+import { prisma, getSession } from "@/lib/useful";
 
 // --- Multer setup ---
 const upload = multer({
@@ -27,6 +27,8 @@ function runMiddleware(req, res, fn) {
 
 // --- API Route ---
 export default async function handler(req, res) {
+  const session = await getSession(req, res);
+  console.log(session);
   if (req.method == "POST") {
     try {
       // Run multer
@@ -78,7 +80,7 @@ export default async function handler(req, res) {
                   lotNumber,
                   auction,
                   brandId: brand.id,
-                  companyId: 1,
+                  companyId: session.companyId,
                   statusId: 1,
                 },
                 create: {
@@ -86,7 +88,7 @@ export default async function handler(req, res) {
                   auction,
                   chassisNumber,
                   brandId: brand.id,
-                  companyId: 1,
+                  companyId: session.companyId,
                   statusId: 1,
                 },
               });
