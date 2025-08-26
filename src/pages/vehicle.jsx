@@ -40,7 +40,7 @@ export default function VehiclesPage() {
   const [sortOrder, setSortOrder] = useState("asc");
 
   // Toast state
-  const [toast, setToast] = useState({ show: false, message: "", type: "success" });
+  const [toast, setToast] = useState({ message: "", type: "success" });
   const toastTimeout = useRef(null);
 
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function VehiclesPage() {
     }
     if (response.error) {
       setError(response.error);
-      showToast(response.error, "error");
+      showToast(response.error, "danger");
       return;
     }
     showToast(edit === 0 ? "Vehicle added successfully!" : "Vehicle updated successfully!", "success");
@@ -493,7 +493,7 @@ export default function VehiclesPage() {
       </Sidebar>
 
       <ConfirmComponent />
-      {toast.show && <Toast type={toast.type} message={toast.message} />}
+      <Toast type={toast.type} message={toast.message} />
     </>
   );
 }
