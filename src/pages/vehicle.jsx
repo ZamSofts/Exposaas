@@ -40,9 +40,8 @@ export default function VehiclesPage() {
   const [sortOrder, setSortOrder] = useState("asc");
 
   // Toast state
-  const [toast, setToast] = useState({ message: "", type: "success" });
-  const toastTimeout = useRef(null);
-
+  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
+  console.log("page rerender");
   useEffect(() => {
     if (status === "authenticated" && session) {
       setCompanyId(Number(session.companyId));
@@ -55,9 +54,7 @@ export default function VehiclesPage() {
   }, [currentPage, perPage, search, sortBy, sortOrder]);
 
   const showToast = (message, type = "success") => {
-    setToast({ show: true, message, type });
-    if (toastTimeout.current) clearTimeout(toastTimeout.current);
-    toastTimeout.current = setTimeout(() => setToast({ show: false, message: "", type }), 3000);
+    setToast({ id: Date.now(), message, type });
   };
 
   const loadInitialData = async () => {
@@ -142,7 +139,7 @@ export default function VehiclesPage() {
     }
     if (response.error) {
       setError(response.error);
-      showToast(response.error, "danger");
+      showToast(response.error, "error");
       return;
     }
     showToast(edit === 0 ? "Vehicle added successfully!" : "Vehicle updated successfully!", "success");
@@ -493,7 +490,7 @@ export default function VehiclesPage() {
       </Sidebar>
 
       <ConfirmComponent />
-      <Toast type={toast.type} message={toast.message} />
+      <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
     </>
   );
 }

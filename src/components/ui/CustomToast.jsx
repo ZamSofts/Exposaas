@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export function Toast({ type = "success", message }) {
+export function Toast({ id, type = "success", message, onClose }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
 
@@ -22,7 +22,7 @@ export function Toast({ type = "success", message }) {
     } else {
       setIsVisible(false);
     }
-  }, [message]);
+  }, [id]);
 
   if (!isVisible && !message) return null;
 
