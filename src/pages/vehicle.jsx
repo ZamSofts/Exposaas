@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { useConfirm, useAuth, Error, API, CustomSelect, CustomButton } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
-import { Plus, Edit, Trash2, Car } from "lucide-react";
+import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
 
 export default function VehiclesPage() {
   const { session, status } = useAuth(["Admin"]);
@@ -14,20 +14,22 @@ export default function VehiclesPage() {
   const [vehicles, setVehicles] = useState([]);
   const [brand, setBrand] = useState([]);
   const [vehicleStatus, setVehicleStatus] = useState([]);
-
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
-  // form states
+  // Form states
   const [name, setName] = useState("");
   const [brandId, setBrandId] = useState(null);
   const [chassisNumber, setChassisNumber] = useState("");
+  const [lotNumber, setLotNumber] = useState("");
+  const [auction, setAuction] = useState("");
   const [companyId, setCompanyId] = useState(Number(session?.companyId));
   const [statusId, setStatusId] = useState(0);
   const [remarks, setRemarks] = useState("");
   const [csvFile, setCsvFile] = useState(null);
-  const [csvError, setCsvError] = useState(null);
+  const [csvFileModal, setCsvFileModal] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [edit, setEdit] = useState(null);
 
@@ -39,23 +41,23 @@ export default function VehiclesPage() {
   const [sortOrder, setSortOrder] = useState("asc");
 
   useEffect(() => {
+    if (status === "authenticated" && session) {
+      loadInitialData();
+    }
+  }, [status, session]);
+
+  useEffect(() => {
     loadData();
   }, [currentPage, perPage, search, sortBy, sortOrder]);
 
-  useEffect(() => {
-    if (status !== "authenticated" || !session) return;
-    loadInitialData();
-  }, [status, session]);
-
   const loadInitialData = async () => {
+    setIsLoading(true);
+    setError("");
     try {
-      setIsLoading(true);
-      setError("");
-
       const [brandData, statusData] = await Promise.all([API("GET", "brand"), API("GET", "vehicleStatus")]);
       setBrand(!brandData.error && session?.permissions?.includes("view:user") ? brandData : []);
       setVehicleStatus(!statusData.error && session?.permissions?.includes("view:user") ? statusData : []);
-    } catch (err) {
+    } catch {
       setError("Something went wrong");
     } finally {
       setIsLoading(false);
@@ -64,21 +66,21 @@ export default function VehiclesPage() {
 
   const loadData = async () => {
     setIsLoading(true);
+    setError("");
     const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      search: search.toString(),
-      sortBy: sortBy.toString(),
-      sortOrder: sortOrder.toString(),
+      page: currentPage,
+      limit: perPage,
+      search,
+      sortBy,
+      sortOrder,
     });
-
     const data = await API("GET", `vehicle?${params}`);
+    console.log("Fetched vehicles data:", data);
     if (data.error) {
       setError(data.error);
       setIsLoading(false);
       return;
     }
-    setError("");
     setVehicles(data.vehicles || []);
     setTotal(data.total || 0);
     setIsLoading(false);
@@ -89,8 +91,8 @@ export default function VehiclesPage() {
     setSortOrder(order);
   };
 
-  const handleSearch = search => {
-    setSearch(search);
+  const handleSearch = value => {
+    setSearch(value);
     setCurrentPage(1);
   };
 
@@ -100,11 +102,10 @@ export default function VehiclesPage() {
   };
 
   const saveVehicle = async () => {
-    if (!name || !brand || !chassisNumber || !statusId) {
-      setError(!name ? "Name is required" : !brand ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
+    if ( !brandId || !chassisNumber || !statusId) {
+      setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
       return;
     }
-
     let response;
     if (edit === 0) {
       response = await API("PUT", "vehicle", {
@@ -113,6 +114,8 @@ export default function VehiclesPage() {
         chassisNumber,
         companyId: Number(session?.companyId),
         statusId,
+        lotNumber,
+        auction,
         remarks,
       });
     } else {
@@ -123,15 +126,15 @@ export default function VehiclesPage() {
         chassisNumber,
         companyId: Number(companyId),
         statusId,
+        lotNumber,
+        auction,
         remarks,
       });
     }
-
     if (response.error) {
       setError(response.error);
       return;
     }
-
     loadData();
     resetForm();
   };
@@ -139,53 +142,62 @@ export default function VehiclesPage() {
   const handleFileChange = e => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
-    if (fileExtension !== "csv") {
-      setCsvError("Only CSV files are allowed!");
+    if (fileExtension !== "csv" || !["text/csv", "application/vnd.ms-excel"].includes(file.type)) {
+      setError("Only valid CSV files are allowed!");
       setCsvFile(null);
       return;
     }
-
-    if (file.type !== "text/csv" && file.type !== "application/vnd.ms-excel") {
-      setCsvError("Invalid file format. Please upload a CSV file.");
-      setCsvFile(null);
-      return;
-    }
-
     setCsvFile(file);
-    setCsvError(null);
+    setError("");
   };
 
   const uploadCsv = async () => {
     if (!csvFile) {
-      setCsvError("Please select a valid CSV file first.");
+      setError("Please select a valid CSV file first.");
       return;
     }
+    setUploadProgress(1);
+    let fakeProgress = 1;
+    const interval = setInterval(() => {
+      fakeProgress += Math.random() * 10;
+      if (fakeProgress < 90) {
+        setUploadProgress(Math.floor(fakeProgress));
+      }
+    }, 200);
 
     const formData = new FormData();
     formData.append("file", csvFile);
-
     const response = await API("POST", "addVehicle", formData, true);
+
+    clearInterval(interval);
+    setUploadProgress(100);
+
+    setTimeout(() => setUploadProgress(0), 1000);
+
     if (response.error) {
       setError(response.error);
       return;
-    } else {
-      alert(`CSV uploaded successfully! ${response.rows} rows processed.`);
     }
-    resetForm();
+    alert(`CSV uploaded successfully! ${response.rows} rows processed.`);
+    setCsvFileModal(false);
     setCsvFile(null);
+    setError("");
   };
 
   const loadEdit = async id => {
     const data = await API("GET", `vehicle?id=${id}`);
-    if (data.error) return setError(data.error);
-
+    if (data.error) {
+      setError(data.error);
+      return;
+    }
     setName(data.name);
     setBrandId(data.brandId);
     setChassisNumber(data.chassisNumber);
     setCompanyId(data.companyId);
     setStatusId(data.statusId);
+    setLotNumber(data.lotNumber || "");
+    setAuction(data.auction || "");
     setRemarks(data.remarks || "");
     setEdit(id);
   };
@@ -198,7 +210,6 @@ export default function VehiclesPage() {
       type: "danger",
     });
     if (!confirmed) return;
-
     const data = await API("DELETE", `vehicle?id=${id}`);
     if (data.error) {
       setError(data.error);
@@ -209,19 +220,22 @@ export default function VehiclesPage() {
 
   const resetForm = () => {
     setName("");
-    setBrandId(0);
+    setBrandId(null);
     setChassisNumber("");
-    setCompanyId(0);
+    setCompanyId(Number(session?.companyId));
     setStatusId(0);
+    setLotNumber("");
+    setAuction("");
     setRemarks("");
     setError("");
     setEdit(null);
+    setCsvFile(null);
+    setCsvFileModal(false);
   };
 
   const toggleStatus = async id => {
     const vehicle = vehicles.find(v => v.id === id);
     if (!vehicle) return;
-
     const newStatus = vehicle.status === "active" ? "inactive" : "active";
     const confirmed = await confirm({
       title: "Change vehicle Status",
@@ -230,8 +244,7 @@ export default function VehiclesPage() {
       type: "warning",
     });
     if (!confirmed) return;
-
-    // You may want to call API here to update status
+    // Add API call to update status if needed
     loadData();
   };
 
@@ -240,7 +253,6 @@ export default function VehiclesPage() {
       <Head>
         <title>Vehicles Management - ExpoSaaS</title>
       </Head>
-
       <Sidebar>
         <div className="p-8 bg-[var(--background)] min-h-screen">
           {/* Header Section */}
@@ -255,84 +267,76 @@ export default function VehiclesPage() {
           </div>
 
           {/* Add/Edit Vehicle Modal */}
-          {edit != null && edit !== 4 && (
+          {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-4 sm:p-6 w-full max-w-3xl">
                 <h3 className="text-lg sm:text-xl font-semibold mb-6">{edit === 0 ? "Add New Vehicle" : "Edit Vehicle"}</h3>
-
-                {/* Responsive grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                  {/* Brand */}
                   <div>
                     <label className="input-label">Brand</label>
                     <CustomSelect data={brand} selectedId={brandId} setSelectedId={setBrandId} />
                   </div>
-
-                  {/* Vehicle Name */}
                   <div>
                     <label className="input-label">Vehicle Name</label>
                     <input type="text" value={name} onChange={e => setName(e.target.value)} className="input-style" placeholder="Enter vehicle name..." />
                   </div>
-
-                  {/* Status */}
                   <div>
                     <label className="input-label">Current Status</label>
                     <CustomSelect data={vehicleStatus} selectedId={statusId} setSelectedId={setStatusId} />
                   </div>
-
-                  {/* Chassis Number */}
                   <div>
                     <label className="input-label">Chassis Number</label>
                     <input type="text" value={chassisNumber} onChange={e => setChassisNumber(e.target.value)} className="input-style" placeholder="Enter chassis number..." />
                   </div>
-
-                  {/* Remarks - full width */}
+                  <div>
+                    <label className="input-label">Lot Number</label>
+                    <input type="text" value={lotNumber} onChange={e => setLotNumber(e.target.value)} className="input-style" placeholder="Enter lot number..." />
+                  </div>
+                  <div>
+                    <label className="input-label">Auction</label>
+                    <input type="text" value={auction} onChange={e => setAuction(e.target.value)} className="input-style" placeholder="Enter auction..." />
+                  </div>
                   <div className="col-span-1 sm:col-span-2">
                     <label className="input-label">Remarks</label>
                     <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="input-style" placeholder="Enter remarks..." />
                   </div>
                 </div>
-
-                {/* Error message */}
                 <Error message={error} />
-
-                {/* Buttons */}
                 <div className="flex flex-col sm:flex-row gap-3 justify-end mt-6">
                   <CustomButton title={edit === 0 ? "Add Vehicle" : "Save Changes"} onClick={saveVehicle} className="btn-primary w-full sm:w-auto text-center justify-center" />
-
                   <CustomButton title="Cancel" onClick={resetForm} className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg w-full sm:w-auto text-center justify-center" />
                 </div>
               </div>
             </div>
           )}
 
-          {edit === 4 && edit != null && (
+          {/* CSV Upload Modal */}
+          {csvFileModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 4 ? "Upload File" : "Edit File"}</h3>
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
                 <div className="space-y-4">
                   <div>
-                    <div className="col-span-1 sm:col-span-2">
-                      <label className="input-label">Upload CSV File</label>
-                      <input type="file" accept=".csv" onChange={handleFileChange} className="input-style" />
-
-                      {csvFile && (
-                        <p className="text-sm text-[var(--secondary-foreground)] mt-2">
-                          Selected file: <strong>{csvFile.name}</strong>
-                        </p>
-                      )}
-
-                      {csvError && <p className="text-sm text-red-500 mt-1">{csvError}</p>}
-                    </div>
+                    <label className="input-label">Upload CSV File</label>
+                    <input type="file" accept=".csv" onChange={handleFileChange} className="input-style" />
+                    {csvFile && (
+                      <p className="text-sm text-[var(--secondary-foreground)] mt-2">
+                        Selected file: <strong>{csvFile.name}</strong>
+                      </p>
+                    )}
                   </div>
                   <Error message={error} />
-
+                  {uploadProgress > 0 && (
+                    <div className="w-full bg-[var(--border)] rounded h-3 mb-2">
+                      <div className="bg-[var(--primary)] h-3 rounded transition-all duration-200" style={{ width: `${uploadProgress}%` }}></div>
+                      <div className="text-xs text-right mt-1 text-[var(--foreground)]">{uploadProgress}%</div>
+                    </div>
+                  )}
                   <div className="flex gap-3">
-                    <CustomButton title={edit === 4 ? "Upload CSV" : "Save Changes"} onClick={uploadCsv} className="btn-primary" />
-
+                    <CustomButton title="Upload CSV" onClick={uploadCsv} className="btn-primary" />
                     <CustomButton
                       title="Cancel"
-                      onClick={() => setEdit(null)}
+                      onClick={resetForm}
                       className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
                     />
                   </div>
@@ -359,17 +363,12 @@ export default function VehiclesPage() {
           <Error message={error} />
 
           <div className="relative">
-            {/* Upload Button */}
             <div className="absolute right-0 top-0 hidden md:block">
-              <CustomButton title="Upload CSV File" onClick={() => setEdit(4)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
+              <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
             </div>
-
-            {/* Show button below search bar on mobile */}
             <div className="block md:hidden mb-3">
-              <CustomButton title="Upload CSV File" onClick={() => setEdit(4)} className="w-full btn-primary" icon={<Plus className="w-5 h-5" />} />
+              <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
             </div>
-
-            {/* Vehicles Table */}
             <DataTable
               data={vehicles}
               total={total}
@@ -388,6 +387,8 @@ export default function VehiclesPage() {
                   <th id="name">Name</th>
                   <th id="brand">Brand</th>
                   <th id="chassisNumber">Chassis Number</th>
+                  <th id="lotNumber">Lot Number</th>
+                  <th id="auction">Auction</th>
                   <th id="status">Status</th>
                   <th id="remarks">Remarks</th>
                   <th id="createdAt">Registered At</th>
@@ -405,17 +406,21 @@ export default function VehiclesPage() {
                         <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                           <Car className="w-4 h-4 text-[var(--primary)]" />
                         </div>
-                        <div className="text-sm font-medium text-[var(--foreground)]">{v.name}</div>
+                        <div className="text-sm font-medium text-[var(--foreground)]">{v.name || "Unknown"}</div>
                       </div>
                     </td>
-
-                    <td className="px-6  py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-[var(--foreground)]">{v.brand.name}</div>
                     </td>
-                    <td className="px-6  py-4 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-[var(--foreground)]">{v.chassisNumber}</div>
                     </td>
-
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-[var(--foreground)]">{v.lotNumber  || "Unknown"}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-[var(--foreground)]">{v.auction || "Unknown"}</div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         onClick={() => toggleStatus(v.id)}
@@ -426,27 +431,21 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-6 py-4 min-w-[100px] max-w-[200px] whitespace-normal">
                       <div className="flex flex-wrap gap-2">
-                        <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "-"}</span>
+                        <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "Unknown"}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(v.createdAt).toLocaleString()}</td>
-                    {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                    {new Date(v.updatedAt).toLocaleString()}
-                  </td> */}
-
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => loadEdit(v.id)}
-                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
+                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => deleteIt(v.id)}
-                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
+                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
