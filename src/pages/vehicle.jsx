@@ -41,7 +41,6 @@ export default function VehiclesPage() {
 
   // Toast state
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
-  console.log("page rerender");
   useEffect(() => {
     if (status === "authenticated" && session) {
       setCompanyId(Number(session.companyId));
@@ -190,7 +189,7 @@ export default function VehiclesPage() {
       showToast(response.error, "error");
       return;
     }
-    showToast(`CSV uploaded successfully! ${response.totalAffected} rows processed.`, "success");
+    showToast(`CSV uploaded successfully!`, "success");
     setCsvFileModal(false);
     setCsvFile(null);
     setError("");
