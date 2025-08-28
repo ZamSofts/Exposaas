@@ -2,7 +2,7 @@ const { PrismaClient } = require("../src/generated/prisma");
 const prisma = new PrismaClient();
 
 async function main() {
-  const permissions = ["add:user", "edit:user", "delete:user", "view:user", "view:vehicle", "add:vehicle", "edit:vehicle", "delete:vehicle"];
+  const permissions = ["add:user", "edit:user", "delete:user", "view:user", "view:vehicle", "add:vehicle", "edit:vehicle", "delete:vehicle", "add:csv"];
 
   try {
     await prisma.permission.deleteMany();

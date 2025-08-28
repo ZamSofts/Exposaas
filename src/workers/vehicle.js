@@ -1,25 +1,44 @@
-import { Worker } from "bullmq";
-import { connection } from "../queues/vehicle.js"; // reuse your redis config
-import { prisma } from "./prismaClient.js";
-import fs from "fs";
-import csv from "csv-parser";
+const { Worker, Queue } = require("bullmq");
+const { connection } = require("../queues/vehicle.js"); // reuse your redis config
+const { prisma } = require("./prismaClient.js");
+const fs = require("fs");
+const csv = require("csv-parser");
+
+// Create queue instance for cleanup
+const vehicleQueue = new Queue("vehicle", { connection });
+
+// Auto-cleanup function
+async function cleanupOldJobs() {
+  try {
+    const completed = await vehicleQueue.getCompleted();
+    if (completed.length > 10) {
+      const toRemove = completed.slice(0, -10); // Keep last 10
+      for (const job of toRemove) {
+        await job.remove();
+      }
+      console.log(`🧹 Cleaned up ${toRemove.length} old jobs`);
+    }
+  } catch (error) {
+    console.error("Cleanup error:", error.message);
+  }
+}
 
 const worker = new Worker(
   "vehicle",
   async job => {
+    console.log("Vehicle Job Started");
     const { filePath, companyId } = job.data;
-
     const results = [];
     let count = 0;
 
     return new Promise((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(
-          csv({
-            mapHeaders: ({ header }) => header.trim().toLowerCase().replace(/\s+/g, "_"),
-            // "Lot Number" → "lot_number"
-          })
-        )
+      const stream = fs.createReadStream(filePath);
+      const parser = csv({
+        mapHeaders: ({ header }) => header.trim().toLowerCase().replace(/\s+/g, "_"),
+      });
+
+      stream
+        .pipe(parser)
         .on("data", data => results.push(data))
         .on("end", async () => {
           try {
@@ -63,24 +82,70 @@ const worker = new Worker(
             }
 
             console.log("CSV Processed: ", count, "for company: ", companyId);
+            resolve({ processed: count });
           } catch (error) {
             console.error(error);
             console.log({ error: "Database insert/update failed" });
+            reject(error);
           } finally {
-            fs.unlinkSync(filePath); // cleanup
+            // Clean up file and memory
+            try {
+              fs.unlinkSync(filePath);
+            } catch (unlinkError) {
+              console.warn("Failed to delete file:", unlinkError.message);
+            }
+
+            // Clear the results array to free memory
+            results.length = 0;
+
+            // Destroy streams
+            stream.destroy();
+            parser.destroy();
           }
-          resolve({ processed: count });
         })
-        .on("error", reject);
+        .on("error", error => {
+          // Clean up on stream error
+          try {
+            fs.unlinkSync(filePath);
+          } catch (unlinkError) {
+            console.warn("Failed to delete file on error:", unlinkError.message);
+          }
+          results.length = 0;
+          stream.destroy();
+          parser.destroy();
+          reject(error);
+        });
     });
   },
   { connection }
 );
 
-worker.on("completed", job => {
+worker.on("completed", async job => {
   console.log(`Job ${job.id} completed ✅`, job.returnvalue);
+  console.log(job.id % 5);
+  // Cleanup old jobs every 5th completion
+  if (job.id % 5 === 0) {
+    await cleanupOldJobs();
+  }
 });
 
 worker.on("failed", (job, err) => {
   console.error(`Job ${job.id} failed:`, err);
 });
+
+// Graceful shutdown handling
+process.on("SIGTERM", async () => {
+  console.log("🛑 SIGTERM received, shutting down gracefully...");
+  await worker.close();
+  await connection.disconnect();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  console.log("🛑 SIGINT received, shutting down gracefully...");
+  await worker.close();
+  await connection.disconnect();
+  process.exit(0);
+});
+
+console.log("🚀 Vehicle worker started and listening...");

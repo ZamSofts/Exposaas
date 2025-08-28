@@ -189,7 +189,7 @@ export default function VehiclesPage() {
       showToast(response.error, "error");
       return;
     }
-    showToast(`CSV uploaded successfully!`, "success");
+    showToast(response.message, "success");
     setCsvFileModal(false);
     setCsvFile(null);
     setError("");
