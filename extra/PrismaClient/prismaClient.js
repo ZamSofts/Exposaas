@@ -1,4 +1,4 @@
-const { PrismaClient } = require("../generated/prisma/index.js"); // <- point to generated client
+const { PrismaClient } = require("../../src/generated/prisma/index.js"); // <- point to generated client
 
 const globalForPrisma = globalThis;
 

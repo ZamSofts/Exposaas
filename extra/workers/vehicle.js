@@ -1,6 +1,7 @@
+
 const { Worker, Queue } = require("bullmq");
 const { connection } = require("../queues/vehicle.js"); // reuse your redis config
-const { prisma } = require("./prismaClient.js");
+const { prisma } = require("../PrismaClient/prismaClient.js");
 const fs = require("fs");
 const csv = require("csv-parser");
 

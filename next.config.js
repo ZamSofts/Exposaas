@@ -9,6 +9,7 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': require('path').resolve(__dirname, 'src'),
+      '@extra': require('path').resolve(__dirname, 'extra'),
     };
     return config;
   },

@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "worker": "node -r dotenv/config src/workers/vehicle.js",
+    "worker": "node -r dotenv/config extra/workers/vehicle.js",
+    "ws": "node extra/webSocket/ws-server.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -24,7 +25,10 @@
     "prisma": "^6.14.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-select": "^5.10.2"
+    "react-select": "^5.10.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
