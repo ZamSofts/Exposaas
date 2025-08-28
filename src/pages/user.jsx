@@ -6,7 +6,6 @@ import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
 
-
 export default function Userss() {
   const { session, status } = useAuth(["Sadmin", "Admin"]);
   const router = useRouter();
@@ -55,8 +54,8 @@ export default function Userss() {
       setError("");
 
       const [companyData, roleData] = await Promise.all([API("GET", "company?col=id,name"), API("GET", "role")]);
-      setRoles(!roleData.error && session?.permissions?.includes("view:user") ? roleData.role : []);
-      if (!companyData.error && session?.permissions?.includes("view:user")) {
+      setRoles(!roleData.error ? roleData.role : []);
+      if (!companyData.error) {
         setCompanies(companyData ?? []);
       } else {
         setCompanies([]);
@@ -96,7 +95,7 @@ export default function Userss() {
     setSortOrder(order);
   };
 
-  const handleSearch = (search) => {
+  const handleSearch = search => {
     setSearch(search);
     setCurrentPage(1); // Reset to first page on search
   };
@@ -119,27 +118,11 @@ export default function Userss() {
       const newUser = {
         username,
         password,
-        companyId:
-          session?.role != "Sadmin"
-            ? Number(session?.companyId)
-            : Number(companyId),
+        companyId: session?.role != "Sadmin" ? Number(session?.companyId) : Number(companyId),
         roleIds: rolesId,
-      };      
-      if (
-        !newUser.username ||
-        !newUser.password ||
-        !newUser.companyId ||
-        newUser.roleIds.length === 0
-      ) {
-        setError(
-          !newUser.username
-            ? "Name is required"
-            : !newUser.password
-            ? "Password is required"
-            : !newUser.companyId
-            ? "Please select a company"
-            : "Please select a role"
-        );
+      };
+      if (!newUser.username || !newUser.password || !newUser.companyId || newUser.roleIds.length === 0) {
+        setError(!newUser.username ? "Name is required" : !newUser.password ? "Password is required" : !newUser.companyId ? "Please select a company" : "Please select a role");
         return;
       }
 
@@ -177,7 +160,7 @@ export default function Userss() {
     setEdit(null);
   };
 
-  const loadEdit = async (id) => {
+  const loadEdit = async id => {
     const data = await API("GET", `user?id=${id}`);
     setIsLoading;
     setUserName(data.username);
@@ -187,7 +170,7 @@ export default function Userss() {
     setEdit(id);
   };
 
-  const deleteIt = async (id) => {
+  const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete User",
       message: "Are you sure you want to delete this user? This action cannot be undone.",
@@ -204,15 +187,15 @@ export default function Userss() {
     loadData();
   };
 
-  const togglePasswordVisibility = (id) => {
+  const togglePasswordVisibility = id => {
     setVisiblePasswords(prev => (prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]));
   };
-  const getRoleName = (roleId) => {
+  const getRoleName = roleId => {
     const rolename = roles.find(r => r.id === roleId);
     if (!rolename) return "Unknown";
     return rolename.name;
   };
-  const getCompanyName = (CompanyId) => {
+  const getCompanyName = CompanyId => {
     const companyName = companies.find(c => c.id === CompanyId);
     if (!companyName) return "Unknown";
     return companyName.name;
