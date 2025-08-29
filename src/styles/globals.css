@@ -92,4 +92,17 @@ body {
 .input-label {
   @apply block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2
 }
+.vehicle-doc-style {
+  @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4 bg-[var(--input)] rounded-lg border border-[var(--border)]
+}
 
+.vehicle-doc-display {
+  @apply aspect-square bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 flex flex-col justify-between hover:border-[var(--primary)] transition-all duration-200
+}
+.vehicle-doc-upload-button {
+  @apply aspect-square border-2 border-dashed border-[var(--border)] rounded-lg flex flex-col items-center justify-center hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 transition-all duration-200 cursor-pointer
+}
+
+.vehicle-doc-remove-button {
+  @apply absolute -top-1 -right-1 w-5 h-5 bg-[var(--error)] text-white rounded-full flex items-center justify-center text-xs hover:bg-[var(--error)]/80 transition-colors duration-200 opacity-0 group-hover:opacity-100
+}

@@ -3,35 +3,38 @@ import Head from "next/head";
 import { Search, Hash, Send, Wifi, WifiOff } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import { useAuth } from "@/hooks/wrapper";
+import { Toast } from "../hooks/wrapper";
 
 export default function Dashboard() {
-  const { session, status } = useAuth(); 
-  
+  const { session, status } = useAuth();
+
   // Get user info - moved before conditional returns to maintain hook order
-  const userInfo = useMemo(() => ({
-    username: session?.name,
-    userId: session?.id
-  }), [session?.name, session?.id]);
-  
-  
+  const userInfo = useMemo(
+    () => ({
+      username: session?.name,
+      userId: session?.id,
+    }),
+    [session?.name, session?.id]
+  );
+
   // Don't render anything while loading or if not authenticated
   if (status === "loading") {
     return <div className="flex justify-center items-center h-screen">Loading...</div>;
   }
-  
+
   if (status !== "authenticated" || !session) {
     return <div className="flex justify-center items-center h-screen">Please log in to access the dashboard.</div>;
   }
-  
+
   return <DashboardContent userInfo={userInfo} />;
 }
 
 function DashboardContent({ userInfo }) {
   const { username, userId } = userInfo;
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [messageInput, setMessageInput] = useState("");
-  
+
   const [isWsConnected, setIsWsConnected] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState(0);
   const [connectionAttempts, setConnectionAttempts] = useState(0);
@@ -40,7 +43,6 @@ function DashboardContent({ userInfo }) {
   const messagesEndRef = useRef(null);
   const historyLoadedRef = useRef(false);
   const connectingRef = useRef(false);
-
 
   const channels = [
     {
@@ -79,10 +81,8 @@ function DashboardContent({ userInfo }) {
   ];
 
   const [selectedChannel, setSelectedChannel] = useState(channels[0]);
-
-  const [messages, setMessages] = useState([
-    // Keep these as fallback messages if no chat history is loaded
-  ]);
+  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
+  const [messages, setMessages] = useState([]);
 
   const containerStats = {
     total: 15,
@@ -91,6 +91,9 @@ function DashboardContent({ userInfo }) {
     pending: 1,
   };
 
+  const showToast = (message, type = "success") => {
+    setToast({ id: Date.now(), message, type });
+  };
   // WebSocket connection for chat
   const connectWebSocket = useCallback(() => {
     // Prevent multiple simultaneous connections
@@ -98,15 +101,15 @@ function DashboardContent({ userInfo }) {
       console.log("⏳ Connection already in progress, skipping...");
       return;
     }
-    
+
     // Close existing connection if any
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       console.log("🔄 Closing existing WebSocket connection");
       wsRef.current.close();
     }
-    
+
     connectingRef.current = true;
-    
+
     try {
       const url = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:5000";
       const ws = new WebSocket(url);
@@ -118,13 +121,13 @@ function DashboardContent({ userInfo }) {
         setError("");
         setConnectionAttempts(0);
         console.log("🔌 WebSocket connected");
-        
+
         // Send join message to authenticate user
         if (userId && username) {
           const joinMessage = {
             type: "join",
             userId: userId,
-            username: username
+            username: username,
           };
           ws.send(JSON.stringify(joinMessage));
           console.log("👤 Sent user join message:", joinMessage);
@@ -134,28 +137,28 @@ function DashboardContent({ userInfo }) {
         }
       };
 
-      ws.onmessage = (event) => {
+      ws.onmessage = event => {
         try {
           const data = JSON.parse(event.data);
           console.log("📨 Received WebSocket message:", data);
-          
+
           // Handle different message types
           if (data.type === "user_count") {
             setOnlineUsers(data.count);
             return;
           }
-          
+
           if (data.type === "join_success") {
             console.log("✅ User joined successfully:", data.message);
             return;
           }
-          
+
           if (data.type === "error") {
             console.error("❌ WebSocket error:", data.message);
             setError(data.message);
             return;
           }
-          
+
           if (data.type === "chat_history") {
             console.log("📚 Received chat history:", data.messages?.length, "messages");
             if (data.messages && data.messages.length > 0 && !historyLoadedRef.current) {
@@ -173,7 +176,7 @@ function DashboardContent({ userInfo }) {
             }
             return;
           }
-          
+
           if (data.type === "chat") {
             const newMessage = {
               ...data,
@@ -183,9 +186,9 @@ function DashboardContent({ userInfo }) {
               message: data.text || data.message || "",
               time: formatTime(data.timestamp || Date.now()),
             };
-            
+
             // Check for duplicate messages by ID
-            setMessages((prev) => {
+            setMessages(prev => {
               const messageExists = prev.some(msg => msg.id === newMessage.id);
               if (messageExists) {
                 console.log("🔄 Skipping duplicate message:", newMessage.id);
@@ -200,22 +203,23 @@ function DashboardContent({ userInfo }) {
         }
       };
 
-      ws.onclose = (event) => {
+      ws.onclose = event => {
         connectingRef.current = false; // Reset connecting flag
         setIsWsConnected(false);
         historyLoadedRef.current = false; // Reset history loaded flag
         console.log("❌ WebSocket closed, code:", event.code);
-        
+
         if (connectionAttempts < 5) {
           setConnectionAttempts(prev => prev + 1);
-          setError(`Connection lost. Reconnecting... (Attempt ${connectionAttempts + 1}/5)`);
+
+          showToast("Connection lost or unstable. Trying to reconnect...", "error");
           setTimeout(connectWebSocket, 2000 * (connectionAttempts + 1)); // Exponential backoff
         } else {
           setError("Failed to connect after multiple attempts. Please refresh the page.");
         }
       };
 
-      ws.onerror = (err) => {
+      ws.onerror = err => {
         connectingRef.current = false; // Reset connecting flag
         console.error("❌ WebSocket error:", err);
         setError("Connection error occurred");
@@ -229,16 +233,15 @@ function DashboardContent({ userInfo }) {
   }, [userId, username]); // useCallback dependencies
 
   // formatTime needs to be defined before connectWebSocket uses it
-  const formatTime = useCallback((timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+  const formatTime = useCallback(timestamp => {
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }, []);
 
-   useEffect(() => {
+  useEffect(() => {
     if (userId && username) {
-      console.log("🔐 User authenticated, connecting WebSocket:", { userId, username });
       connectWebSocket();
     } else {
       console.log("⏳ Waiting for authentication:", { userId, username });
@@ -272,9 +275,9 @@ function DashboardContent({ userInfo }) {
       const payload = {
         type: "chat",
         text,
-        userId: userId,  // Use the correct userId
+        userId: userId, // Use the correct userId
         user: username,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       try {
@@ -291,12 +294,15 @@ function DashboardContent({ userInfo }) {
     }
   }, [messageInput, userId, username]);
 
-  const handleKeyPress = useCallback((e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  }, [sendMessage]);
+  const handleKeyPress = useCallback(
+    e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    },
+    [sendMessage]
+  );
 
   return (
     <>
@@ -320,7 +326,7 @@ function DashboardContent({ userInfo }) {
                   type="text"
                   placeholder="Search channels..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={e => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 bg-[var(--input)] border border-[var(--border)] rounded-lg
                          text-[var(--foreground)] placeholder-[var(--secondary-foreground)]
                          focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent
@@ -331,34 +337,28 @@ function DashboardContent({ userInfo }) {
 
             {/* Channels List */}
             <div className="flex-1 overflow-y-auto">
-              {channels.map((channel) => (
+              {channels.map(channel => (
                 <div
                   key={channel.id}
                   onClick={() => setSelectedChannel(channel)}
                   className={`p-4 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--input)] transition-colors duration-200 ${
                     selectedChannel.id === channel.id ? "bg-[var(--input)]" : ""
-                  }`}>
+                  }`}
+                >
                   <div className="flex items-center gap-3">
                     <div className={`w-12 h-12 ${channel.color} rounded-full flex items-center justify-center text-white font-semibold relative`}>
                       {channel.icon}
                       <div
                         className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[var(--surface)] ${
-                          channel.status === "active"
-                            ? "bg-[var(--success)]"
-                            : channel.status === "busy"
-                            ? "bg-[var(--error)]"
-                            : "bg-[var(--secondary-foreground)]"
-                        }`}></div>
+                          channel.status === "active" ? "bg-[var(--success)]" : channel.status === "busy" ? "bg-[var(--error)]" : "bg-[var(--secondary-foreground)]"
+                        }`}
+                      ></div>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <h3 className="font-medium text-[var(--foreground)] truncate">{channel.name}</h3>
                         <div className="flex items-center gap-2">
-                          {channel.unread > 0 && (
-                            <span className="bg-[var(--error)] text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">
-                              {channel.unread}
-                            </span>
-                          )}
+                          {channel.unread > 0 && <span className="bg-[var(--error)] text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center">{channel.unread}</span>}
                           <span className="text-xs text-[var(--secondary-foreground)]">{channel.lastMessage}</span>
                         </div>
                       </div>
@@ -380,9 +380,7 @@ function DashboardContent({ userInfo }) {
             <div className="p-4 border-b border-[var(--border)] bg-[var(--surface)]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 ${selectedChannel.color} rounded-lg flex items-center justify-center text-white font-semibold`}>
-                    {selectedChannel.icon}
-                  </div>
+                  <div className={`w-10 h-10 ${selectedChannel.color} rounded-lg flex items-center justify-center text-white font-semibold`}>{selectedChannel.icon}</div>
                   <div>
                     <h2 className="font-semibold text-[var(--foreground)]">{selectedChannel.name}</h2>
                     <p className="text-sm text-[var(--secondary-foreground)]">{selectedChannel.description}</p>
@@ -391,7 +389,7 @@ function DashboardContent({ userInfo }) {
                 <div className="flex items-center gap-2">
                   <span className="bg-[var(--success)] text-white text-xs font-medium px-2 py-1 rounded-full">Active</span>
                   <span className="text-sm text-[var(--secondary-foreground)]">{selectedChannel.channel}</span>
-                  
+
                   {/* Chat Status Indicator */}
                   <div className="flex items-center gap-2">
                     {isWsConnected ? (
@@ -413,56 +411,52 @@ function DashboardContent({ userInfo }) {
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Error Display */}
+
+              <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
               {error && (
                 <div className="bg-[var(--error)] text-white p-3 rounded-lg mb-4">
                   <p className="text-sm">{error}</p>
                 </div>
               )}
-              
-              {messages.map((message) => {
+
+              {/* {messages.map(message => (
+                <div key={message.id} className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold ${message.isSystem ? "bg-[var(--warning)]" : "bg-[var(--success)]"}`}>
+                    {message.isSystem ? "SY" : "MH"}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-medium text-[var(--foreground)]">{message.sender}</span>
+                      <span className="text-xs text-[var(--secondary-foreground)]">{message.time}</span>
+                    </div>
+                    <p className="text-[var(--secondary-foreground)] mt-1">{message.message}</p>
+                  </div>
+                </div>
+              ))} */}
+
+              {messages.map(message => {
                 if (message.isSystem) {
                   return (
                     <div key={message.id} className="flex justify-center">
                       <div className="px-3 py-1 bg-[var(--secondary)] rounded-full">
-                        <span className="text-xs text-[var(--secondary-foreground)]">
-                          {message.message}
-                        </span>
+                        <span className="text-xs text-[var(--secondary-foreground)]">{message.message}</span>
                       </div>
                     </div>
                   );
                 }
 
                 const isOwnMessage = message.sender === username;
-                
+
                 return (
-                  <div 
-                    key={message.id} 
-                    className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}
-                  >
+                  <div key={message.id} className={`flex ${isOwnMessage ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg shadow-sm ${
-                        isOwnMessage 
-                          ? "bg-[var(--primary)] text-[var(--primary-foreground)]" 
-                          : "bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)]"
+                        isOwnMessage ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "bg-[var(--surface)] text-[var(--foreground)] border border-[var(--border)]"
                       }`}
                     >
-                      {!isOwnMessage && (
-                        <div className="text-xs font-medium mb-1 text-[var(--primary)]">
-                          {message.sender || "Anonymous"}
-                        </div>
-                      )}
-                      <div className="text-sm leading-relaxed break-words">
-                        {message.message}
-                      </div>
-                      <div 
-                        className={`text-xs mt-2 ${
-                          isOwnMessage 
-                            ? "text-[var(--primary-foreground)]/70" 
-                            : "text-[var(--secondary-foreground)]"
-                        }`}
-                      >
-                        {message.time}
-                      </div>
+                      {!isOwnMessage && <div className="text-xs font-medium mb-1 text-[var(--primary)]">{message.sender || "Anonymous"}</div>}
+                      <div className="text-sm leading-relaxed break-words">{message.message}</div>
+                      <div className={`text-xs mt-2 ${isOwnMessage ? "text-[var(--primary-foreground)]/70" : "text-[var(--secondary-foreground)]"}`}>{message.time}</div>
                     </div>
                   </div>
                 );
@@ -502,7 +496,7 @@ function DashboardContent({ userInfo }) {
                     type="text"
                     placeholder="Type a message..."
                     value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
+                    onChange={e => setMessageInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     className="w-full px-4 py-3 bg-[var(--input)] border border-[var(--border)] rounded-lg
                            text-[var(--foreground)] placeholder-[var(--secondary-foreground)]
@@ -510,7 +504,7 @@ function DashboardContent({ userInfo }) {
                            transition-all duration-200"
                   />
                 </div>
-                <button 
+                <button
                   onClick={sendMessage}
                   disabled={!messageInput.trim()}
                   className="p-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"

@@ -1,11 +1,9 @@
-// ws-server.js
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 import { WebSocketServer, WebSocket } from "ws";
 const { prisma } = require("../PrismaClient/prismaClient.js");
 
 const WS_PORT = process.env.WS_PORT || 5000;
-const HEARTBEAT_INTERVAL = 30000;
 
 class WebSocketManager {
   constructor() {
@@ -45,7 +43,7 @@ class WebSocketManager {
         ws.isAlive = false;
         ws.ping();
       });
-    }, HEARTBEAT_INTERVAL);
+    }, 30000);
 
     this.wss.on("close", () => {
       if (this.heartbeatInterval) {
