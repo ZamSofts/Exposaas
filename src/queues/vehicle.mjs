@@ -1,6 +1,6 @@
-const { Queue } = require("bullmq");
-const IORedis = require("ioredis");
-const dotenv = require("dotenv");
+import { Queue } from "bullmq";
+import IORedis from "ioredis";
+import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
@@ -27,4 +27,4 @@ const vehicle = new Queue("vehicle", {
 
 console.log("Vehicle Queue initialized.");
 
-module.exports = { connection, vehicle };
+export { connection, vehicle };

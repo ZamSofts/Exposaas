@@ -1,5 +1,5 @@
 import { vehicle } from "@/queues/vehicle";
-import { getSession } from "@/lib/useful"; // adjust path if needed
+import { getSession, putFile } from "@/lib/useful"; // adjust path if needed
 
 import multer from "multer";
 
@@ -8,7 +8,7 @@ export const config = {
 };
 
 const upload = multer({
-  dest: "/tmp",
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "text/csv" || file.mimetype === "application/vnd.ms-excel") {
       cb(null, true);
@@ -25,9 +25,10 @@ export default async function handler(req, res) {
   const session = await getSession(req, res);
   upload(req, res, async function (err) {
     if (err) return res.status(500).json({ error: err.message });
+    const { url } = await putFile(req.file, "csv/");
     // Add CSV processing job to the queue
     await vehicle.add("processCSV", {
-      filePath: req.file.path,
+      filePath: url,
       companyId: session?.companyId,
     });
   });

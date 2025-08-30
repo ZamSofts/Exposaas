@@ -1,6 +1,7 @@
 import prismaClient from "@/lib/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import { putFile, deleteFile, downloadFile } from "./blob.mjs";
 
 const getSession = async (req, res) => {
   const session = await getServerSession(req, res, authOptions);
@@ -15,4 +16,4 @@ const getSession = async (req, res) => {
 
 export const prisma = prismaClient;
 
-export { getSession };
+export { getSession, putFile, deleteFile, downloadFile };

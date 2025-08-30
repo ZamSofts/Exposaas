@@ -1,4 +1,4 @@
-const { PrismaClient } = require("../generated/prisma/index.js"); // <- point to generated client
+import { PrismaClient } from "../generated/prisma/index.js"; // <- point to generated client
 
 const globalForPrisma = globalThis;
 
@@ -24,4 +24,4 @@ process.on("SIGINT", async () => {
   await prisma.$disconnect();
 });
 
-module.exports = { prisma };
+export { prisma };

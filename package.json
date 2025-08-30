@@ -3,15 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next dev\" \"node -r dotenv/config src/workers/vehicle.js\"",
-    "worker": "node -r dotenv/config src/workers/vehicle.js",
+    "dev": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next dev\" \"node -r dotenv/config src/workers/vehicle.mjs\"",
+    "worker": "node -r dotenv/config src/workers/vehicle.mjs",
     "build": "next build",
-    "start": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next start\" \"node -r dotenv/config src/workers/vehicle.js\"",
+    "start": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next start\" \"node -r dotenv/config src/workers/vehicle.mjs\"",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",
+    "@azure/storage-blob": "^12.28.0",
     "@prisma/client": "^6.13.0",
     "bullmq": "^5.58.2",
     "csv-parser": "^3.2.0",
@@ -24,7 +25,8 @@
     "prisma": "^6.14.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-select": "^5.10.2"
+    "react-select": "^5.10.2",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

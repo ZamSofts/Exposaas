@@ -1,8 +1,9 @@
-const { Worker, Queue } = require("bullmq");
-const { connection } = require("../queues/vehicle.js"); // reuse your redis config
-const { prisma } = require("./prismaClient.js");
-const fs = require("fs");
-const csv = require("csv-parser");
+import { Worker, Queue } from "bullmq";
+import { connection } from "../queues/vehicle.mjs"; // reuse your redis config
+import { prisma } from "./prismaClient.mjs";
+import { downloadFile, deleteFile } from "../lib/blob.mjs";
+import fs from "fs";
+import csv from "csv-parser";
 
 // Create queue instance for cleanup
 const vehicleQueue = new Queue("vehicle", { connection });
@@ -31,8 +32,8 @@ const worker = new Worker(
     const results = [];
     let count = 0;
 
-    return new Promise((resolve, reject) => {
-      const stream = fs.createReadStream(filePath);
+    return new Promise(async (resolve, reject) => {
+      const stream = await downloadFile(filePath);
       const parser = csv({
         mapHeaders: ({ header }) => header.trim().toLowerCase().replace(/\s+/g, "_"),
       });
@@ -88,41 +89,49 @@ const worker = new Worker(
             console.log({ error: "Database insert/update failed" });
             reject(error);
           } finally {
-            // Clean up file and memory
+            // Clean up Azure blob and memory
             try {
-              fs.unlinkSync(filePath);
-            } catch (unlinkError) {
-              console.warn("Failed to delete file:", unlinkError.message);
+              await deleteFile(filePath);
+              console.log("Deleted blob:", filePath);
+            } catch (deleteError) {
+              console.warn("Failed to delete blob:", deleteError.message);
             }
 
             // Clear the results array to free memory
             results.length = 0;
 
-            // Destroy streams
-            stream.destroy();
-            parser.destroy();
+            // Destroy streams to prevent memory leaks
+            if (stream && typeof stream.destroy === "function") {
+              stream.destroy();
+            }
+            if (parser && typeof parser.destroy === "function") {
+              parser.destroy();
+            }
           }
         })
         .on("error", error => {
           // Clean up on stream error
-          try {
-            fs.unlinkSync(filePath);
-          } catch (unlinkError) {
-            console.warn("Failed to delete file on error:", unlinkError.message);
-          }
+          deleteFile(filePath).catch(deleteError => {
+            console.warn("Failed to delete blob on error:", deleteError.message);
+          });
+
+          // Clear memory and destroy streams
           results.length = 0;
-          stream.destroy();
-          parser.destroy();
+          if (stream && typeof stream.destroy === "function") {
+            stream.destroy();
+          }
+          if (parser && typeof parser.destroy === "function") {
+            parser.destroy();
+          }
           reject(error);
         });
     });
   },
-  { connection }
+  { connection, type: "module" }
 );
 
 worker.on("completed", async job => {
   console.log(`Job ${job.id} completed ✅`, job.returnvalue);
-  console.log(job.id % 5);
   // Cleanup old jobs every 5th completion
   if (job.id % 5 === 0) {
     await cleanupOldJobs();
