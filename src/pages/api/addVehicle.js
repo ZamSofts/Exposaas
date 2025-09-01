@@ -1,11 +1,17 @@
-import { vehicle } from "@/queues/vehicle";
+import { vehicle } from "@extra/queues/vehicle";
 import { getSession, putFile } from "@/lib/useful"; // adjust path if needed
-
 import multer from "multer";
+import fs from "fs";
+import path from "path";
 
 export const config = {
   api: { bodyParser: false },
 };
+
+const uploadDir = path.join(process.cwd(), "uploads", "vehicles-CSVs");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),

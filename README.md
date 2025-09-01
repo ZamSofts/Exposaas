@@ -100,3 +100,302 @@ A clean Next.js application with PostgreSQL backend integration.
 - [Next.js Documentation](https://nextjs.org/docs)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [React Documentation](https://reactjs.org/docs/)
+
+```
+Exposaas
+├─ .prettierrc
+├─ cleanup-jobs.js
+├─ eslint.config.mjs
+├─ inspect-redis.js
+├─ memory-monitor.js
+├─ next.config.js
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.mjs
+├─ prisma
+│  ├─ migrations
+│  │  ├─ 20250810070258_initial_schema
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810070403_add_company_details
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810093108_dd
+│  │  │  └─ migration.sql
+│  │  ├─ 20250815163921_update_for_detlet
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820124624_add_vehicle_model
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820145741_add_brand_table
+│  │  │  └─ migration.sql
+│  │  ├─ 20250822044739_add_vehicle_status
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
+│  │  │  └─ migration.sql
+│  │  └─ migration_lock.toml
+│  ├─ schema.prisma
+│  └─ seed.js
+├─ public
+│  ├─ favicon.ico
+│  ├─ file.svg
+│  ├─ globe.svg
+│  ├─ next.svg
+│  ├─ vercel.svg
+│  └─ window.svg
+├─ README.md
+├─ src
+│  ├─ components
+│  │  ├─ Sidebar.jsx
+│  │  └─ ui
+│  │     ├─ ConfirmModal.jsx
+│  │     ├─ CustomButton.jsx
+│  │     ├─ CustomToast.jsx
+│  │     ├─ DataTable.jsx
+│  │     ├─ Error.jsx
+│  │     ├─ MultiSelect.jsx
+│  │     ├─ SingleSelecter.jsx
+│  │     └─ Skeleton.jsx
+│  ├─ generated
+│  ├─ hooks
+│  │  ├─ useAuth.js
+│  │  ├─ useTheme.js
+│  │  └─ wrapper.js
+│  ├─ lib
+│  │  ├─ auth.js
+│  │  ├─ db.js
+│  │  └─ useful.js
+│  ├─ middleware.js
+│  ├─ pages
+│  │  ├─ api
+│  │  │  ├─ addVehicle.js
+│  │  │  ├─ auth
+│  │  │  │  └─ [...nextauth].js
+│  │  │  ├─ brand.js
+│  │  │  ├─ company.js
+│  │  │  ├─ permission.js
+│  │  │  ├─ role.js
+│  │  │  ├─ socket_io.js
+│  │  │  ├─ user.js
+│  │  │  ├─ vehicle.js
+│  │  │  └─ vehicleStatus.js
+│  │  ├─ chat.jsx
+│  │  ├─ company.jsx
+│  │  ├─ dashboard.jsx
+│  │  ├─ index.jsx
+│  │  ├─ role.jsx
+│  │  ├─ user.jsx
+│  │  ├─ vehicle.jsx
+│  │  ├─ _app.jsx
+│  │  └─ _document.jsx
+│  ├─ queues
+│  │  └─ vehicle.js
+│  ├─ styles
+│  │  └─ globals.css
+│  ├─ utils
+│  │  └─ reactSelectStyles.js
+│  └─ workers
+│     ├─ prismaClient.js
+│     └─ vehicle.js
+└─ uploads
+
+```
+```
+Exposaas
+├─ .prettierrc
+├─ cleanup-jobs.js
+├─ eslint.config.mjs
+├─ inspect-redis.js
+├─ memory-monitor.js
+├─ next.config.js
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.mjs
+├─ prisma
+│  ├─ migrations
+│  │  ├─ 20250810070258_initial_schema
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810070403_add_company_details
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810093108_dd
+│  │  │  └─ migration.sql
+│  │  ├─ 20250815163921_update_for_detlet
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820124624_add_vehicle_model
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820145741_add_brand_table
+│  │  │  └─ migration.sql
+│  │  ├─ 20250822044739_add_vehicle_status
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
+│  │  │  └─ migration.sql
+│  │  └─ migration_lock.toml
+│  ├─ schema.prisma
+│  └─ seed.js
+├─ public
+│  ├─ favicon.ico
+│  ├─ file.svg
+│  ├─ globe.svg
+│  ├─ next.svg
+│  ├─ vercel.svg
+│  └─ window.svg
+├─ README.md
+├─ src
+│  ├─ components
+│  │  ├─ Sidebar.jsx
+│  │  └─ ui
+│  │     ├─ ConfirmModal.jsx
+│  │     ├─ CustomButton.jsx
+│  │     ├─ CustomToast.jsx
+│  │     ├─ DataTable.jsx
+│  │     ├─ Error.jsx
+│  │     ├─ MultiSelect.jsx
+│  │     ├─ SingleSelecter.jsx
+│  │     └─ Skeleton.jsx
+│  ├─ generated
+│  ├─ hooks
+│  │  ├─ useAuth.js
+│  │  ├─ useTheme.js
+│  │  └─ wrapper.js
+│  ├─ lib
+│  │  ├─ auth.js
+│  │  ├─ db.js
+│  │  └─ useful.js
+│  ├─ middleware.js
+│  ├─ pages
+│  │  ├─ api
+│  │  │  ├─ addVehicle.js
+│  │  │  ├─ auth
+│  │  │  │  └─ [...nextauth].js
+│  │  │  ├─ brand.js
+│  │  │  ├─ company.js
+│  │  │  ├─ permission.js
+│  │  │  ├─ role.js
+│  │  │  ├─ socket_io.js
+│  │  │  ├─ user.js
+│  │  │  ├─ vehicle.js
+│  │  │  └─ vehicleStatus.js
+│  │  ├─ chat.jsx
+│  │  ├─ company.jsx
+│  │  ├─ dashboard.jsx
+│  │  ├─ index.jsx
+│  │  ├─ role.jsx
+│  │  ├─ user.jsx
+│  │  ├─ vehicle.jsx
+│  │  ├─ _app.jsx
+│  │  └─ _document.jsx
+│  ├─ queues
+│  │  └─ vehicle.js
+│  ├─ styles
+│  │  └─ globals.css
+│  ├─ utils
+│  │  └─ reactSelectStyles.js
+│  └─ workers
+│     ├─ prismaClient.js
+│     └─ vehicle.js
+└─ uploads
+
+```
+```
+Exposaas
+├─ .prettierrc
+├─ cleanup-jobs.js
+├─ eslint.config.mjs
+├─ extra
+│  ├─ queues
+│  │  └─ vehicle.js
+│  ├─ webSocket
+│  │  └─ ws-server.js
+│  └─ workers
+│     ├─ prismaClient.js
+│     └─ vehicle.js
+├─ inspect-redis.js
+├─ memory-monitor.js
+├─ next.config.js
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.mjs
+├─ prisma
+│  ├─ migrations
+│  │  ├─ 20250810070258_initial_schema
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810070403_add_company_details
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810093108_dd
+│  │  │  └─ migration.sql
+│  │  ├─ 20250815163921_update_for_detlet
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820124624_add_vehicle_model
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820145741_add_brand_table
+│  │  │  └─ migration.sql
+│  │  ├─ 20250822044739_add_vehicle_status
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
+│  │  │  └─ migration.sql
+│  │  ├─ 20250828112721_add_simple_chat_messages
+│  │  │  └─ migration.sql
+│  │  └─ migration_lock.toml
+│  ├─ schema.prisma
+│  └─ seed.js
+├─ public
+│  ├─ favicon.ico
+│  ├─ file.svg
+│  ├─ globe.svg
+│  ├─ next.svg
+│  ├─ vercel.svg
+│  └─ window.svg
+├─ README.md
+├─ src
+│  ├─ components
+│  │  ├─ Sidebar.jsx
+│  │  └─ ui
+│  │     ├─ ConfirmModal.jsx
+│  │     ├─ CustomButton.jsx
+│  │     ├─ CustomToast.jsx
+│  │     ├─ DataTable.jsx
+│  │     ├─ Error.jsx
+│  │     ├─ MultiSelect.jsx
+│  │     ├─ SingleSelecter.jsx
+│  │     └─ Skeleton.jsx
+│  ├─ generated
+│  ├─ hooks
+│  │  ├─ useAuth.js
+│  │  ├─ useTheme.js
+│  │  └─ wrapper.js
+│  ├─ lib
+│  │  ├─ auth.js
+│  │  ├─ db.js
+│  │  └─ useful.js
+│  ├─ middleware.js
+│  ├─ pages
+│  │  ├─ api
+│  │  │  ├─ addVehicle.js
+│  │  │  ├─ auth
+│  │  │  │  └─ [...nextauth].js
+│  │  │  ├─ brand.js
+│  │  │  ├─ company.js
+│  │  │  ├─ permission.js
+│  │  │  ├─ role.js
+│  │  │  ├─ user.js
+│  │  │  ├─ vehicle.js
+│  │  │  └─ vehicleStatus.js
+│  │  ├─ chat.jsx
+│  │  ├─ company.jsx
+│  │  ├─ dashboard.jsx
+│  │  ├─ index.jsx
+│  │  ├─ role.jsx
+│  │  ├─ user.jsx
+│  │  ├─ vehicle.jsx
+│  │  ├─ _app.jsx
+│  │  └─ _document.jsx
+│  ├─ styles
+│  │  └─ globals.css
+│  └─ utils
+│     └─ reactSelectStyles.js
+└─ uploads
+
+```

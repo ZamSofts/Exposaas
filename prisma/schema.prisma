@@ -25,6 +25,7 @@ model User {
   createdAt DateTime   @default(now())
   company   Company    @relation(fields: [companyId], references: [id])
   roles     UserRole[] 
+  chatMessages ChatMessage[]
 }
 
 model Role {
@@ -88,6 +89,14 @@ model Brand {
   id       Int       @id @default(autoincrement())
   name     String    @unique
   vehicles Vehicle[]
+}
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  message   String
+  userId    Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }
 
 enum CompanyStatus {

@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next dev\" \"node -r dotenv/config src/workers/vehicle.mjs\"",
-    "worker": "node -r dotenv/config src/workers/vehicle.mjs",
+    "dev": "next dev",
+    "worker": "node -r dotenv/config extra/workers/vehicle.js",
+    "ws": "node extra/webSocket/ws.mjs",
     "build": "next build",
     "start": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next start\" \"node -r dotenv/config src/workers/vehicle.mjs\"",
     "lint": "next lint",
@@ -26,6 +27,9 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-select": "^5.10.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "ws": "^8.18.3",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
