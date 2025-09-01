@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2,Shield,Car } from "lucide-react";
+import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2, Shield, Car } from "lucide-react";
 
 // Create context for sidebar state
 const SidebarContext = createContext({
@@ -29,14 +29,16 @@ export default function Sidebar({ children }) {
           onClick={() => setIsMobileMenuOpen(true)}
           className="fixed top-4 left-4 z-30 md:hidden w-10 h-10 rounded-lg bg-[var(--surface)] border border-[var(--border)]
                    flex items-center justify-center text-[var(--foreground)] hover:bg-[var(--secondary)]
-                   transition-all duration-200 shadow-lg">
+                   transition-all duration-200 shadow-lg"
+        >
           <Menu size={20} />
         </button>
         <main
           className={`
             transition-all duration-300 min-h-screen
             ${isCollapsed ? "md:ml-16" : "md:ml-72"}
-          `}>
+          `}
+        >
           {children}
         </main>
       </div>
@@ -46,7 +48,7 @@ export default function Sidebar({ children }) {
 
 // Helper function to filter items based on user role
 const filterItemsByRole = (items, userRole) => {
-  return items.filter((item) => {
+  return items.filter(item => {
     // If no roles specified, show to everyone
     if (!item.roles || item.roles.length === 0) return true;
     // If user has no role, only show items with no role restrictions
@@ -148,17 +150,17 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
-  const {session,status} = useAuth();
+  const { session, status } = useAuth();
 
   // Get filtered sidebar sections based on user role
   const sidebarSections = getAllSidebarSections()
-    .map((section) => ({
+    .map(section => ({
       ...section,
       items: filterItemsByRole(section.items, session?.role),
     }))
-    .filter((section) => section.items.length > 0); // Remove empty sections
+    .filter(section => section.items.length > 0); // Remove empty sections
 
-  const isActiveRoute = (href) => {
+  const isActiveRoute = href => {
     return router.pathname === href;
   };
 
@@ -175,14 +177,16 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
         // Mobile: show/hide with overlay, full width when open
         isMobileMenuOpen ? "w-72 translate-x-0 md:translate-x-0" : "w-72 -translate-x-full md:translate-x-0 md:w-16"
       }
-    `}>
+    `}
+    >
       {/* Header - only show on desktop */}
       <div className="h-16 items-center justify-between px-4 border-b border-[var(--border)] hidden md:flex">
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="w-8 h-8 rounded-lg bg-[var(--secondary)] hover:bg-[var(--border)] 
                    flex items-center justify-center transition-all duration-200 
-                   text-[var(--secondary-foreground)] hover:text-[var(--foreground)]">
+                   text-[var(--secondary-foreground)] hover:text-[var(--foreground)]"
+        >
           <Menu size={20} />
         </button>
       </div>
@@ -194,21 +198,24 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           onClick={() => setIsMobileMenuOpen?.(false)}
           className="w-8 h-8 rounded-lg bg-[var(--secondary)] hover:bg-[var(--border)] 
                    flex items-center justify-center transition-all duration-200 
-                   text-[var(--secondary-foreground)] hover:text-[var(--foreground)]">
+                   text-[var(--secondary-foreground)] hover:text-[var(--foreground)]"
+        >
           ×
         </button>
       </div>
 
       {/* User Profile */}
       <div className="p-4 border-b border-[var(--border)]">
-        <div className="flex items-center justify-center">
-          <div className="w-10 h-10 bg-[var(--primary)] rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">EH</div>
-          <div className={`flex-1 ml-3 transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0 md:ml-0" : "opacity-100"}`}>
-            <div className="text-sm font-medium text-[var(--foreground)]">{session?.company} ({session?.role})</div>
-            <div className="text-xs text-[var(--success)] flex items-center space-x-1">
-              <div className="w-2 h-2 bg-[var(--success)] rounded-full"></div>
-              <span>Online</span>
+        <div className="flex items-center space-x-3">
+          <div className="relative">
+            <div className="w-12 h-12 bg-gradient-to-br from-[var(--primary)] to-[var(--primary)]/80 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg">
+              {session?.name ? `${session.name.charAt(0).toUpperCase()}${session.name.charAt(session.name.length - 1).toUpperCase()}` : "U"}
             </div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[var(--success)] border-2 border-[var(--surface)] rounded-full"></div>
+          </div>
+          <div className={`flex-1 min-w-0 transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}`}>
+            <p className="text-sm font-semibold text-[var(--foreground)] truncate">{session?.name || session?.username || "User"}</p>
+            <p className="text-xs text-[var(--muted-foreground)] truncate">{session?.company || ""}</p>
           </div>
         </div>
       </div>
@@ -222,7 +229,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             </div>
 
             <nav className="space-y-1 px-2">
-              {section.items.map((item) => {
+              {section.items.map(item => {
                 const isActive = isActiveRoute(item.href);
 
                 return (
@@ -235,17 +242,15 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                     }}
                     className={`
                       group flex items-center px-3 py-2.5 rounded-lg transition-all duration-200
-                      ${
-                        isActive
-                          ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg"
-                          : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
-                      }
-                    `}>
+                      ${isActive ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"}
+                    `}
+                  >
                     <div
                       className={`
                       flex-shrink-0 w-5 h-5 transition-transform duration-200
                       ${isActive ? "text-white" : "group-hover:scale-110"}
-                    `}>
+                    `}
+                    >
                       {item.icon}
                     </div>
 
@@ -253,7 +258,8 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                       className={`
                       ml-3 text-sm font-medium transition-all duration-300
                       ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
-                    `}>
+                    `}
+                    >
                       {item.label}
                     </span>
 
@@ -263,7 +269,8 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                         ml-auto bg-[var(--error)] text-white text-xs px-2 py-0.5 rounded-full
                         transition-all duration-300
                         ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
-                      `}>
+                      `}
+                      >
                         {item.badge}
                       </span>
                     )}
@@ -288,7 +295,8 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             text-[var(--secondary-foreground)] hover:text-[var(--foreground)] 
             hover:bg-[var(--secondary)] transition-all duration-200
             group
-          `}>
+          `}
+        >
           <div className="relative w-5 h-5">
             {theme === "dark" ? (
               <Sun size={20} className="group-hover:scale-110 transition-transform duration-200" />
@@ -296,9 +304,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
               <Moon size={20} className="group-hover:scale-110 transition-transform duration-200" />
             )}
           </div>
-          <span className={`text-sm transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}`}>
-            {theme === "dark" ? "Light Mode" : "Dark Mode"}
-          </span>
+          <span className={`text-sm transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}`}>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
         </button>
 
         {/* Logout */}
@@ -311,7 +317,8 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           w-full mt-2 flex items-center space-x-3 px-3 py-2.5 rounded-lg 
           text-[var(--secondary-foreground)] hover:text-[var(--error)] 
           hover:bg-[var(--secondary)] transition-all duration-200
-        `}>
+        `}
+        >
           <LogOut size={20} />
           <span className={`text-sm transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}`}>Logout</span>
         </button>

@@ -3,312 +3,199 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 
+// Setup file upload
 const uploadDir = path.join(process.cwd(), "uploads", "vehicles-doc");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const upload = multer({
   dest: uploadDir,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit per file
-  },
+  limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    // Allow PDF, images, and documents
-    const allowedTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/jpg', 
-      'image/png',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ];
-    
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF, JPG, PNG, DOC, DOCX files are allowed!"), false);
+    const allowed = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    cb(allowed.includes(file.mimetype) ? null : new Error("Invalid file type"), allowed.includes(file.mimetype));
+  },
+}).array("documents", 15);
+
+export const config = { api: { bodyParser: false } };
+
+// Utilities
+const cleanupFiles = files =>
+  files?.forEach(file => {
+    try {
+      fs.unlinkSync(file.path);
+    } catch (e) {
+      console.warn("Cleanup failed:", e.message);
     }
-  },
-}).array("documents", 15); // Allow up to 15 files
+  });
 
-export const config = {
-  api: { 
-    bodyParser: false // Disable default body parser for file uploads
-  },
-};
-
-// Helper function to parse multipart form data
-const parseFormData = (req) => {
-  return new Promise((resolve, reject) => {
-    upload(req, {}, (err) => {
+const parseFormData = req =>
+  new Promise((resolve, reject) => {
+    upload(req, {}, err => {
       if (err) {
+        cleanupFiles(req.files);
         reject(err);
       } else {
-        resolve({
-          files: req.files || [],
-          body: req.body || {}
-        });
+        resolve({ files: req.files || [], body: req.body || {} });
       }
     });
   });
+
+const validateVehicle = async ({ chassisNumber, brandId, companyId, statusId, vehicleId = null }) => {
+  if (!chassisNumber || !brandId || !companyId || !statusId) {
+    throw new Error("Missing required fields");
+  }
+
+  const [brand, status, existing] = await Promise.all([
+    prisma.brand.findUnique({ where: { id: Number(brandId) } }),
+    prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } }),
+    prisma.vehicle.findFirst({ where: { chassisNumber, ...(vehicleId && { id: { not: vehicleId } }) } }),
+  ]);
+
+  if (!brand) throw new Error("Brand not found");
+  if (!status) throw new Error("Status not found");
+  if (existing) throw new Error("Chassis number already exists");
 };
 
-// Helper function to save file information to database
-const saveVehicleDocuments = async (vehicleId, files) => {
-  if (!files || files.length === 0) return [];
+const getSearchFilter = search =>
+  search
+    ? {
+        OR: [
+          { name: { contains: search, mode: "insensitive" } },
+          { chassisNumber: { contains: search, mode: "insensitive" } },
+          { auction: { contains: search, mode: "insensitive" } },
+          { lotNumber: { contains: search, mode: "insensitive" } },
+          { remarks: { contains: search, mode: "insensitive" } },
+          { brand: { name: { contains: search, mode: "insensitive" } } },
+          { status: { name: { contains: search, mode: "insensitive" } } },
+        ],
+      }
+    : {};
 
-  const documentData = files.map(file => ({
-    vehicleId: vehicleId,
-    filename: file.filename,
-    originalName: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size,
-    path: file.path,
-  }));
+const getOrderBy = (sortBy, sortOrder) =>
+  ({
+    brand: { brand: { name: sortOrder } },
+    status: { status: { name: sortOrder } },
+  }[sortBy] || { [sortBy]: sortOrder });
 
-  // Save to database (you'll need to create a VehicleDocument model in your schema)
-  // const savedDocuments = await prisma.vehicleDocument.createMany({
-  //   data: documentData
-  // });
-  console.log('received documents :', documentData.length);
-  return documentData;
-};
-
-
-const getOrderBy = (sortBy, sortOrder) => {
-  if (sortBy === "brand") {
-    return { brand: { name: sortOrder } };
-  }
-  if (sortBy === "status") {
-    return { status: { name: sortOrder } };
-  }
-  // Add other relation-based sorting if needed
-  return { [String(sortBy)]: String(sortOrder) };
+const includeRelations = {
+  company: { select: { name: true } },
+  brand: { select: { name: true } },
+  status: { select: { name: true } },
 };
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
-
-  // Handle file uploads for PUT and POST methods
-  if (req.method === "PUT" || req.method === "POST") {
-    try {
-      const { files, body } = await parseFormData(req);
-      req.files = files;
-      req.body = body;
-    } catch (error) {
-      return res.status(400).json({ error: error.message });
-    }
-  }
-
-  const id = Number(req.query.id);
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 10;
-  const search = String(req.query.search || "")
-    .trim()
-    .toLowerCase();
-  const { sortBy = "id", sortOrder = "asc" } = req.query;
-  const col = req.query.col ? String(req.query.col).split(",") : null;
-  const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
+  let uploadedFiles = [];
 
   try {
-    if (req.method === "GET") {
-      const userCompanyId = session?.companyId;
-      const filterByCompany = session.role === "Sadmin" ? {} : { companyId: userCompanyId };
+    // Handle file uploads
+    if (["PUT", "POST"].includes(req.method)) {
+      const { files, body } = await parseFormData(req);
+      req.files = uploadedFiles = files;
+      req.body = body;
+    }
 
-      // ---- Load single vehicle ----
-      if (id) {
-        const vehicle = await prisma.vehicle.findUnique({
-          where: { id },
-          include: {
-            company: { select: { name: true } },
-            brand: { select: { name: true } },
-            status: { select: { name: true } },
-          },
-        });
+    const id = Number(req.query.id);
+    const { page = 1, limit = 10, search = "", sortBy = "id", sortOrder = "asc", col } = req.query;
+    const selectFields = col ? Object.fromEntries(col.split(",").map(c => [c, true])) : undefined;
+    const userFilter = session.role === "Sadmin" ? {} : { companyId: session?.companyId };
 
-        if (!vehicle || (session.role !== "Sadmin" && vehicle.companyId !== userCompanyId)) {
-          return res.status(404).json({ error: "Vehicle not found" });
+    switch (req.method) {
+      case "GET": {
+        // Single vehicle
+        if (id) {
+          const vehicle = await prisma.vehicle.findUnique({ where: { id }, include: includeRelations });
+          if (!vehicle || (session.role !== "Sadmin" && vehicle.companyId !== session?.companyId)) {
+            return res.status(404).json({ error: "Vehicle not found" });
+          }
+          return res.json(vehicle);
         }
 
-        return res.status(200).json(vehicle);
+        const where = { ...userFilter, ...getSearchFilter(search.trim().toLowerCase()) };
+
+        // Specific fields
+        if (selectFields) {
+          const vehicles = await prisma.vehicle.findMany({
+            select: { ...selectFields, ...includeRelations },
+            where,
+            orderBy: getOrderBy(sortBy, sortOrder),
+          });
+          return res.json(vehicles);
+        }
+
+        // Paginated list
+        const [vehicles, total] = await Promise.all([
+          prisma.vehicle.findMany({
+            skip: (page - 1) * limit,
+            take: Number(limit),
+            where,
+            include: includeRelations,
+            orderBy: getOrderBy(sortBy, sortOrder),
+          }),
+          prisma.vehicle.count({ where }),
+        ]);
+        return res.json({ vehicles, total });
       }
 
-      // ---- Specific fields ----
-      if (selectFields) {
-        const vehicles = await prisma.vehicle.findMany({
-          select: {
-            ...selectFields,
-            company: { select: { name: true } },
-            brand: { select: { name: true } },
-            status: { select: { name: true } },
+      case "PUT": {
+        const { name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
+        await validateVehicle({ chassisNumber, brandId, companyId, statusId });
+
+        const vehicle = await prisma.vehicle.create({
+          data: {
+            name,
+            chassisNumber,
+            auction,
+            lotNumber,
+            remarks,
+            brandId: Number(brandId),
+            companyId: Number(companyId),
+            statusId: Number(statusId),
           },
-          where: {
-            ...filterByCompany,
-            ...(search
-              ? {
-                  OR: [
-                    { name: { contains: search, mode: "insensitive" } },
-                    { chassisNumber: { contains: search, mode: "insensitive" } },
-                    { auction: { contains: search, mode: "insensitive" } },
-                    { lotNumber: { contains: search, mode: "insensitive" } },
-                    { remarks: { contains: search, mode: "insensitive" } },
-                    { brand: { name: { contains: search, mode: "insensitive" } } },
-                  ],
-                }
-              : {}),
-          },
-          orderBy: getOrderBy(sortBy, sortOrder),
         });
 
-        return res.status(200).json(vehicles);
+        if (uploadedFiles.length) cleanupFiles(uploadedFiles); // Clean files after processing
+        return res.status(201).json({ message: "Vehicle created", vehicleId: vehicle.id });
       }
 
-      // ---- All with pagination ----
-      const searchFilter = search
-        ? {
-            OR: [
-              { name: { contains: search, mode: "insensitive" } },
-              { chassisNumber: { contains: search, mode: "insensitive" } },
-              { auction: { contains: search, mode: "insensitive" } },
-              { lotNumber: { contains: search, mode: "insensitive" } },
-              { remarks: { contains: search, mode: "insensitive" } },
-              { brand: { name: { contains: search, mode: "insensitive" } } },
-              { status: { name: { contains: search, mode: "insensitive" } } }, // <-- Add this line
-            ],
-          }
-        : {};
+      case "POST": {
+        const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
+        const vehicleId = Number(id);
+        if (!vehicleId) return res.status(400).json({ error: "Valid vehicle ID required" });
 
-      const where = {
-        ...filterByCompany,
-        ...searchFilter,
-      };
+        await validateVehicle({ chassisNumber, brandId, companyId, statusId, vehicleId });
 
-      const [vehicles, total] = await Promise.all([
-        prisma.vehicle.findMany({
-          skip: (page - 1) * limit,
-          take: limit,
-          orderBy: getOrderBy(sortBy, sortOrder),
-          where,
-          include: {
-            company: { select: { name: true } },
-            brand: { select: { name: true } },
-            status: { select: { name: true } },
+        await prisma.vehicle.update({
+          where: { id: vehicleId },
+          data: {
+            name,
+            chassisNumber,
+            auction,
+            lotNumber,
+            remarks,
+            brandId: Number(brandId),
+            companyId: Number(companyId),
+            statusId: Number(statusId),
           },
-        }),
-        prisma.vehicle.count({ where }),
-      ]);
+        });
 
-      return res.status(200).json({ vehicles, total });
-    }
-
-    if (req.method === "PUT") {
-      const { name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
-      const uploadedFiles = req.files || [];
-
-      if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
-      if (!brandId) return res.status(400).json({ error: "Brand is required" });
-      if (!companyId) return res.status(400).json({ error: "Company is required" });
-      if (!statusId) return res.status(400).json({ error: "Status is required" });
-
-      // ensure brand exists
-      const brandExists = await prisma.brand.findUnique({ where: { id: Number(brandId) } });
-      if (!brandExists) return res.status(404).json({ error: "Brand not found" });
-
-      // ensure status exists
-      const statusExists = await prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } });
-      if (!statusExists) return res.status(404).json({ error: "Status not found" });
-
-      const exists = await prisma.vehicle.findUnique({ where: { chassisNumber } });
-      if (exists) return res.status(409).json({ error: "Chassis number already exists" });
-
-      const vehicle = await prisma.vehicle.create({
-        data: {
-          name,
-          chassisNumber,
-          brandId: Number(brandId),
-          remarks,
-          companyId: Number(companyId),
-          statusId: Number(statusId),
-          auction,
-          lotNumber,
-        },
-      });
-
-      // Save uploaded documents
-      if (uploadedFiles.length > 0) {
-        await saveVehicleDocuments(vehicle.id, uploadedFiles);
+        if (uploadedFiles.length) cleanupFiles(uploadedFiles);
+        return res.json({ message: "Vehicle updated" });
       }
 
-      res.status(201).json({ 
-        message: "Vehicle created successfully",
-        vehicleId: vehicle.id,
-        documentsUploaded: uploadedFiles.length
-      });
-    }
-
-    if (req.method === "POST") {
-      const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
-      const uploadedFiles = req.files || [];
-
-      if (!id) return res.status(400).json({ error: "Vehicle ID is required" });
-
-      // Convert id to number
-      const vehicleId = Number(id);
-      if (isNaN(vehicleId)) return res.status(400).json({ error: "Invalid vehicle ID" });
-
-      if (!chassisNumber) return res.status(400).json({ error: "Chassis number is required" });
-      if (!brandId) return res.status(400).json({ error: "Brand is required" });
-      if (!companyId) return res.status(400).json({ error: "Company is required" });
-      if (!statusId) return res.status(400).json({ error: "Status is required" });
-
-      // ensure brand exists
-      const brandExists = await prisma.brand.findUnique({ where: { id: Number(brandId) } });
-      if (!brandExists) return res.status(404).json({ error: "Brand not found" });
-
-      // ensure status exists
-      const statusExists = await prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } });
-      if (!statusExists) return res.status(404).json({ error: "Status not found" });
-
-      const exists = await prisma.vehicle.findFirst({
-        where: { chassisNumber, id: { not: vehicleId } },
-      });
-      if (exists) return res.status(409).json({ error: "Chassis number already exists" });
-
-      await prisma.vehicle.update({
-        where: { id: vehicleId },
-        data: {
-          name,
-          chassisNumber,
-          auction,
-          lotNumber,
-          brandId: Number(brandId),
-          remarks,
-          companyId: Number(companyId),
-          statusId: Number(statusId),
-        },
-      });
-
-      // Save uploaded documents (append to existing ones)
-      if (uploadedFiles.length > 0) {
-        await saveVehicleDocuments(vehicleId, uploadedFiles);
+      case "DELETE": {
+        if (!id) return res.status(400).json({ error: "Vehicle ID required" });
+        await prisma.vehicle.delete({ where: { id } });
+        return res.json({ message: "Vehicle deleted" });
       }
 
-      res.status(200).json({ 
-        message: "Vehicle updated successfully",
-        documentsUploaded: uploadedFiles.length
-      });
-    }
-
-    if (req.method === "DELETE") {
-      if (!id) return res.status(400).json({ error: "Vehicle ID is required" });
-
-      await prisma.vehicle.delete({ where: { id: Number(id) } });
-
-      res.status(200).json({ message: "Vehicle deleted successfully" });
+      default:
+        return res.status(405).json({ error: "Method not allowed" });
     }
   } catch (error) {
     console.error("API error:", error);
-    res.status(500).json({ error: "Internal server error" });
+    cleanupFiles(uploadedFiles);
+    const status = error.message.includes("not found") ? 404 : error.message.includes("already exists") ? 409 : error.message.includes("required") ? 400 : 500;
+    res.status(status).json({ error: error.message || "Internal server error" });
   }
 }

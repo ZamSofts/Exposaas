@@ -1,18 +1,8 @@
-<<<<<<<< HEAD:src/workers/vehicle.mjs
 import { Worker, Queue } from "bullmq";
 import { connection } from "../queues/vehicle.mjs"; // reuse your redis config
-import { prisma } from "./prismaClient.mjs";
-import { downloadFile, deleteFile } from "../lib/blob.mjs";
-import fs from "fs";
+import { prisma } from "../PrismaClient/prismaClient.mjs";
+import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
-========
-
-const { Worker, Queue } = require("bullmq");
-const { connection } = require("../queues/vehicle.js"); // reuse your redis config
-const { prisma } = require("../PrismaClient/prismaClient.js");
-const fs = require("fs");
-const csv = require("csv-parser");
->>>>>>>> documents:extra/workers/vehicle.js
 
 // Create queue instance for cleanup
 const vehicleQueue = new Queue("vehicle", { connection });

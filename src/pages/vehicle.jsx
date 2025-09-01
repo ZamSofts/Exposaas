@@ -29,7 +29,7 @@ export default function VehiclesPage() {
   const [csvFile, setCsvFile] = useState(null);
   const [csvFileModal, setCsvFileModal] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   // Vehicle documents upload states
   const [vehicleDocuments, setVehicleDocuments] = useState([]);
 
@@ -109,7 +109,6 @@ export default function VehiclesPage() {
     setPerPage(perPageValue);
   };
 
-
   const handleFileChange = e => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -127,27 +126,21 @@ export default function VehiclesPage() {
   const handleDocumentChange = e => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    if(vehicleDocuments.length + files.length > 15) {
+    if (vehicleDocuments.length + files.length > 15) {
       setError("You can upload a maximum of 15 files.");
       return;
     }
 
     const validFiles = [];
     const invalidFiles = [];
-    const allowedTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/jpg', 
-      'image/png',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ];
-    const allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
-    
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    const allowedExtensions = ["pdf", "jpg", "jpeg", "png", "doc", "docx"];
+
     files.forEach(file => {
       const fileExtension = file.name.split(".").pop()?.toLowerCase();
       if (allowedExtensions.includes(fileExtension) && allowedTypes.includes(file.type)) {
-        if(file.size > 5 * 1024 * 1024) { // 5MB limit
+        if (file.size > 5 * 1024 * 1024) {
+          // 5MB limit
           setError(`File ${file.name} exceeds the 5MB size limit.`);
           invalidFiles.push(file.name);
         } else {
@@ -156,26 +149,26 @@ export default function VehiclesPage() {
             file,
             name: file.name,
             size: file.size,
-            type: file.type
+            type: file.type,
           });
         }
       } else {
         invalidFiles.push(file.name);
       }
     });
-    
+
     if (invalidFiles.length > 0) {
       setError(`Invalid files: ${invalidFiles.join(", ")}. Only PDF, JPG, PNG, DOC, DOCX files are allowed! and must be under 5MB.`);
     } else {
       setError("");
     }
-    
+
     setVehicleDocuments(prev => [...prev, ...validFiles]);
     // Reset the input value to allow selecting the same files again
-    e.target.value = '';
+    e.target.value = "";
   };
 
-  const removeDocument = (fileId) => {
+  const removeDocument = fileId => {
     setVehicleDocuments(prev => prev.filter(file => file.id !== fileId));
     setError("");
   };
@@ -217,52 +210,48 @@ export default function VehiclesPage() {
     loadData();
   };
 
-
   const saveVehicle = async () => {
     if (!brandId || !chassisNumber || !statusId) {
       setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
       return;
     }
     const formData = new FormData();
-    formData.append('name', name);
-    formData.append('brandId', brandId);
-    formData.append('chassisNumber', chassisNumber);
-    formData.append('companyId', Number(session.companyId));
-    formData.append('statusId', statusId);
-    formData.append('lotNumber', lotNumber);
-    formData.append('auction', auction);
-    formData.append('remarks', remarks);
-    vehicleDocuments.forEach((docObj) => {
-      formData.append('documents', docObj.file);
+    formData.append("name", name);
+    formData.append("brandId", brandId);
+    formData.append("chassisNumber", chassisNumber);
+    formData.append("companyId", Number(session.companyId));
+    formData.append("statusId", statusId);
+    formData.append("lotNumber", lotNumber);
+    formData.append("auction", auction);
+    formData.append("remarks", remarks);
+    vehicleDocuments.forEach(docObj => {
+      formData.append("documents", docObj.file);
     });
 
     if (edit !== 0) {
-      formData.append('id', edit);
+      formData.append("id", edit);
     }
 
     let response;
     if (edit === 0) {
-      response = await API("PUT", "vehicle", formData, true); 
+      response = await API("PUT", "vehicle", formData, true);
     } else {
-      response = await API("POST", "vehicle", formData, true); 
+      response = await API("POST", "vehicle", formData, true);
     }
-    
+
     if (response.error) {
       setError(response.error);
       showToast(response.error, "error");
       return;
     }
-    
+
     showToast(
-      edit === 0 ? 
-        `Vehicle added successfully! ${response.documentsUploaded || 0} document(s) uploaded.` : 
-        `Vehicle updated successfully! ${response.documentsUploaded || 0} document(s) uploaded.`, 
+      edit === 0 ? `Vehicle added successfully! ${response.documentsUploaded || 0} document(s) uploaded.` : `Vehicle updated successfully! ${response.documentsUploaded || 0} document(s) uploaded.`,
       "success"
     );
     loadData();
     resetForm();
   };
-
 
   const loadEdit = async id => {
     const data = await API("GET", `vehicle?id=${id}`);
@@ -378,7 +367,7 @@ export default function VehiclesPage() {
                     <label className="input-label">Brand</label>
                     <CustomSelect data={brand} selectedId={brandId} setSelectedId={setBrandId} />
                   </div>
-                  
+
                   <div>
                     <label className="input-label">Current Status</label>
                     <CustomSelect data={vehicleStatus} selectedId={statusId} setSelectedId={setStatusId} />
@@ -395,77 +384,58 @@ export default function VehiclesPage() {
                     <label className="input-label">Auction</label>
                     <input type="text" value={auction} onChange={e => setAuction(e.target.value)} className="input-style" placeholder="Enter auction..." />
                   </div>
-                  
+
                   {/* Remarks - Full Width */}
                   <div className="col-span-1 md:col-span-3">
                     <label className="input-label">Remarks</label>
                     <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="input-style" placeholder="Enter remarks..." rows={3} />
                   </div>
-                  
+
                   {/* Vehicle Documents Upload Section - Full Width */}
                   <div className="col-span-1 md:col-span-3">
                     <label className="input-label">Vehicle Documents</label>
                     <div className="vehicle-doc-style">
                       {/* Add Document Tile */}
                       <div className="relative">
-                        <input 
-                          type="file" 
-                          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" 
-                          multiple
-                          onChange={handleDocumentChange} 
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                        />
+                        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple onChange={handleDocumentChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                         <div className="vehicle-doc-upload-button">
                           <Plus className="w-6 h-6 text-[var(--secondary-foreground)] mb-1" />
                           <span className="text-xs text-[var(--secondary-foreground)] text-center px-1">Add Documents</span>
                         </div>
                       </div>
-                      
+
                       {/* Document Tiles */}
-                      {vehicleDocuments.map((docObj) => (
+                      {vehicleDocuments.map(docObj => (
                         <div key={docObj.id} className="relative group">
                           <div className="vehicle-doc-display">
                             <div className="flex-1 flex flex-col items-center justify-center">
-                              {docObj.type.includes('image') ? (
-                                <img 
-                                  src={URL.createObjectURL(docObj.file)} 
-                                  alt={docObj.name}
-                                  className="w-8 h-8 object-cover rounded mb-1"
-                                />
+                              {docObj.type.includes("image") ? (
+                                <img src={URL.createObjectURL(docObj.file)} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
                               ) : (
                                 <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
                               )}
                               <div className="text-xs text-[var(--foreground)] text-center break-words leading-tight">
-                                {docObj.name.length > 15 ? docObj.name.substring(0, 12) + '...' : docObj.name}
+                                {docObj.name.length > 15 ? docObj.name.substring(0, 12) + "..." : docObj.name}
                               </div>
-                              <div className="text-xs text-[var(--secondary-foreground)] mt-1">
-                                {(docObj.size / 1024).toFixed(1)} KB
-                              </div>
+                              <div className="text-xs text-[var(--secondary-foreground)] mt-1">{(docObj.size / 1024).toFixed(1)} KB</div>
                             </div>
                             {/* Remove Button */}
-                            <button
-                              onClick={() => removeDocument(docObj.id)}
-                              className="vehicle-doc-remove-button"
-                            >
+                            <button onClick={() => removeDocument(docObj.id)} className="vehicle-doc-remove-button">
                               ×
                             </button>
                           </div>
                         </div>
                       ))}
                     </div>
-                    
+
                     {/* Document Info */}
                     {vehicleDocuments.length > 0 && (
                       <div className="mt-2 p-2 bg-[var(--surface)] rounded text-xs text-[var(--secondary-foreground)]">
                         <span className="font-medium">{vehicleDocuments.length} document(s) selected</span>
-                        <span className="ml-2">
-                          ({(vehicleDocuments.reduce((acc, doc) => acc + doc.size, 0) / 1024).toFixed(1)} KB total)
-                        </span>
+                        <span className="ml-2">({(vehicleDocuments.reduce((acc, doc) => acc + doc.size, 0) / 1024).toFixed(1)} KB total)</span>
                       </div>
                     )}
-                    <p className="text-xs text-[var(--secondary-foreground)] mt-1">
-                      Supported formats: PDF, JPG, PNG, DOC, DOCX (Max size per file: 10MB)
-                    </p>
+                    <p className="text-xs text-[var(--secondary-foreground)] mt-1">Supported formats: PDF, JPG, PNG, DOC, DOCX (Max size per file: 10MB)</p>
                   </div>
                 </div>
                 <Error message={error} />

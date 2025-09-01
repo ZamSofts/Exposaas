@@ -1,8 +1,4 @@
-<<<<<<<< HEAD:src/workers/prismaClient.mjs
-import { PrismaClient } from "../generated/prisma/index.js"; // <- point to generated client
-========
-const { PrismaClient } = require("../../src/generated/prisma/index.js"); // <- point to generated client
->>>>>>>> documents:extra/PrismaClient/prismaClient.js
+import { PrismaClient } from "../../src/generated/prisma/index.js"; // <- point to generated client
 
 const globalForPrisma = globalThis;
 

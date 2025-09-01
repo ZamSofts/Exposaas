@@ -1,7 +1,5 @@
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
 import { WebSocketServer, WebSocket } from "ws";
-const { prisma } = require("../PrismaClient/prismaClient.js");
+import { prisma } from "../PrismaClient/prismaClient.mjs";
 
 const WS_PORT = process.env.WS_PORT || 5000;
 
@@ -16,8 +14,6 @@ class WebSocketManager {
     try {
       // Test database connection
       await prisma.$connect();
-      console.log("✅ Database connected successfully");
-
       this.wss = new WebSocketServer({
         port: WS_PORT,
         perMessageDeflate: false,

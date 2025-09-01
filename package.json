@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "worker": "node -r dotenv/config extra/workers/vehicle.js",
+    "dev": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next dev\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\"",
+    "worker": "node -r dotenv/config extra/workers/vehicle.mjs",
     "ws": "node extra/webSocket/ws.mjs",
     "build": "next build",
     "start": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next start\" \"node -r dotenv/config src/workers/vehicle.mjs\"",
@@ -27,10 +27,8 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-select": "^5.10.2",
-    "socket.io": "^4.8.1",
-    "socket.io-client": "^4.8.1",
-    "ws": "^8.18.3",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
