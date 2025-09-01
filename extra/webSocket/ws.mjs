@@ -153,10 +153,10 @@ class WebSocketManager {
 
   async handleUserJoin(senderWs, payload) {
     try {
-      const { userId, username } = payload;
+      const { userId, username, companyId } = payload;
 
-      if (!userId || !username) {
-        this.sendError(senderWs, "userId and username are required");
+      if (!userId || !username || !companyId) {
+        this.sendError(senderWs, "userId, username, and companyId are required");
         return;
       }
 
@@ -173,15 +173,31 @@ class WebSocketManager {
         return;
       }
 
+      // Verify user belongs to the specified company
+      if (user.companyId !== parseInt(companyId)) {
+        this.sendError(senderWs, "User does not belong to the specified company");
+        return;
+      }
+
+      // Check for existing connections for this user and close them
+      this.clients.forEach((client, clientId) => {
+        if (client.userId === parseInt(userId) && client.ws !== senderWs && client.ws.readyState === WebSocket.OPEN) {
+          console.log(`🔄 Closing existing connection for user ${username} (${clientId})`);
+          client.ws.close(1000, "New connection established");
+          this.clients.delete(clientId);
+        }
+      });
+
       // Update client info
       const client = this.clients.get(senderWs.id);
       if (client) {
         client.userId = parseInt(userId);
         client.username = username;
+        client.companyId = parseInt(companyId);
         client.user = user;
       }
 
-      console.log(`👤 User ${username} (${userId}) joined the chat`);
+      console.log(`👤 User ${username} (${userId}) from company ${user.company.name} joined the chat`);
 
       // Send join confirmation
       this.sendToClient(senderWs, {
@@ -195,8 +211,11 @@ class WebSocketManager {
         timestamp: Date.now(),
       });
 
-      // Load recent chat history for the user
-      await this.sendChatHistory(senderWs, { limit: 50 });
+      // Load recent chat history for the user (filtered by company)
+      await this.sendChatHistory(senderWs, { limit: 50, companyId: parseInt(companyId) });
+      
+      // Update user count for all companies
+      this.broadcastUserCount();
     } catch (error) {
       console.error("❌ Error handling user join:", error.message);
       this.sendError(senderWs, "Failed to join chat");
@@ -206,23 +225,41 @@ class WebSocketManager {
   async handleLoadHistory(senderWs, payload) {
     try {
       const { page = 1, limit = 50 } = payload;
-      await this.sendChatHistory(senderWs, { page, limit });
+      const client = this.clients.get(senderWs.id);
+      const companyId = client?.companyId;
+      
+      await this.sendChatHistory(senderWs, { page, limit, companyId });
     } catch (error) {
       console.error("❌ Error loading history:", error.message);
       this.sendError(senderWs, "Failed to load chat history");
     }
   }
 
-  async sendChatHistory(ws, { page = 1, limit = 50 } = {}) {
+  async sendChatHistory(ws, { page = 1, limit = 50, companyId = null } = {}) {
     try {
       const skip = (page - 1) * limit;
 
+      // Get the client's company ID if not provided
+      const client = this.clients.get(ws.id);
+      const filterCompanyId = companyId || client?.companyId;
+
+      if (!filterCompanyId) {
+        this.sendError(ws, "Unable to determine company for chat history");
+        return;
+      }
+
       const messages = await prisma.chatMessage.findMany({
+        where: {
+          user: {
+            companyId: filterCompanyId
+          }
+        },
         include: {
           user: {
             select: {
               id: true,
               username: true,
+              companyId: true,
               company: {
                 select: {
                   id: true,
@@ -311,10 +348,10 @@ class WebSocketManager {
         company: savedMessage.user.company,
       };
 
-      // Broadcast to all clients
-      this.broadcast(broadcastMessage);
+      // Broadcast only to clients from the same company
+      this.broadcast(broadcastMessage, null, savedMessage.user.company.id);
 
-      console.log(`💬 Message saved and broadcasted: ${savedMessage.user.username}: ${savedMessage.message}`);
+      console.log(`💬 Message saved and broadcasted to company ${savedMessage.user.company.name}: ${savedMessage.user.username}: ${savedMessage.message}`);
     } catch (error) {
       console.error("❌ Error handling chat message:", error.message);
       this.sendError(senderWs, "Failed to save message");
@@ -348,10 +385,24 @@ class WebSocketManager {
   }
 
   broadcastUserCount() {
-    this.broadcast({
-      type: "user_count",
-      count: this.wss.clients.size,
-      timestamp: Date.now(),
+    // Get unique companies and their user counts
+    const companyCounts = new Map();
+    
+    this.clients.forEach(client => {
+      if (client.companyId && client.ws.readyState === WebSocket.OPEN) {
+        const count = companyCounts.get(client.companyId) || 0;
+        companyCounts.set(client.companyId, count + 1);
+      }
+    });
+
+    // Send company-specific user counts
+    companyCounts.forEach((count, companyId) => {
+      const payload = {
+        type: "user_count",
+        count: count,
+        timestamp: Date.now(),
+      };
+      this.broadcast(payload, null, companyId);
     });
   }
 
@@ -360,13 +411,21 @@ class WebSocketManager {
     this.clients.delete(ws.id);
   }
 
-  broadcast(payload, excludeWs = null) {
+  broadcast(payload, excludeWs = null, companyId = null) {
     const message = typeof payload === "string" ? payload : JSON.stringify(payload);
     let sentCount = 0;
 
     this.wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN && client !== excludeWs) {
         try {
+          // Get client info
+          const clientInfo = this.clients.get(client.id);
+          
+          // If companyId is specified, only send to clients from the same company
+          if (companyId && clientInfo && clientInfo.companyId !== companyId) {
+            return; // Skip this client
+          }
+          
           client.send(message);
           sentCount++;
         } catch (error) {

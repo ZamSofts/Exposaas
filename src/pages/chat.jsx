@@ -12,8 +12,9 @@ export default function ChatPage() {
     () => ({
       username: session?.name,
       userId: session?.id,
+      companyId: session?.companyId,
     }),
-    [session?.name, session?.id]
+    [session?.name, session?.id, session?.companyId]
   );
 
   // Don't render anything while loading or if not authenticated
@@ -29,13 +30,14 @@ export default function ChatPage() {
 }
 
 function ChatContent({ userInfo }) {
-  const { username, userId } = userInfo;
+  const { username, userId, companyId } = userInfo;
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
   const connectingRef = useRef(false);
   const connectionAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
   const shouldConnectRef = useRef(true);
+  const mountedRef = useRef(true);
   const [ready, setReady] = useState(false);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
@@ -43,6 +45,19 @@ function ChatContent({ userInfo }) {
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(1);
   const [loading, setLoading] = useState(true);
+
+  // Component mount/unmount tracking
+  useEffect(() => {
+    mountedRef.current = true;
+    shouldConnectRef.current = true;
+    console.log("📍 Chat component mounted");
+    
+    return () => {
+      console.log("📍 Chat component unmounting");
+      mountedRef.current = false;
+      shouldConnectRef.current = false;
+    };
+  }, []);
 
   // Auto-scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
@@ -56,8 +71,12 @@ function ChatContent({ userInfo }) {
   // WebSocket connection with improved error handling
   const connect = useCallback(() => {
     // Prevent multiple simultaneous connections
-    if (connectingRef.current) {
-      console.log("⏳ Connection already in progress, skipping...");
+    if (connectingRef.current || !mountedRef.current || !shouldConnectRef.current) {
+      console.log("⏳ Connection prevented:", { 
+        connecting: connectingRef.current, 
+        mounted: mountedRef.current, 
+        shouldConnect: shouldConnectRef.current 
+      });
       return;
     }
 
@@ -71,9 +90,11 @@ function ChatContent({ userInfo }) {
     if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
       console.log("🔄 Closing existing WebSocket connection");
       wsRef.current.close();
+      wsRef.current = null;
     }
 
     connectingRef.current = true;
+    console.log("🔌 Starting WebSocket connection...");
 
     try {
       const url = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:5000";
@@ -81,6 +102,11 @@ function ChatContent({ userInfo }) {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (!mountedRef.current) {
+          ws.close();
+          return;
+        }
+        
         connectingRef.current = false; // Reset connecting flag
         setReady(true);
         setError("");
@@ -89,17 +115,18 @@ function ChatContent({ userInfo }) {
         console.log("🔌 WebSocket connected");
 
         // Join the chat with user info
-        if (userId && username) {
+        if (userId && username && companyId) {
           ws.send(
             JSON.stringify({
               type: "join",
               userId: userId,
               username: username,
+              companyId: companyId,
               timestamp: Date.now(),
             })
           );
         } else {
-          console.error("❌ Missing user credentials:", { userId, username });
+          console.error("❌ Missing user credentials:", { userId, username, companyId });
           setError("User authentication data missing");
         }
       };
@@ -184,17 +211,20 @@ function ChatContent({ userInfo }) {
         setReady(false);
         console.log("❌ WebSocket closed, code:", event.code);
 
-        if (connectionAttemptsRef.current < 5) {
+        // Only attempt reconnection if component is still mounted and we should connect
+        if (mountedRef.current && shouldConnectRef.current && connectionAttemptsRef.current < 5) {
           connectionAttemptsRef.current += 1;
           setConnectionAttempts(connectionAttemptsRef.current);
-          setError(`Connection lost. Reconnecting... (Attempt ${connectionAttemptsRef.current}/5)`);
+         
 
           // Use timeout ref to allow cleanup
           reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectTimeoutRef.current = null;
-            connect();
+            if (mountedRef.current && shouldConnectRef.current) {
+              reconnectTimeoutRef.current = null;
+              connect();
+            }
           }, 2000 * connectionAttemptsRef.current); // Exponential backoff
-        } else {
+        } else if (connectionAttemptsRef.current >= 5) {
           setError("Failed to connect after multiple attempts. Please refresh the page.");
         }
       };
@@ -202,8 +232,11 @@ function ChatContent({ userInfo }) {
       ws.onerror = err => {
         connectingRef.current = false; // Reset connecting flag
         console.error("❌ WebSocket error:", err);
-        setError("Connection error occurred");
-        ws.close();
+        setError("Failed to connect to chat server");
+        
+        if (ws.readyState !== WebSocket.CLOSED) {
+          ws.close();
+        }
       };
     } catch (err) {
       connectingRef.current = false; // Reset connecting flag
@@ -211,30 +244,50 @@ function ChatContent({ userInfo }) {
       console.error("Connection error:", err);
       setLoading(false);
     }
-  }, [userId, username]); // Removed connectionAttempts from dependencies
+  }, [userId, username, companyId]); // Removed connectionAttempts from dependencies
 
   useEffect(() => {
-    if (userId && username && shouldConnectRef.current) {
-      console.log("🔐 User authenticated, connecting WebSocket:", { userId, username });
-      shouldConnectRef.current = false; // Prevent multiple connections
-      connect();
-    } else {
-      console.log("⏳ Waiting for authentication or already connected:", { userId, username, shouldConnect: shouldConnectRef.current });
-    }
+    // Add a small delay to prevent double connection in React Strict Mode
+    const timer = setTimeout(() => {
+      if (userId && username && companyId && shouldConnectRef.current && mountedRef.current) {
+        console.log("🔐 User authenticated, connecting WebSocket:", { userId, username, companyId });
+        connect();
+        shouldConnectRef.current = false; // Prevent multiple connections
+      } else {
+        console.log("⏳ Waiting for authentication or already connected:", { 
+          userId, 
+          username, 
+          companyId, 
+          shouldConnect: shouldConnectRef.current,
+          mounted: mountedRef.current 
+        });
+      }
+    }, 100);
+    
     return () => {
+      clearTimeout(timer);
+      console.log("🧹 Chat component cleanup");
+      shouldConnectRef.current = false; // Prevent reconnections during cleanup
+      
       // Clear reconnection timeout
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = null;
       }
-      // Close WebSocket connection
-      if (wsRef.current) {
-        wsRef.current.close();
+      
+      // Close WebSocket connection safely
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        console.log("🔌 Closing WebSocket on cleanup");
+        wsRef.current.close(1000, "Component unmounting");
       }
-      // Reset connection flag for next mount
-      shouldConnectRef.current = true;
+      wsRef.current = null;
+      
+      // Reset states
+      setReady(false);
+      setMessages([]);
+      setOnlineUsers(1);
     };
-  }, [userId, username]); // Removed connect from dependencies to prevent reconnection loops
+  }, [userId, username, companyId]); // Removed connect dependency
 
   const sendMessage = useCallback(() => {
     const text = message.trim();
@@ -253,6 +306,7 @@ function ChatContent({ userInfo }) {
       user: username,
       text,
       userId: userId,
+      companyId: companyId,
       timestamp: Date.now(),
     };
 
@@ -264,7 +318,7 @@ function ChatContent({ userInfo }) {
       setError("Failed to send message");
       console.error("Send error:", err);
     }
-  }, [message, ready, userId, username]);
+  }, [message, ready, userId, username, companyId]);
 
   const handleKeyPress = useCallback(
     e => {

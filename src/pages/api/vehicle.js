@@ -1,4 +1,5 @@
 import { prisma, getSession } from "@/lib/useful";
+import { putFile, deleteFile } from "@/lib/blob.mjs";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
@@ -154,7 +155,11 @@ export default async function handler(req, res) {
           },
         });
 
-        if (uploadedFiles.length) cleanupFiles(uploadedFiles); // Clean files after processing
+        if (uploadedFiles.length) {
+          await Promise.all(uploadedFiles.map(file => putFile(file)));
+        }
+
+        cleanupFiles(uploadedFiles); // Clean files after processing
         return res.status(201).json({ message: "Vehicle created", vehicleId: vehicle.id });
       }
 
@@ -165,18 +170,23 @@ export default async function handler(req, res) {
 
         await validateVehicle({ chassisNumber, brandId, companyId, statusId, vehicleId });
 
+        const updateData = {
+          chassisNumber,
+          auction,
+          lotNumber,
+          remarks,
+          brandId: Number(brandId),
+          companyId: Number(companyId),
+          statusId: Number(statusId),
+        };
+
+        if (name !== "null") {
+          updateData.name = name;
+        }
+        
         await prisma.vehicle.update({
           where: { id: vehicleId },
-          data: {
-            name,
-            chassisNumber,
-            auction,
-            lotNumber,
-            remarks,
-            brandId: Number(brandId),
-            companyId: Number(companyId),
-            statusId: Number(statusId),
-          },
+          data: updateData,
         });
 
         if (uploadedFiles.length) cleanupFiles(uploadedFiles);

@@ -35,6 +35,10 @@ export default function VehiclesPage() {
 
   const [edit, setEdit] = useState(null);
 
+  // Modal refs for click outside
+  const vehicleModalRef = useRef(null);
+  const csvModalRef = useRef(null);
+
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(5);
@@ -54,6 +58,23 @@ export default function VehiclesPage() {
   useEffect(() => {
     loadData();
   }, [currentPage, perPage, search, sortBy, sortOrder]);
+
+  // Handle click outside modal to close
+  useEffect(() => {
+    const handleClickOutside = event => {
+      if (vehicleModalRef.current && !vehicleModalRef.current.contains(event.target)) {
+        resetForm();
+      }
+      if (csvModalRef.current && !csvModalRef.current.contains(event.target)) {
+        resetForm();
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
@@ -127,6 +148,7 @@ export default function VehiclesPage() {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     if (vehicleDocuments.length + files.length > 15) {
+      showToast("You can upload a maximum of 15 files.", "error");
       setError("You can upload a maximum of 15 files.");
       return;
     }
@@ -141,6 +163,7 @@ export default function VehiclesPage() {
       if (allowedExtensions.includes(fileExtension) && allowedTypes.includes(file.type)) {
         if (file.size > 5 * 1024 * 1024) {
           // 5MB limit
+          showToast(`File ${file.name} exceeds the 5MB size limit.`, "error");
           setError(`File ${file.name} exceeds the 5MB size limit.`);
           invalidFiles.push(file.name);
         } else {
@@ -228,14 +251,11 @@ export default function VehiclesPage() {
       formData.append("documents", docObj.file);
     });
 
-    if (edit !== 0) {
-      formData.append("id", edit);
-    }
-
     let response;
     if (edit === 0) {
       response = await API("PUT", "vehicle", formData, true);
     } else {
+      formData.append("id", edit);
       response = await API("POST", "vehicle", formData, true);
     }
 
@@ -356,7 +376,7 @@ export default function VehiclesPage() {
           {/* Add/Edit Vehicle Modal */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
-              <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-4 sm:p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+              <div ref={vehicleModalRef} className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-4 sm:p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
                 <h3 className="text-lg sm:text-xl font-semibold mb-6">{edit === 0 ? "Add New Vehicle" : "Edit Vehicle"}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                   <div>
@@ -438,7 +458,9 @@ export default function VehiclesPage() {
                     <p className="text-xs text-[var(--secondary-foreground)] mt-1">Supported formats: PDF, JPG, PNG, DOC, DOCX (Max size per file: 10MB)</p>
                   </div>
                 </div>
-                <Error message={error} />
+                <div className="mt-4">
+                  <Error message={error} />
+                </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-end mt-6">
                   <CustomButton title={edit === 0 ? "Add Vehicle" : "Save Changes"} onClick={saveVehicle} className="btn-primary w-full sm:w-auto text-center justify-center" />
                   <CustomButton title="Cancel" onClick={resetForm} className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg w-full sm:w-auto text-center justify-center" />
@@ -450,7 +472,7 @@ export default function VehiclesPage() {
           {/* CSV Upload Modal */}
           {csvFileModal && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
+              <div ref={csvModalRef} className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
                 <div className="space-y-4">
                   <div>

@@ -18,27 +18,27 @@ model Company {
 }
 
 model User {
-  id        Int        @id @default(autoincrement())
-  username  String     @unique
-  password  String
-  companyId Int
-  createdAt DateTime   @default(now())
-  company   Company    @relation(fields: [companyId], references: [id])
-  roles     UserRole[] 
+  id           Int           @id @default(autoincrement())
+  username     String        @unique
+  password     String
+  companyId    Int
+  createdAt    DateTime      @default(now())
   chatMessages ChatMessage[]
+  company      Company       @relation(fields: [companyId], references: [id])
+  roles        UserRole[]
 }
 
 model Role {
   id          Int              @id @default(autoincrement())
   name        String           @unique
-  permissions RolePermission[] 
-  users       UserRole[]       
+  permissions RolePermission[]
+  users       UserRole[]
 }
 
 model Permission {
   id    Int              @id @default(autoincrement())
   name  String           @unique
-  roles RolePermission[] 
+  roles RolePermission[]
 }
 
 model RolePermission {
@@ -46,7 +46,7 @@ model RolePermission {
   roleId       Int
   permissionId Int
   permission   Permission @relation(fields: [permissionId], references: [id])
-  role         Role       @relation(fields: [roleId], references: [id] )
+  role         Role       @relation(fields: [roleId], references: [id])
 
   @@unique([roleId, permissionId])
 }
@@ -60,28 +60,27 @@ model UserRole {
 
   @@unique([userId, roleId])
 }
-model Vehicle {
-  id            Int            @id @default(autoincrement())
-  name          String?
-  chassisNumber String         @unique
-  lotNumber     String?         
-  auction       String?         
-  remarks       String?        // optional remarks/notes
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
 
+model Vehicle {
+  id            Int           @id @default(autoincrement())
+  name          String?
+  chassisNumber String        @unique
+  remarks       String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   companyId     Int
   brandId       Int
   statusId      Int
-  brand         Brand          @relation(fields: [brandId], references: [id])
-  company       Company        @relation(fields: [companyId], references: [id])
-  status        VehicleStatus   @relation(fields: [statusId], references: [id])
-
+  auction       String?
+  lotNumber     String?
+  brand         Brand         @relation(fields: [brandId], references: [id])
+  company       Company       @relation(fields: [companyId], references: [id])
+  status        VehicleStatus @relation(fields: [statusId], references: [id])
 }
 
 model VehicleStatus {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique   // e.g. "Packing", "Shipped", "Delivered"
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
   vehicles Vehicle[]
 }
 
