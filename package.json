@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "worker": "node -r dotenv/config extra/workers/vehicle.js",
-    "ws": "node extra/webSocket/ws-server.js",
+    "ws": "node extra/webSocket/ws.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

@@ -1,4 +1,4 @@
-import { createRequire } from 'module';
+import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 import { WebSocketServer, WebSocket } from "ws";
 const { prisma } = require("../PrismaClient/prismaClient.js");
@@ -18,14 +18,14 @@ class WebSocketManager {
       await prisma.$connect();
       console.log("✅ Database connected successfully");
 
-      this.wss = new WebSocketServer({ 
+      this.wss = new WebSocketServer({
         port: WS_PORT,
-        perMessageDeflate: false
+        perMessageDeflate: false,
       });
-      
+
       this.setupHeartbeat();
       this.setupEventHandlers();
-      
+
       console.log(`🚀 WebSocket server running on ws://localhost:${WS_PORT}`);
     } catch (error) {
       console.error("❌ Failed to start WebSocket server:", error.message);
@@ -35,7 +35,7 @@ class WebSocketManager {
 
   setupHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
-      this.wss.clients.forEach((ws) => {
+      this.wss.clients.forEach(ws => {
         if (ws.isAlive === false) {
           console.log("💀 Terminating dead connection");
           return ws.terminate();
@@ -64,34 +64,33 @@ class WebSocketManager {
       ws.id = clientId;
       ws.isAlive = true;
       ws.connectedAt = new Date();
-      
+
       this.clients.set(clientId, {
         ws,
         connectedAt: ws.connectedAt,
         lastActivity: new Date(),
         userId: null, // Will be set when user joins
-        username: null
+        username: null,
       });
 
       console.log(`🔌 New client connected: ${clientId} (Total: ${this.wss.clients.size})`);
 
       // Setup event listeners
       ws.on("pong", this.handlePong.bind(ws));
-      ws.on("message", (message) => this.handleMessage(ws, message));
+      ws.on("message", message => this.handleMessage(ws, message));
       ws.on("close", () => this.handleDisconnection(ws));
-      ws.on("error", (error) => this.handleError(ws, error));
+      ws.on("error", error => this.handleError(ws, error));
 
       // Send welcome message and user count
       this.sendToClient(ws, {
         type: "system",
         message: "Welcome to ExpoSaaS 👋",
         clientId,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Send current user count
       this.broadcastUserCount();
-
     } catch (error) {
       console.error("❌ Error handling connection:", error.message);
       ws.close(1011, "Server error");
@@ -113,10 +112,10 @@ class WebSocketManager {
       try {
         payload = JSON.parse(message.toString());
       } catch {
-        payload = { 
-          type: "chat", 
+        payload = {
+          type: "chat",
           text: message.toString(),
-          clientId: ws.id
+          clientId: ws.id,
         };
       }
 
@@ -128,7 +127,6 @@ class WebSocketManager {
 
       // Route message based on type
       this.routeMessage(ws, payload);
-
     } catch (error) {
       console.error("❌ Error handling message:", error.message);
       this.sendError(ws, "Invalid message format");
@@ -160,7 +158,7 @@ class WebSocketManager {
   async handleUserJoin(senderWs, payload) {
     try {
       const { userId, username } = payload;
-      
+
       if (!userId || !username) {
         this.sendError(senderWs, "userId and username are required");
         return;
@@ -170,8 +168,8 @@ class WebSocketManager {
       const user = await prisma.user.findUnique({
         where: { id: parseInt(userId) },
         include: {
-          company: true
-        }
+          company: true,
+        },
       });
 
       if (!user) {
@@ -196,14 +194,13 @@ class WebSocketManager {
         user: {
           id: user.id,
           username: user.username,
-          company: user.company
+          company: user.company,
         },
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
 
       // Load recent chat history for the user
       await this.sendChatHistory(senderWs, { limit: 50 });
-
     } catch (error) {
       console.error("❌ Error handling user join:", error.message);
       this.sendError(senderWs, "Failed to join chat");
@@ -254,7 +251,7 @@ class WebSocketManager {
         userId: msg.userId,
         timestamp: msg.createdAt.getTime(),
         type: "chat",
-        company: msg.user.company
+        company: msg.user.company,
       }));
 
       this.sendToClient(ws, {
@@ -262,9 +259,8 @@ class WebSocketManager {
         messages: formattedMessages,
         hasMore: messages.length === limit,
         page,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-
     } catch (error) {
       console.error("❌ Error sending chat history:", error.message);
       this.sendError(ws, "Failed to load chat history");
@@ -316,14 +312,13 @@ class WebSocketManager {
         userId: savedMessage.userId,
         timestamp: savedMessage.createdAt.getTime(),
         type: "chat",
-        company: savedMessage.user.company
+        company: savedMessage.user.company,
       };
 
       // Broadcast to all clients
       this.broadcast(broadcastMessage);
 
       console.log(`💬 Message saved and broadcasted: ${savedMessage.user.username}: ${savedMessage.message}`);
-
     } catch (error) {
       console.error("❌ Error handling chat message:", error.message);
       this.sendError(senderWs, "Failed to save message");
@@ -339,7 +334,7 @@ class WebSocketManager {
     });
   } */
 
-/*   handleSystemMessage(senderWs, payload) {
+  /*   handleSystemMessage(senderWs, payload) {
     console.log(`🔧 System message from ${senderWs.id}:`, payload.message);
   } */
 
@@ -350,7 +345,7 @@ class WebSocketManager {
     } else {
       console.log(`❌ Client disconnected: ${ws.id}`);
     }
-    
+
     this.clients.delete(ws.id);
     this.broadcastUserCount();
     console.log(`📊 Remaining clients: ${this.wss.clients.size}`);
@@ -360,7 +355,7 @@ class WebSocketManager {
     this.broadcast({
       type: "user_count",
       count: this.wss.clients.size,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -373,7 +368,7 @@ class WebSocketManager {
     const message = typeof payload === "string" ? payload : JSON.stringify(payload);
     let sentCount = 0;
 
-    this.wss.clients.forEach((client) => {
+    this.wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN && client !== excludeWs) {
         try {
           client.send(message);
@@ -402,7 +397,7 @@ class WebSocketManager {
     this.sendToClient(ws, {
       type: "error",
       message: errorMessage,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   }
 
@@ -414,18 +409,18 @@ class WebSocketManager {
     return {
       totalClients: this.wss.clients.size,
       activeConnections: this.clients.size,
-      uptime: process.uptime()
+      uptime: process.uptime(),
     };
   }
 
   async shutdown() {
     console.log("🛑 Shutting down WebSocket server...");
-    
+
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
     }
 
-    this.wss.clients.forEach((ws) => {
+    this.wss.clients.forEach(ws => {
       ws.close(1001, "Server shutting down");
     });
 
