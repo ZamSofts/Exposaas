@@ -76,12 +76,12 @@ const getAllSidebarSections = () => [
         href: "/company",
         roles: ["Sadmin"], // Only show to Sadmin
       },
-      {
-        id: "shipping",
-        label: "Shipping Channels",
-        icon: <Truck size={20} />,
-        href: "/shipping",
-      },
+      // {
+      //   id: "shipping",
+      //   label: "Shipping Channels",
+      //   icon: <Truck size={20} />,
+      //   href: "/shipping",
+      // },
       {
         id: "chat",
         label: "General Chat",
@@ -110,40 +110,40 @@ const getAllSidebarSections = () => [
       },
     ],
   },
-  {
-    title: "FEATURES",
-    items: [
-      {
-        id: "messages",
-        label: "Saved Messages",
-        icon: <Bookmark size={20} />,
-        href: "/messages",
-      },
-      {
-        id: "contacts",
-        label: "Contacts",
-        icon: <Contact size={20} />,
-        href: "/contacts",
-      },
-    ],
-  },
-  {
-    title: "HELP",
-    items: [
-      {
-        id: "features",
-        label: "ExpoSaaS Features",
-        icon: <Star size={20} />,
-        href: "/features",
-      },
-      {
-        id: "bug-report",
-        label: "Report Bug",
-        icon: <Bug size={20} />,
-        href: "/bug-report",
-      },
-    ],
-  },
+  // {
+  //   title: "FEATURES",
+  //   items: [
+  //     {
+  //       id: "messages",
+  //       label: "Saved Messages",
+  //       icon: <Bookmark size={20} />,
+  //       href: "/messages",
+  //     },
+  //     {
+  //       id: "contacts",
+  //       label: "Contacts",
+  //       icon: <Contact size={20} />,
+  //       href: "/contacts",
+  //     },
+  //   ],
+  // },
+  // {
+  //   title: "HELP",
+  //   items: [
+  //     {
+  //       id: "features",
+  //       label: "ExpoSaaS Features",
+  //       icon: <Star size={20} />,
+  //       href: "/features",
+  //     },
+  //     {
+  //       id: "bug-report",
+  //       label: "Report Bug",
+  //       icon: <Bug size={20} />,
+  //       href: "/bug-report",
+  //     },
+  //   ],
+  // },
 ];
 
 function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
