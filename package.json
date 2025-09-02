@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next dev\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\"",
     "worker": "node -r dotenv/config extra/workers/vehicle.mjs",
-    "ws": "node extra/webSocket/ws.mjs",
-    "build": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next build\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\"",
-    "start": "concurrently -n \"NEXT,WORKER\" -c \"blue,green\" \"next start\" \"node -r dotenv/config src/workers/vehicle.mjs\"",
+    "ws": "node -r dotenv/config extra/webSocket/ws.mjs",
+    "build": "next build",
+    "start": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next start\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\"",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
