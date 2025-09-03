@@ -1,18 +1,24 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile } from "@/lib/blob.mjs";
 import multer from "multer";
-import fs from "fs";
-import path from "path";
-
-// Setup file upload
-const uploadDir = path.join(process.cwd(), "uploads", "vehicles-doc");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const upload = multer({
-  dest: uploadDir,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit per file
   fileFilter: (req, file, cb) => {
-    const allowed = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    const allowed = [
+      "application/pdf", 
+      "image/jpeg", 
+      "image/jpg", 
+      "image/png", 
+      "application/msword", 
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-powerpoint",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "text/csv"
+    ];
     cb(allowed.includes(file.mimetype) ? null : new Error("Invalid file type"), allowed.includes(file.mimetype));
   },
 }).array("documents", 15);
@@ -20,26 +26,57 @@ const upload = multer({
 export const config = { api: { bodyParser: false } };
 
 // Utilities
-const cleanupFiles = files =>
-  files?.forEach(file => {
-    try {
-      fs.unlinkSync(file.path);
-    } catch (e) {
-      console.warn("Cleanup failed:", e.message);
-    }
-  });
-
 const parseFormData = req =>
   new Promise((resolve, reject) => {
     upload(req, {}, err => {
       if (err) {
-        cleanupFiles(req.files);
         reject(err);
       } else {
         resolve({ files: req.files || [], body: req.body || {} });
       }
     });
   });
+
+//file upload function 
+const uploadFilesToAzure = async (files, vehicleId, folderPath = "vehicles/") => {
+  if (!files || files.length === 0) {
+    return { uploadedDocuments: [], documentsUploaded: 0, errors: [] };
+  }
+
+  const uploadResults = [];
+  const uploadErrors = [];
+
+  // Process files one by one 
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    try {
+      console.log(`📤 Uploading file ${i + 1}/${files.length}: ${file.originalname} (${(file.buffer.length / 1024).toFixed(2)} KB)`);
+      
+      const result = await putFile(file, folderPath);
+      uploadResults.push({
+        vehicleId: vehicleId,
+        docUrl: result.url,
+        fileName: file.originalname,
+        fileSize: file.buffer.length,
+        mimeType: file.mimetype
+      });
+      
+      console.log(`✅ Successfully uploaded: ${file.originalname}`);
+    } catch (error) {
+      console.error(`❌ Failed to upload ${file.originalname}:`, error);
+      uploadErrors.push({
+        fileName: file.originalname,
+        error: error.message
+      });
+    }
+  }
+
+  return {
+    uploadedDocuments: uploadResults,
+    documentsUploaded: uploadResults.length,
+    errors: uploadErrors
+  };
+};
 
 const validateVehicle = async ({ chassisNumber, brandId, companyId, statusId, vehicleId = null }) => {
   if (!chassisNumber || !brandId || !companyId || !statusId) {
@@ -82,17 +119,17 @@ const includeRelations = {
   company: { select: { name: true } },
   brand: { select: { name: true } },
   status: { select: { name: true } },
+  documents: { select: { id: true, docUrl: true, createdAt: true } },
 };
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
-  let uploadedFiles = [];
 
   try {
-    // Handle file uploads
+    // Handle file uploads for PUT and POST methods
     if (["PUT", "POST"].includes(req.method)) {
       const { files, body } = await parseFormData(req);
-      req.files = uploadedFiles = files;
+      req.files = files;
       req.body = body;
     }
 
@@ -155,16 +192,36 @@ export default async function handler(req, res) {
           },
         });
 
-        if (uploadedFiles.length) {
-          await Promise.all(uploadedFiles.map(file => putFile(file)));
+        // Handle document uploads
+        const uploadResult = await uploadFilesToAzure(req.files, vehicle.id, "vehicles/");
+        
+        // Save successfully uploaded documents to database
+        if (uploadResult.uploadedDocuments.length > 0) {
+          await prisma.vehicleDocument.createMany({
+            data: uploadResult.uploadedDocuments.map(doc => ({
+              vehicleId: doc.vehicleId,
+              docUrl: doc.docUrl
+            }))
+          });
         }
 
-        cleanupFiles(uploadedFiles); // Clean files after processing
-        return res.status(201).json({ message: "Vehicle created", vehicleId: vehicle.id });
+        const response = { 
+          message: "Vehicle created successfully", 
+          vehicleId: vehicle.id,
+          documentsUploaded: uploadResult.documentsUploaded
+        };
+
+        // Include upload errors if any
+        if (uploadResult.errors.length > 0) {
+          response.uploadErrors = uploadResult.errors;
+          response.message += ` (${uploadResult.errors.length} files failed to upload)`;
+        }
+
+        return res.status(201).json(response);
       }
 
       case "POST": {
-        const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
+        const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber, documentsToDelete } = req.body;
         const vehicleId = Number(id);
         if (!vehicleId) return res.status(400).json({ error: "Valid vehicle ID required" });
 
@@ -189,14 +246,126 @@ export default async function handler(req, res) {
           data: updateData,
         });
 
-        if (uploadedFiles.length) cleanupFiles(uploadedFiles);
-        return res.json({ message: "Vehicle updated" });
+        // Handle document deletions
+        let documentsDeleted = 0;
+        const deletionErrors = [];
+        if (documentsToDelete) {
+          try {
+            const idsToDelete = JSON.parse(documentsToDelete);
+            if (Array.isArray(idsToDelete) && idsToDelete.length > 0) {
+              // Get document URLs before deletion for Azure cleanup
+              const docsToDelete = await prisma.vehicleDocument.findMany({
+                where: {
+                  id: { in: idsToDelete },
+                  vehicleId: vehicleId // Ensure docs belong to this vehicle
+                }
+              });
+
+              // Delete from database first
+              const deleteResult = await prisma.vehicleDocument.deleteMany({
+                where: {
+                  id: { in: idsToDelete },
+                  vehicleId: vehicleId
+                }
+              });
+              
+              documentsDeleted = deleteResult.count;
+
+              // Delete from Azure Blob Storage one by one
+              for (const doc of docsToDelete) {
+                try {
+                  await deleteFile(doc.docUrl);
+                  console.log(`✅ Deleted from Azure: ${doc.docUrl}`);
+                } catch (error) {
+                  console.error(`❌ Failed to delete from Azure: ${doc.docUrl}`, error);
+                  deletionErrors.push({
+                    docUrl: doc.docUrl,
+                    error: error.message
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error processing document deletions:", error);
+            deletionErrors.push({
+              error: error.message,
+              context: "Failed to parse documentsToDelete"
+            });
+          }
+        }
+
+        // Handle new document uploads
+        const uploadResult = await uploadFilesToAzure(req.files, vehicleId, "vehicles/");
+        
+        // Save successfully uploaded documents to database
+        if (uploadResult.uploadedDocuments.length > 0) {
+          await prisma.vehicleDocument.createMany({
+            data: uploadResult.uploadedDocuments.map(doc => ({
+              vehicleId: doc.vehicleId,
+              docUrl: doc.docUrl
+            }))
+          });
+        }
+        
+        const response = {
+          message: "Vehicle updated successfully",
+          documentsUploaded: uploadResult.documentsUploaded,
+          documentsDeleted: documentsDeleted
+        };
+
+        // Include any errors
+        const allErrors = [...uploadResult.errors, ...deletionErrors];
+        if (allErrors.length > 0) {
+          response.errors = allErrors;
+          response.message += ` (${allErrors.length} operations had errors)`;
+        }
+
+        return res.json(response);
       }
 
       case "DELETE": {
         if (!id) return res.status(400).json({ error: "Vehicle ID required" });
+        
+        // First, get all documents associated with this vehicle BEFORE deletion
+        const vehicleDocuments = await prisma.vehicleDocument.findMany({
+          where: { vehicleId: id },
+          select: { id: true, docUrl: true }
+        });
+
+        // Delete the vehicle (cascade will automatically delete documents from database)
         await prisma.vehicle.delete({ where: { id } });
-        return res.json({ message: "Vehicle deleted" });
+
+        // Clean up documents from Azure Blob Storage one by one
+        let documentsDeleted = 0;
+        const deletionErrors = [];
+        
+        if (vehicleDocuments.length > 0) {
+          for (const doc of vehicleDocuments) {
+            try {
+              await deleteFile(doc.docUrl);
+              documentsDeleted++;
+              console.log(`✅ Deleted from Azure: ${doc.docUrl}`);
+            } catch (error) {
+              console.error(`❌ Failed to delete from Azure: ${doc.docUrl}`, error);
+              deletionErrors.push({
+                docUrl: doc.docUrl,
+                error: error.message
+              });
+            }
+          }
+        }
+
+        const response = { 
+          message: "Vehicle deleted successfully",
+          documentsDeleted: documentsDeleted 
+        };
+
+        if (deletionErrors.length > 0) {
+          response.errors = deletionErrors;
+          response.message += ` (${deletionErrors.length} files failed to delete from storage)`;
+        }
+
+        return res.json(response);
       }
 
       default:
@@ -204,8 +373,9 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error("API error:", error);
-    cleanupFiles(uploadedFiles);
-    const status = error.message.includes("not found") ? 404 : error.message.includes("already exists") ? 409 : error.message.includes("required") ? 400 : 500;
+    const status = error.message.includes("not found") ? 404 : 
+                  error.message.includes("already exists") ? 409 : 
+                  error.message.includes("required") ? 400 : 500;
     res.status(status).json({ error: error.message || "Internal server error" });
   }
 }

@@ -76,6 +76,17 @@ model Vehicle {
   brand         Brand         @relation(fields: [brandId], references: [id])
   company       Company       @relation(fields: [companyId], references: [id])
   status        VehicleStatus @relation(fields: [statusId], references: [id])
+  documents     VehicleDocument[]
+
+}
+
+model VehicleDocument {
+  id        Int      @id @default(autoincrement())
+  vehicleId Int
+  docUrl    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model VehicleStatus {

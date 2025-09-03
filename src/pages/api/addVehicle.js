@@ -8,10 +8,6 @@ export const config = {
   api: { bodyParser: false },
 };
 
-const uploadDir = path.join(process.cwd(), "uploads", "vehicles-CSVs");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
 
 const upload = multer({
   storage: multer.memoryStorage(),

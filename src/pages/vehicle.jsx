@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, CustomSelect, CustomButton } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer,Toast } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
-import { Toast } from "../hooks/wrapper";
 
 export default function VehiclesPage() {
   const { session, status } = useAuth(["Admin"]);
@@ -32,6 +31,9 @@ export default function VehiclesPage() {
 
   // Vehicle documents upload states
   const [vehicleDocuments, setVehicleDocuments] = useState([]);
+  const [documentsToDelete, setDocumentsToDelete] = useState([]); // Track documents to delete
+  const [isSaving, setIsSaving] = useState(false); // Loading state for save operations
+  const [previewFile, setPreviewFile] = useState(null); // State for file preview
 
   const [edit, setEdit] = useState(null);
 
@@ -62,6 +64,13 @@ export default function VehiclesPage() {
   // Handle click outside modal to close
   useEffect(() => {
     const handleClickOutside = event => {
+      // Prevent closing modal during save operation
+      if (isSaving) return;
+      
+      // Check if the click target is part of a FilePreviewer modal
+      const isFilePreviewer = event.target.closest('[data-file-previewer-modal]');
+      if (isFilePreviewer) return;
+      
       if (vehicleModalRef.current && !vehicleModalRef.current.contains(event.target)) {
         resetForm();
       }
@@ -74,7 +83,7 @@ export default function VehiclesPage() {
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
+  }, [isSaving]);
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
@@ -192,6 +201,14 @@ export default function VehiclesPage() {
   };
 
   const removeDocument = fileId => {
+    const documentToRemove = vehicleDocuments.find(doc => doc.id === fileId);
+    
+    // If it's an existing document from the database, add it to delete list
+    if (documentToRemove && documentToRemove.isExisting) {
+      setDocumentsToDelete(prev => [...prev, documentToRemove.id]);
+    }
+    
+    // Remove from current documents list
     setVehicleDocuments(prev => prev.filter(file => file.id !== fileId));
     setError("");
   };
@@ -238,39 +255,54 @@ export default function VehiclesPage() {
       setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
       return;
     }
-    const formData = new FormData();
-    formData.append("name", name);
-    formData.append("brandId", brandId);
-    formData.append("chassisNumber", chassisNumber);
-    formData.append("companyId", Number(session.companyId));
-    formData.append("statusId", statusId);
-    formData.append("lotNumber", lotNumber);
-    formData.append("auction", auction);
-    formData.append("remarks", remarks);
-    vehicleDocuments.forEach(docObj => {
-      formData.append("documents", docObj.file);
-    });
+    
+    setIsSaving(true); // Start loading
+    setError(""); // Clear any previous errors
+    
+    try {
+      const formData = new FormData();
+      formData.append("name", name);
+      formData.append("brandId", brandId);
+      formData.append("chassisNumber", chassisNumber);
+      formData.append("companyId", Number(session.companyId));
+      formData.append("statusId", statusId);
+      formData.append("lotNumber", lotNumber);
+      formData.append("auction", auction);
+      formData.append("remarks", remarks);
+      
+      // Only append new files (not existing documents)
+      const newFiles = vehicleDocuments.filter(docObj => !docObj.isExisting && docObj.file);
+      newFiles.forEach(docObj => {
+        formData.append("documents", docObj.file);
+      });
+      
+      let response;
+      if (edit === 0) {
+        response = await API("PUT", "vehicle", formData, true);
+      } else {
+        formData.append("id", edit);
+        formData.append("documentsToDelete", JSON.stringify(documentsToDelete));
+        response = await API("POST", "vehicle", formData, true);
+      }
 
-    let response;
-    if (edit === 0) {
-      response = await API("PUT", "vehicle", formData, true);
-    } else {
-      formData.append("id", edit);
-      response = await API("POST", "vehicle", formData, true);
+      if (response.error) {
+        setError(response.error);
+        showToast(response.error, "error");
+        return;
+      }
+
+      showToast(
+        edit === 0 ? `Vehicle added successfully! ${response.documentsUploaded || 0} document(s) uploaded.` : `Vehicle updated successfully! ${response.documentsUploaded || 0} document(s) uploaded, ${response.documentsDeleted || 0} document(s) deleted.`,
+        "success"
+      );
+      loadData();
+      resetForm();
+    } catch (error) {
+      setError("An unexpected error occurred");
+      showToast("An unexpected error occurred", "error");
+    } finally {
+      setIsSaving(false); // Stop loading
     }
-
-    if (response.error) {
-      setError(response.error);
-      showToast(response.error, "error");
-      return;
-    }
-
-    showToast(
-      edit === 0 ? `Vehicle added successfully! ${response.documentsUploaded || 0} document(s) uploaded.` : `Vehicle updated successfully! ${response.documentsUploaded || 0} document(s) uploaded.`,
-      "success"
-    );
-    loadData();
-    resetForm();
   };
 
   const loadEdit = async id => {
@@ -289,12 +321,24 @@ export default function VehiclesPage() {
     setAuction(data.auction || "");
     setRemarks(data.remarks || "");
     setEdit(id);
+    setDocumentsToDelete([]); // Clear delete list when loading
+    
+    // Map existing documents to the format expected by the frontend
+    const existingDocs = (data.documents || []).map(doc => ({
+      id: doc.id,
+      name: doc.docUrl.split('/').pop(), // Extract filename from URL
+      docUrl: doc.docUrl,
+      isExisting: true, // Flag to identify existing documents
+      size: 0, // Unknown size for existing documents
+      type: doc.docUrl.toLowerCase().includes('.jpg') || doc.docUrl.toLowerCase().includes('.jpeg') || doc.docUrl.toLowerCase().includes('.png') ? 'image' : 'document'
+    }));
+    setVehicleDocuments(existingDocs);
   };
 
   const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete Vehicle",
-      message: "Are you sure you want to delete this vehicle? This action cannot be undone.",
+      message: "Are you sure you want to delete this vehicle? This will also permanently delete all associated documents. This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
@@ -305,7 +349,8 @@ export default function VehiclesPage() {
       showToast(data.error, "error");
       return;
     }
-    showToast("Vehicle deleted successfully!", "success");
+    const documentsDeletedText = data.documentsDeleted > 0 ? ` ${data.documentsDeleted} associated document(s) were also removed.` : "";
+    showToast(`Vehicle deleted successfully!${documentsDeletedText}`, "success");
     loadData();
   };
 
@@ -323,6 +368,8 @@ export default function VehiclesPage() {
     setCsvFile(null);
     setCsvFileModal(false);
     setVehicleDocuments([]);
+    setDocumentsToDelete([]); // Clear documents to delete
+    setIsSaving(false); // Reset loading state
   };
 
   // Toggle vehicle status with API call
@@ -376,7 +423,22 @@ export default function VehiclesPage() {
           {/* Add/Edit Vehicle Modal */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
-              <div ref={vehicleModalRef} className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-4 sm:p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+              <div ref={vehicleModalRef} className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-4 sm:p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto relative">
+                {/* Loading Overlay */}
+                {isSaving && (
+                  <div className="absolute inset-0 bg-[var(--surface)]/80 backdrop-blur-sm rounded-xl flex items-center justify-center z-10">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[var(--primary)] mx-auto mb-4"></div>
+                      <p className="text-[var(--foreground)] font-medium">
+                        {edit === 0 ? "Adding vehicle..." : "Saving changes..."}
+                      </p>
+                      <p className="text-[var(--secondary-foreground)] text-sm mt-2">
+                        Please wait while we process your request
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
                 <h3 className="text-lg sm:text-xl font-semibold mb-6">{edit === 0 ? "Add New Vehicle" : "Edit Vehicle"}</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                   <div>
@@ -428,16 +490,35 @@ export default function VehiclesPage() {
                       {vehicleDocuments.map(docObj => (
                         <div key={docObj.id} className="relative group">
                           <div className="vehicle-doc-display">
-                            <div className="flex-1 flex flex-col items-center justify-center">
-                              {docObj.type.includes("image") ? (
-                                <img src={URL.createObjectURL(docObj.file)} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
+                            <div 
+                              className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-[var(--secondary)]/30 rounded transition-colors"
+                              onClick={() => setPreviewFile({
+                                url: docObj.isExisting ? docObj.docUrl : URL.createObjectURL(docObj.file),
+                                fileName: docObj.name
+                              })}
+                            >
+                              {/* Handle existing documents vs new uploads */}
+                              {docObj.isExisting ? (
+                                // Existing document from database
+                                docObj.type === 'image' ? (
+                                  <img src={docObj.docUrl} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
+                                ) : (
+                                  <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
+                                )
                               ) : (
-                                <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
+                                // New uploaded file
+                                docObj.type && docObj.type.includes("image") ? (
+                                  <img src={URL.createObjectURL(docObj.file)} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
+                                ) : (
+                                  <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
+                                )
                               )}
                               <div className="text-xs text-[var(--foreground)] text-center break-words leading-tight">
-                                {docObj.name.length > 15 ? docObj.name.substring(0, 12) + "..." : docObj.name}
+                                {docObj.name && docObj.name.length > 15 ? docObj.name.substring(0, 12) + "..." : docObj.name || ''}
                               </div>
-                              <div className="text-xs text-[var(--secondary-foreground)] mt-1">{(docObj.size / 1024).toFixed(1)} KB</div>
+                              <div className="text-xs text-[var(--secondary-foreground)] mt-1">
+                                {docObj.isExisting ? 'Existing' : `${(docObj.size / 1024).toFixed(1)} KB`}
+                              </div>
                             </div>
                             {/* Remove Button */}
                             <button onClick={() => removeDocument(docObj.id)} className="vehicle-doc-remove-button">
@@ -462,8 +543,19 @@ export default function VehiclesPage() {
                   <Error message={error} />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 justify-end mt-6">
-                  <CustomButton title={edit === 0 ? "Add Vehicle" : "Save Changes"} onClick={saveVehicle} className="btn-primary w-full sm:w-auto text-center justify-center" />
-                  <CustomButton title="Cancel" onClick={resetForm} className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg w-full sm:w-auto text-center justify-center" />
+                  <CustomButton 
+                    title={isSaving ? "Saving..." : (edit === 0 ? "Add Vehicle" : "Save Changes")} 
+                    onClick={isSaving ? null : saveVehicle} 
+                    className={`btn-primary w-full sm:w-auto text-center justify-center flex items-center gap-2 ${isSaving ? 'opacity-75 cursor-not-allowed' : ''}`}
+                    icon={isSaving ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : null}
+                  />
+                  <CustomButton 
+                    title="Cancel" 
+                    onClick={isSaving ? null : resetForm} 
+                    className={`px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg w-full sm:w-auto text-center justify-center ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                  />
                 </div>
               </div>
             </div>
@@ -617,6 +709,17 @@ export default function VehiclesPage() {
           </div>
         </div>
       </Sidebar>
+
+      {/* File Preview Component */}
+      {previewFile && (
+        <FilePreviewer 
+          url={previewFile.url} 
+          fileName={previewFile.fileName}
+          isOpen={true}
+          onClose={() => setPreviewFile(null)}
+          trigger={null}
+        />
+      )}
 
       <ConfirmComponent />
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
