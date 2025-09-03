@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2, Shield, Car } from "lucide-react";
+import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2, Shield, Car, ChevronDown, ChevronRight, Settings } from "lucide-react";
 
 // Create context for sidebar state
 const SidebarContext = createContext({
@@ -108,6 +108,21 @@ const getAllSidebarSections = () => [
         href: "/vehicle",
         roles: ["Admin"],
       },
+      {
+        id: "extras",
+        label: "Extras",
+        icon: <Settings size={20} />,
+        isDropdown: true,
+        roles: ["Admin", "Sadmin"],
+        subItems: [
+          {
+            id: "manage-status",
+            label: "Manage Status",
+            href: "/status",
+            roles: ["Admin", "Sadmin"],
+          }
+        ]
+      },
     ],
   },
   // {
@@ -151,6 +166,15 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const { session, status } = useAuth();
+  const [dropdownStates, setDropdownStates] = useState({});
+
+  // Toggle dropdown state
+  const toggleDropdown = (itemId) => {
+    setDropdownStates(prev => ({
+      ...prev,
+      [itemId]: !prev[itemId]
+    }));
+  };
 
   // Get filtered sidebar sections based on user role
   const sidebarSections = getAllSidebarSections()
@@ -221,7 +245,25 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-auto overflow-x-hidden md:overflow-hidden py-4">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-4" style={{
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'var(--border) transparent'
+      }}>
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            width: 6px;
+          }
+          div::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          div::-webkit-scrollbar-thumb {
+            background-color: var(--border);
+            border-radius: 3px;
+          }
+          div::-webkit-scrollbar-thumb:hover {
+            background-color: var(--muted-foreground);
+          }
+        `}</style>
         {sidebarSections.map((section, sectionIndex) => (
           <div key={section.title} className="mb-6">
             <div className={`px-4 mb-2 transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:h-0" : "opacity-100 h-auto"}`}>
@@ -231,7 +273,98 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             <nav className="space-y-1 px-2">
               {section.items.map(item => {
                 const isActive = isActiveRoute(item.href);
+                const isDropdownOpen = dropdownStates[item.id];
 
+                // If it's a dropdown item
+                if (item.isDropdown && item.subItems) {
+                  return (
+                    <div key={item.id} className="space-y-1">
+                      {/* Dropdown trigger */}
+                      <button
+                        onClick={() => toggleDropdown(item.id)}
+                        className={`
+                          group w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200
+                          text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]
+                        `}
+                      >
+                        <div className="flex-shrink-0 w-5 h-5 transition-transform duration-200 group-hover:scale-110">
+                          {item.icon}
+                        </div>
+
+                        <span
+                          className={`
+                            ml-3 text-sm font-medium transition-all duration-300
+                            ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
+                          `}
+                        >
+                          {item.label}
+                        </span>
+
+                        {/* Dropdown arrow */}
+                        <div
+                          className={`
+                            ml-auto transition-all duration-300
+                            ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
+                          `}
+                        >
+                          {isDropdownOpen ? (
+                            <ChevronDown size={16} className="transition-transform duration-200" />
+                          ) : (
+                            <ChevronRight size={16} className="transition-transform duration-200" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Dropdown content */}
+                      <div
+                        className={`
+                          overflow-hidden transition-all duration-300 ease-in-out
+                          ${isDropdownOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}
+                          ${isCollapsed ? "md:hidden" : ""}
+                        `}
+                      >
+                        <div className="ml-8 space-y-1 py-1">
+                          {item.subItems
+                            .filter(subItem => {
+                              // Filter sub-items by role
+                              if (!subItem.roles || subItem.roles.length === 0) return true;
+                              if (!session?.role) return false;
+                              return subItem.roles.includes(session.role);
+                            })
+                            .map(subItem => {
+                              const isSubActive = isActiveRoute(subItem.href);
+                              return (
+                                <Link
+                                  key={subItem.id}
+                                  href={subItem.href}
+                                  onClick={() => {
+                                    setIsMobileMenuOpen?.(false);
+                                    // Close the dropdown when clicking on a sub-item
+                                    setDropdownStates(prev => ({
+                                      ...prev,
+                                      [item.id]: false
+                                    }));
+                                  }}
+                                  className={`
+                                    block px-3 py-2 rounded-lg text-sm transition-all duration-200 relative
+                                    ${isSubActive 
+                                      ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg" 
+                                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
+                                    }
+                                  `}
+                                >
+                                  {subItem.label}
+                                  {isSubActive && <div className="absolute -left-2 top-2 w-1 h-6 bg-white rounded-r-full"></div>}
+                                </Link>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Regular menu item
                 return (
                   <Link
                     key={item.id}
@@ -263,17 +396,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                       {item.label}
                     </span>
 
-                    {item.badge && (
-                      <span
-                        className={`
-                        ml-auto bg-[var(--error)] text-white text-xs px-2 py-0.5 rounded-full
-                        transition-all duration-300
-                        ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
-                      `}
-                      >
-                        {item.badge}
-                      </span>
-                    )}
+                   
 
                     {/* Active indicator */}
                     {isActive && <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full"></div>}
