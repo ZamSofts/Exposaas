@@ -1,5 +1,5 @@
 import { prisma, getSession } from "@/lib/useful";
-import { putFile, deleteFile } from "@/lib/blob.mjs";
+import { putFile, deleteFile, putMultipleFiles } from "@/lib/blob.mjs";
 import multer from "multer";
 
 const upload = multer({
@@ -37,45 +37,41 @@ const parseFormData = req =>
     });
   });
 
-//file upload function 
-const uploadFilesToAzure = async (files, vehicleId, folderPath = "vehicles/") => {
+//file upload function using putMultipleFiles
+const uploadFilesToAzure = async (files, vehicleId, folderPath = "vehicle/") => {
   if (!files || files.length === 0) {
     return { uploadedDocuments: [], documentsUploaded: 0, errors: [] };
   }
 
-  const uploadResults = [];
-  const uploadErrors = [];
+  try {
+    // Use putMultipleFiles to upload all files at once
+    const uploadResults = await putMultipleFiles(files, folderPath);
+    
+    // Transform results to match expected format
+    const uploadedDocuments = uploadResults.map((result, index) => ({
+      vehicleId: vehicleId,
+      Url: result.url,
+      fileName: files[index].originalname,
+      fileSize: files[index].buffer.length,
+      mimeType: files[index].mimetype
+    }));
 
-  // Process files one by one 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    try {
-      console.log(`📤 Uploading file ${i + 1}/${files.length}: ${file.originalname} (${(file.buffer.length / 1024).toFixed(2)} KB)`);
-      
-      const result = await putFile(file, folderPath);
-      uploadResults.push({
-        vehicleId: vehicleId,
-        docUrl: result.url,
-        fileName: file.originalname,
-        fileSize: file.buffer.length,
-        mimeType: file.mimetype
-      });
-      
-      console.log(`✅ Successfully uploaded: ${file.originalname}`);
-    } catch (error) {
-      console.error(`❌ Failed to upload ${file.originalname}:`, error);
-      uploadErrors.push({
-        fileName: file.originalname,
-        error: error.message
-      });
-    }
+    console.log(`✅ Successfully uploaded ${uploadedDocuments.length} files`);
+
+    return {
+      uploadedDocuments: uploadedDocuments,
+      documentsUploaded: uploadedDocuments.length,
+      errors: []
+    };
+    
+  } catch (error) {
+    console.error("❌ Upload failed:", error);
+    return {
+      uploadedDocuments: [],
+      documentsUploaded: 0,
+      errors: [{ fileName: "batch_upload", error: error.message }]
+    };
   }
-
-  return {
-    uploadedDocuments: uploadResults,
-    documentsUploaded: uploadResults.length,
-    errors: uploadErrors
-  };
 };
 
 const validateVehicle = async ({ chassisNumber, brandId, companyId, statusId, vehicleId = null }) => {
@@ -119,7 +115,7 @@ const includeRelations = {
   company: { select: { name: true } },
   brand: { select: { name: true } },
   status: { select: { name: true } },
-  documents: { select: { id: true, docUrl: true, createdAt: true } },
+  documents: { select: { id: true, Url: true, createdAt: true } },
 };
 
 export default async function handler(req, res) {
@@ -193,14 +189,14 @@ export default async function handler(req, res) {
         });
 
         // Handle document uploads
-        const uploadResult = await uploadFilesToAzure(req.files, vehicle.id, "vehicles/");
+        const uploadResult = await uploadFilesToAzure(req.files, vehicle.id, "vehicle/");
         
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
           await prisma.vehicleDocument.createMany({
             data: uploadResult.uploadedDocuments.map(doc => ({
               vehicleId: doc.vehicleId,
-              docUrl: doc.docUrl
+              Url: doc.Url
             }))
           });
         }
@@ -274,12 +270,12 @@ export default async function handler(req, res) {
               // Delete from Azure Blob Storage one by one
               for (const doc of docsToDelete) {
                 try {
-                  await deleteFile(doc.docUrl);
-                  console.log(`✅ Deleted from Azure: ${doc.docUrl}`);
+                  await deleteFile(doc.Url);
+                  console.log(`✅ Deleted from Azure: ${doc.Url}`);
                 } catch (error) {
-                  console.error(`❌ Failed to delete from Azure: ${doc.docUrl}`, error);
+                  console.error(`❌ Failed to delete from Azure: ${doc.Url}`, error);
                   deletionErrors.push({
-                    docUrl: doc.docUrl,
+                    docUrl: doc.Url,
                     error: error.message
                   });
                 }
@@ -295,14 +291,14 @@ export default async function handler(req, res) {
         }
 
         // Handle new document uploads
-        const uploadResult = await uploadFilesToAzure(req.files, vehicleId, "vehicles/");
+        const uploadResult = await uploadFilesToAzure(req.files, vehicleId, "vehicle/");
         
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
           await prisma.vehicleDocument.createMany({
             data: uploadResult.uploadedDocuments.map(doc => ({
               vehicleId: doc.vehicleId,
-              docUrl: doc.docUrl
+              Url: doc.Url
             }))
           });
         }
@@ -329,7 +325,7 @@ export default async function handler(req, res) {
         // First, get all documents associated with this vehicle BEFORE deletion
         const vehicleDocuments = await prisma.vehicleDocument.findMany({
           where: { vehicleId: id },
-          select: { id: true, docUrl: true }
+          select: { id: true, Url: true }
         });
 
         // Delete the vehicle (cascade will automatically delete documents from database)
@@ -342,13 +338,13 @@ export default async function handler(req, res) {
         if (vehicleDocuments.length > 0) {
           for (const doc of vehicleDocuments) {
             try {
-              await deleteFile(doc.docUrl);
+              await deleteFile(doc.Url);
               documentsDeleted++;
-              console.log(`✅ Deleted from Azure: ${doc.docUrl}`);
+              console.log(`✅ Deleted from Azure: ${doc.Url}`);
             } catch (error) {
-              console.error(`❌ Failed to delete from Azure: ${doc.docUrl}`, error);
+              console.error(`❌ Failed to delete from Azure: ${doc.Url}`, error);
               deletionErrors.push({
-                docUrl: doc.docUrl,
+                docUrl: doc.Url,
                 error: error.message
               });
             }

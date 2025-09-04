@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer,Toast } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer,Toast,Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
@@ -250,14 +250,14 @@ export default function VehiclesPage() {
     loadData();
   };
 
-  const saveVehicle = async () => {
+  const editData = async () => {
     if (!brandId || !chassisNumber || !statusId) {
       setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
       return;
     }
     
-    setIsSaving(true); // Start loading
-    setError(""); // Clear any previous errors
+    setIsSaving(true); 
+    setError("");
     
     try {
       const formData = new FormData();
@@ -306,6 +306,7 @@ export default function VehiclesPage() {
   };
 
   const loadEdit = async id => {
+    setIsLoading(true)
     const data = await API("GET", `vehicle?id=${id}`);
     if (data.error) {
       setError(data.error);
@@ -326,13 +327,14 @@ export default function VehiclesPage() {
     // Map existing documents to the format expected by the frontend
     const existingDocs = (data.documents || []).map(doc => ({
       id: doc.id,
-      name: doc.docUrl.split('/').pop(), // Extract filename from URL
-      docUrl: doc.docUrl,
+      name: doc.Url.split('/').pop(), // Extract filename from URL
+      docUrl: doc.Url,
       isExisting: true, // Flag to identify existing documents
       size: 0, // Unknown size for existing documents
-      type: doc.docUrl.toLowerCase().includes('.jpg') || doc.docUrl.toLowerCase().includes('.jpeg') || doc.docUrl.toLowerCase().includes('.png') ? 'image' : 'document'
+      type: doc.Url.toLowerCase().includes('.jpg') || doc.Url.toLowerCase().includes('.jpeg') || doc.Url.toLowerCase().includes('.png') ? 'image' : 'document'
     }));
     setVehicleDocuments(existingDocs);
+    setIsLoading(false)
   };
 
   const deleteIt = async id => {
@@ -342,6 +344,7 @@ export default function VehiclesPage() {
       confirmText: "Delete",
       type: "danger",
     });
+    setIsLoading(true);
     if (!confirmed) return;
     const data = await API("DELETE", `vehicle?id=${id}`);
     if (data.error) {
@@ -349,6 +352,7 @@ export default function VehiclesPage() {
       showToast(data.error, "error");
       return;
     }
+    setIsLoading(false);
     const documentsDeletedText = data.documentsDeleted > 0 ? ` ${data.documentsDeleted} associated document(s) were also removed.` : "";
     showToast(`Vehicle deleted successfully!${documentsDeletedText}`, "success");
     loadData();
@@ -372,35 +376,8 @@ export default function VehiclesPage() {
     setIsSaving(false); // Reset loading state
   };
 
-  // Toggle vehicle status with API call
-  const toggleStatus = async id => {
-    const vehicle = vehicles.find(v => v.id === id);
-    if (!vehicle) return;
-    const currentStatusName = vehicle.status?.name?.toLowerCase();
-    const newStatusObj = vehicleStatus.find(s => s.name?.toLowerCase() !== currentStatusName);
-    if (!newStatusObj) {
-      showToast("No alternate status found.", "error");
-      return;
-    }
-    const confirmed = await confirm({
-      title: "Change vehicle Status",
-      message: `Are you sure you want to change "${vehicle.name}" status to ${newStatusObj.name}?`,
-      confirmText: "Change Status",
-      type: "warning",
-    });
-    if (!confirmed) return;
-    const response = await API("POST", "vehicle", {
-      id: vehicle.id,
-      statusId: newStatusObj.id,
-    });
-    if (response.error) {
-      setError(response.error);
-      showToast(response.error, "error");
-      return;
-    }
-    showToast(`Status changed to ${newStatusObj.name}`, "success");
-    loadData();
-  };
+  
+
 
   return (
     <>
@@ -409,6 +386,7 @@ export default function VehiclesPage() {
       </Head>
       <Sidebar>
         <div className="p-8 bg-[var(--background)] min-h-screen">
+          {isLoading && <Loader /> }
           {/* Header Section */}
           <div className="mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -545,7 +523,7 @@ export default function VehiclesPage() {
                 <div className="flex flex-col sm:flex-row gap-3 justify-end mt-6">
                   <CustomButton 
                     title={isSaving ? "Saving..." : (edit === 0 ? "Add Vehicle" : "Save Changes")} 
-                    onClick={isSaving ? null : saveVehicle} 
+                    onClick={isSaving ? null : editData} 
                     className={`btn-primary w-full sm:w-auto text-center justify-center flex items-center gap-2 ${isSaving ? 'opacity-75 cursor-not-allowed' : ''}`}
                     icon={isSaving ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

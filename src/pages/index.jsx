@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { signIn, getSession } from "next-auth/react";
 import { Geist } from "next/font/google";
-import { Error } from "@/hooks/wrapper";
+import { Error, Loader } from "@/hooks/wrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,7 +19,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if user is already authenticated
-    getSession().then((session) => {
+    getSession().then(session => {
       if (session) {
         router.push("/dashboard");
       } else {
@@ -28,7 +28,7 @@ export default function LoginPage() {
     });
   }, [router]);
 
-  const handleLogin = async (e) => {
+  const handleLogin = async e => {
     e.preventDefault();
     setError("");
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
         password,
         redirect: false,
       });
-    console.log("SignIn result:", result);
+      console.log("SignIn result:", result);
 
       if (result?.error) {
         setError("Invalid username or password");
@@ -61,13 +61,7 @@ export default function LoginPage() {
   };
 
   if (isCheckingSession) {
-    return (
-      <div className={`${geistSans.variable} font-sans min-h-screen flex items-center justify-center`} style={{ background: "var(--background)" }}>
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--primary)" }}></div>
-        </div>
-      </div>
-    );
+    return <Loader />;
   }
 
   return (
@@ -83,9 +77,7 @@ export default function LoginPage() {
       <header className="relative z-10 px-6 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center space-x-3">
-            <div
-              className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-lg"
-              style={{ background: "var(--primary)" }}>
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-lg" style={{ background: "var(--primary)" }}>
               E
             </div>
             <div>
@@ -110,19 +102,13 @@ export default function LoginPage() {
               background: "var(--surface-elevated)",
               borderColor: "var(--border)",
               boxShadow: "var(--shadow-lg)",
-            }}>
+            }}
+          >
             {/* Login Header */}
             <div className="text-center mb-8">
-              <div
-                className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white text-2xl font-bold"
-                style={{ background: "var(--primary)" }}>
+              <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white text-2xl font-bold" style={{ background: "var(--primary)" }}>
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
               <h2 className="text-2xl font-semibold mb-2" style={{ color: "var(--foreground)" }}>
@@ -143,7 +129,7 @@ export default function LoginPage() {
                   id="username"
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={e => setUsername(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
                   style={{
                     backgroundColor: "var(--surface)",
@@ -164,7 +150,7 @@ export default function LoginPage() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={e => setPassword(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
                   style={{
                     backgroundColor: "var(--surface)",
@@ -184,7 +170,8 @@ export default function LoginPage() {
                 style={{
                   backgroundColor: "var(--primary)",
                   focusRingColor: "var(--primary)",
-                }}>
+                }}
+              >
                 {isLoading ? (
                   <div className="flex items-center justify-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>

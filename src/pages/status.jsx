@@ -37,37 +37,39 @@ export default function StatusPage() {
       setIsLoading(false);
     }
   };
-
-  const saveStatus = async () => {
-    if (!name.trim()) {
+  const editData = async () => {
+   if (!name.trim()) {
       setError("Status name is required");
       return;
     }
 
-    setError("");
-    try {
-      const response = edit === null 
-        ? await API("PUT", "status", { name })
-        : await API("POST", "status", { id: edit, name });
-
-      if (response.error) {
-        setError(response.error);
+    if (edit === 0) {
+      const data = await API("PUT", "status", { name });
+      if (data.error) {
+        setError(data.error);
         return;
       }
-
-      loadData();
-      resetForm();
-    } catch (error) {
-      setError("Something went wrong");
+    } else {
+      const data = await API("POST", "status", { id: edit, name });
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
     }
+
+    loadData();
+    setName("");
+    setEdit(null);
   };
 
   const loadEdit = async (id) => {
-    const status = statuses.find(s => s.id === id);
-    if (status) {
-      setName(status.name);
-      setEdit(id);
+    const data = await API("GET", `status?id=${id}`);
+    if (data.error) {
+      setError(data.error);
+      return;
     }
+    setName(data.name);
+    setEdit(id);
   };
 
   const deleteIt = async (id) => {
@@ -150,16 +152,17 @@ export default function StatusPage() {
                   <div className="mt-4">
                     <Error message={error} />
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-end mt-6">
-                    <CustomButton 
-                      title={edit === 0 ? "Add Status" : "Update Status"} 
-                      onClick={saveStatus} 
-                      className="btn-primary w-full sm:w-auto text-center justify-center" 
+                 <div className="flex gap-3">
+                    <CustomButton
+                      title={edit === 0 ? "Add Role" : "Save Changes"}
+                      onClick={editData}
+                      className="btn-primary"
                     />
-                    <CustomButton 
-                      title="Cancel" 
-                      onClick={resetForm} 
-                      className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg w-full sm:w-auto text-center justify-center" 
+
+                    <CustomButton
+                      title="Cancel"
+                      onClick={() => setEdit(null)}
+                      className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
                     />
                   </div>
                 </div>
