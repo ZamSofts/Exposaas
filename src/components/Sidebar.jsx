@@ -141,7 +141,7 @@ const getAllSidebarSections = () => [
         label: "Extras",
         icon: <Settings size={20} />,
         isDropdown: true,
-        roles: ["Admin", "Sadmin"],
+        roles: ["Sadmin"],
         subItems: [
           {
             id: "manage-status",

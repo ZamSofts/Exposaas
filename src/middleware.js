@@ -45,6 +45,12 @@ const PERMISSIONS = {
     PUT: "edit:addVehicle",
     DELETE: "delete:addVehicle",
   },
+  "/api/status": {
+    GET: "",
+    POST: "add:status",
+    PUT: "edit:status",
+    DELETE: "delete:status",
+  },
 };
 
 // Routes that don't require authentication
