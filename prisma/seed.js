@@ -40,7 +40,16 @@ async function main() {
     });
   }
 
-  for (const b of Brand) {
+  // Ensure "-" brand gets ID = 1 by seeding it first
+  await prisma.brand.upsert({
+    where: { id: 1 },
+    update: { name: "-" },
+    create: { id: 1, name: "-" },
+  });
+
+  // Seed the rest of the brands (excluding "-" since it's already handled)
+  const otherBrands = Brand.filter(b => b !== "-");
+  for (const b of otherBrands) {
     await prisma.brand.upsert({
       where: { name: b },
       update: {}, // do nothing if already exists
