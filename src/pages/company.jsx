@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API,Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Building2, Edit, Trash2 } from "lucide-react";
@@ -19,6 +19,7 @@ export default function Company() {
   const [total, setTotal] = useState(0);
   const [inactive, setInactive] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [customLoader, setCustomLoader] = useState(false);
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,6 +80,11 @@ export default function Company() {
   };
 
   const editData = async () => {
+    if (!name.trim()) {
+      setError("Company name cannot be empty");
+      return;
+    }
+    setCustomLoader(true);
     if (edit === 0) {
       const data = await API("PUT", "company", { name });
       if (data.error) {
@@ -96,9 +102,11 @@ export default function Company() {
     loadData();
     setName("");
     setEdit(null);
+    setCustomLoader(false);
   };
 
   const loadEdit = async (id) => {
+    setCustomLoader(true);
     const data = await API("GET", `company?id=${id}`);
     if (data.error) {
       setError(data.error);
@@ -106,6 +114,7 @@ export default function Company() {
     }
     setName(data.name);
     setEdit(id);
+    setCustomLoader(false);
   };
 
   const deleteIt = async (id) => {
@@ -116,13 +125,14 @@ export default function Company() {
       type: "danger",
     });
     if (!confirmed) return;
-
+    setCustomLoader(true);
     const data = await API("DELETE", `company?id=${id}`);
     if (data.error) {
       setError(data.error);
       return;
     }
     loadData();
+    setCustomLoader(false);
   };
 
   const toggleStatus = async (id) => {
@@ -137,13 +147,14 @@ export default function Company() {
       type: "warning",
     });
     if (!confirmed) return;
-
+    setCustomLoader(true);
     const data = await API("POST", `company`, { id, status: newStatus, name: company.name });
     if (data.error) {
       setError(data.error);
       return;
     }
     loadData();
+    setCustomLoader(false);
   };
 
   return (
@@ -256,6 +267,7 @@ export default function Company() {
             </div>
           </div>
           <Error message={error} />
+          {customLoader && <Loader />}
           {/* DataTable with JSX children */}
           <DataTable
             data={companies}

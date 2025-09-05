@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API, CustomButton } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomButton, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import { Plus, Edit, Trash2, Tag } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 
 export default function StatusPage() {
   const { session, status: authStatus } = useAuth(["Sadmin", "Admin"]);
@@ -15,6 +16,7 @@ export default function StatusPage() {
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [customLoader, setCustomLoader] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -38,7 +40,8 @@ export default function StatusPage() {
     }
   };
   const editData = async () => {
-   if (!name.trim()) {
+    setCustomLoader(true);
+    if (!name.trim()) {
       setError("Status name is required");
       return;
     }
@@ -60,9 +63,11 @@ export default function StatusPage() {
     loadData();
     setName("");
     setEdit(null);
+    setCustomLoader(false);
   };
 
-  const loadEdit = async (id) => {
+  const loadEdit = async id => {
+    setCustomLoader(true);
     const data = await API("GET", `status?id=${id}`);
     if (data.error) {
       setError(data.error);
@@ -70,9 +75,10 @@ export default function StatusPage() {
     }
     setName(data.name);
     setEdit(id);
+    setCustomLoader(false);
   };
 
-  const deleteIt = async (id) => {
+  const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete Status",
       message: "Are you sure you want to delete this status? This action cannot be undone.",
@@ -80,27 +86,25 @@ export default function StatusPage() {
       type: "danger",
     });
     if (!confirmed) return;
-
+    setCustomLoader(true);
     const data = await API("DELETE", `status?id=${id}`);
     if (data.error) {
       setError(data.error);
       return;
     }
     loadData();
+    setCustomLoader(false);
   };
 
   const resetForm = () => {
     setName("");
     setEdit(null);
     setError("");
+    setCustomLoader(false);
   };
 
   if (authStatus === "loading") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen"></div>;
   }
 
   if (!session) {
@@ -123,41 +127,24 @@ export default function StatusPage() {
               </div>
               <h1 className="text-3xl font-bold text-[var(--foreground)]">Status Management</h1>
             </div>
-            <CustomButton 
-              title="Add Status" 
-              onClick={() => setEdit(0)} 
-              className="btn-primary" 
-              icon={<Plus className="w-5 h-5" />} 
-            />
+            <CustomButton title="Add Status" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
           </div>
 
           {/* Add/Edit Status Modal */}
           {edit !== null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
               <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-4 sm:p-6 w-full max-w-md">
-                <h3 className="text-lg sm:text-xl font-semibold mb-6">
-                  {edit === 0 ? "Add New Status" : "Edit Status"}
-                </h3>
+                <h3 className="text-lg sm:text-xl font-semibold mb-6">{edit === 0 ? "Add New Status" : "Edit Status"}</h3>
                 <div className="space-y-4">
                   <div>
                     <label className="input-label">Status Name</label>
-                    <input 
-                      type="text" 
-                      value={name} 
-                      onChange={(e) => setName(e.target.value)} 
-                      className="input-style" 
-                      placeholder="Enter status name..." 
-                    />
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="input-style" placeholder="Enter status name..." />
                   </div>
                   <div className="mt-4">
                     <Error message={error} />
                   </div>
-                 <div className="flex gap-3">
-                    <CustomButton
-                      title={edit === 0 ? "Add Role" : "Save Changes"}
-                      onClick={editData}
-                      className="btn-primary"
-                    />
+                  <div className="flex gap-3">
+                    <CustomButton title={edit === 0 ? "Add Role" : "Save Changes"} onClick={editData} className="btn-primary" />
 
                     <CustomButton
                       title="Cancel"
@@ -186,6 +173,7 @@ export default function StatusPage() {
           </div>
 
           <Error message={error} />
+          {customLoader && <Loader />}
 
           {/* Status Table */}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden">
@@ -196,24 +184,14 @@ export default function StatusPage() {
               <table className="w-full">
                 <thead className="bg-[var(--secondary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">
-                      ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">
-                      Status Name
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">Status Name</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
                   {isLoading ? (
-                    <tr>
-                      <td colSpan="3" className="px-6 py-4 text-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--primary)] mx-auto"></div>
-                      </td>
-                    </tr>
+                    <Skeleton columns={3} rows={5} />
                   ) : statuses.length === 0 ? (
                     <tr>
                       <td colSpan="3" className="px-6 py-4 text-center text-[var(--muted-foreground)]">
@@ -221,21 +199,17 @@ export default function StatusPage() {
                       </td>
                     </tr>
                   ) : (
-                    statuses.map((status) => (
+                    statuses.map(status => (
                       <tr key={status.id} className="hover:bg-[var(--input)] transition-colors duration-200">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm font-mono text-[var(--secondary-foreground)]">
-                            #{status.id.toString().padStart(3, "0")}
-                          </span>
+                          <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{status.id.toString().padStart(3, "0")}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
                               <Tag className="w-4 h-4 text-[var(--primary)]" />
                             </div>
-                            <div className="text-sm font-medium text-[var(--foreground)]">
-                              {status.name}
-                            </div>
+                            <div className="text-sm font-medium text-[var(--foreground)]">{status.name}</div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm">

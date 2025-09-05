@@ -2,12 +2,18 @@ import { WebSocketServer, WebSocket } from "ws";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 
 const WS_PORT = process.env.WS_PORT || 5000;
+const MAX_CONNECTIONS = parseInt(process.env.MAX_WS_CONNECTIONS) || 1000;
+const MAX_MESSAGE_LENGTH = parseInt(process.env.MAX_MESSAGE_LENGTH) || 5000;
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const RATE_LIMIT_MAX_MESSAGES = 60; // 60 messages per minute
 
 class WebSocketManager {
   constructor() {
     this.wss = null;
     this.heartbeatInterval = null;
     this.clients = new Map();
+    this.rateLimitMap = new Map(); // Track message rates per user
+    this.cleanupInterval = null;
   }
 
   async initialize() {
@@ -17,12 +23,15 @@ class WebSocketManager {
       this.wss = new WebSocketServer({
         port: WS_PORT,
         perMessageDeflate: false,
+        maxPayload: MAX_MESSAGE_LENGTH,
       });
 
       this.setupHeartbeat();
+      this.setupCleanup();
       this.setupEventHandlers();
 
       console.log(`🚀 WebSocket server running on ws://localhost:${WS_PORT}`);
+      console.log(`📊 Max connections: ${MAX_CONNECTIONS}, Max message length: ${MAX_MESSAGE_LENGTH}`);
     } catch (error) {
       console.error("❌ Failed to start WebSocket server:", error.message);
       process.exit(1);
@@ -34,6 +43,10 @@ class WebSocketManager {
       this.wss.clients.forEach(ws => {
         if (ws.isAlive === false) {
           console.log("💀 Terminating dead connection");
+          const client = this.clients.get(ws.id);
+          if (client) {
+            this.clients.delete(ws.id);
+          }
           return ws.terminate();
         }
         ws.isAlive = false;
@@ -45,7 +58,26 @@ class WebSocketManager {
       if (this.heartbeatInterval) {
         clearInterval(this.heartbeatInterval);
       }
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+      }
     });
+  }
+
+  setupCleanup() {
+    // Clean up rate limit map every 5 minutes
+    this.cleanupInterval = setInterval(() => {
+      const now = Date.now();
+      this.rateLimitMap.forEach((data, userId) => {
+        // Remove entries older than rate limit window
+        data.messages = data.messages.filter(timestamp => 
+          now - timestamp < RATE_LIMIT_WINDOW
+        );
+        if (data.messages.length === 0) {
+          this.rateLimitMap.delete(userId);
+        }
+      });
+    }, 300000); // 5 minutes
   }
 
   setupEventHandlers() {
@@ -56,6 +88,13 @@ class WebSocketManager {
 
   handleConnection(ws, req) {
     try {
+      // Check connection limit
+      if (this.wss.clients.size >= MAX_CONNECTIONS) {
+        console.log("🚫 Connection limit reached, rejecting new connection");
+        ws.close(1013, "Server overloaded");
+        return;
+      }
+
       const clientId = this.generateClientId();
       ws.id = clientId;
       ws.isAlive = true;
@@ -67,6 +106,7 @@ class WebSocketManager {
         lastActivity: new Date(),
         userId: null, // Will be set when user joins
         username: null,
+        companyId: null,
       });
 
       console.log(`🔌 New client connected: ${clientId} (Total: ${this.wss.clients.size})`);
@@ -104,15 +144,34 @@ class WebSocketManager {
         client.lastActivity = new Date();
       }
 
+      // Check message size
+      if (message.length > MAX_MESSAGE_LENGTH) {
+        this.sendError(ws, "Message too long");
+        return;
+      }
+
       let payload;
       try {
         payload = JSON.parse(message.toString());
       } catch {
+        // If not JSON, treat as plain text message
         payload = {
           type: "chat",
-          text: message.toString(),
+          text: this.sanitizeInput(message.toString()),
           clientId: ws.id,
         };
+      }
+
+      // Validate payload structure
+      if (!this.validatePayload(payload)) {
+        this.sendError(ws, "Invalid message format");
+        return;
+      }
+
+      // Check rate limiting for authenticated users
+      if (client?.userId && !this.checkRateLimit(client.userId)) {
+        this.sendError(ws, "Too many messages. Please slow down.");
+        return;
       }
 
       // Add metadata
@@ -129,6 +188,60 @@ class WebSocketManager {
     }
   }
 
+  validatePayload(payload) {
+    if (!payload || typeof payload !== 'object') return false;
+    if (!payload.type || typeof payload.type !== 'string') return false;
+    
+    // Additional validation based on message type
+    switch (payload.type) {
+      case 'chat':
+        return payload.text && typeof payload.text === 'string' && payload.text.trim().length > 0;
+      case 'join':
+        return payload.userId && payload.username && payload.companyId;
+      case 'load_more':
+      case 'load_history':
+        return true; // Basic validation already done
+      default:
+        return true;
+    }
+  }
+
+  sanitizeInput(input) {
+    if (typeof input !== 'string') return '';
+    
+    // Remove potential XSS characters and limit length
+    return input
+      .replace(/[<>]/g, '') // Remove angle brackets
+      .replace(/javascript:/gi, '') // Remove javascript: protocol
+      .replace(/on\w+=/gi, '') // Remove event handlers
+      .trim()
+      .substring(0, MAX_MESSAGE_LENGTH);
+  }
+
+  checkRateLimit(userId) {
+    const now = Date.now();
+    
+    if (!this.rateLimitMap.has(userId)) {
+      this.rateLimitMap.set(userId, { messages: [] });
+    }
+    
+    const userData = this.rateLimitMap.get(userId);
+    
+    // Clean old messages outside the window
+    userData.messages = userData.messages.filter(timestamp => 
+      now - timestamp < RATE_LIMIT_WINDOW
+    );
+    
+    // Check if user exceeds rate limit
+    if (userData.messages.length >= RATE_LIMIT_MAX_MESSAGES) {
+      return false;
+    }
+    
+    // Add current message timestamp
+    userData.messages.push(now);
+    return true;
+  }
+
   routeMessage(senderWs, payload) {
     switch (payload.type) {
       case "chat":
@@ -139,6 +252,9 @@ class WebSocketManager {
         break;
       case "load_history":
         this.handleLoadHistory(senderWs, payload);
+        break;
+      case "load_more":
+        this.handleLoadMore(senderWs, payload);
         break;
       case "vehicle_update":
         this.handleVehicleUpdate(senderWs, payload);
@@ -212,7 +328,11 @@ class WebSocketManager {
       });
 
       // Load recent chat history for the user (filtered by company)
-      await this.sendChatHistory(senderWs, { limit: 50, companyId: parseInt(companyId) });
+      await this.sendInitialChatHistory(senderWs, { 
+        page: payload.page || 1, 
+        limit: payload.limit || 20, 
+        companyId: parseInt(companyId) 
+      });
       
       // Update user count for all companies
       this.broadcastUserCount();
@@ -235,6 +355,180 @@ class WebSocketManager {
     }
   }
 
+  async handleLoadMore(senderWs, payload) {
+    try {
+      // Validate pagination parameters
+      const page = Math.max(1, parseInt(payload.page) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(payload.limit) || 20)); // Limit between 1-50
+      
+      const client = this.clients.get(senderWs.id);
+      const companyId = client?.companyId;
+      
+      if (!companyId || !Number.isInteger(companyId)) {
+        this.sendError(senderWs, "");
+        return;
+      }
+
+      console.log(`📖 Loading more messages - Page: ${page}, Limit: ${limit}, Company: ${companyId}`);
+      
+      await this.sendMoreMessages(senderWs, { page, limit, companyId });
+    } catch (error) {
+      console.error("❌ Error loading more messages:", error.message);
+      this.sendError(senderWs, "Failed to load more messages");
+    }
+  }
+
+  async sendInitialChatHistory(ws, { page = 1, limit = 20, companyId = null } = {}) {
+    try {
+      const client = this.clients.get(ws.id);
+      const filterCompanyId = companyId || client?.companyId;
+
+      if (!filterCompanyId) {
+        this.sendError(ws, "");
+        return;
+      }
+
+      // Get total count for pagination info
+      const totalCount = await prisma.chatMessage.count({
+        where: {
+          user: {
+            companyId: filterCompanyId
+          }
+        }
+      });
+
+      // Get latest messages (most recent first)
+      const messages = await prisma.chatMessage.findMany({
+        where: {
+          user: {
+            companyId: filterCompanyId
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              companyId: true,
+              company: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc", // Most recent first
+        },
+        take: limit,
+      });
+
+      // Reverse to show oldest first (for display)
+      const formattedMessages = messages.reverse().map(msg => ({
+        id: msg.id,
+        text: msg.message,
+        user: msg.user.username,
+        userId: msg.userId,
+        timestamp: msg.createdAt.getTime(),
+        type: "chat",
+        company: msg.user.company,
+      }));
+
+      this.sendToClient(ws, {
+        type: "chat_history",
+        messages: formattedMessages,
+        total: totalCount,
+        page: 1,
+        hasMore: totalCount > limit,
+        timestamp: Date.now(),
+      });
+
+      console.log(`📨 Sent initial chat history: ${formattedMessages.length} messages, total: ${totalCount}`);
+    } catch (error) {
+      console.error("❌ Error sending initial chat history:", error.message);
+      this.sendError(ws, "Failed to load chat history");
+    }
+  }
+
+  async sendMoreMessages(ws, { page = 1, limit = 20, companyId = null } = {}) {
+    try {
+      const client = this.clients.get(ws.id);
+      const filterCompanyId = companyId || client?.companyId;
+
+      if (!filterCompanyId) {
+        this.sendError(ws, "");
+        return;
+      }
+
+      const skip = (page - 1) * limit;
+
+      // Get total count for pagination info
+      const totalCount = await prisma.chatMessage.count({
+        where: {
+          user: {
+            companyId: filterCompanyId
+          }
+        }
+      });
+
+      // Get older messages for pagination (exclude already loaded messages)
+      const messages = await prisma.chatMessage.findMany({
+        where: {
+          user: {
+            companyId: filterCompanyId
+          }
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              companyId: true,
+              company: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc", // Most recent first
+        },
+        skip,
+        take: limit,
+      });
+
+      // Keep desc order for older messages (newest of the batch first)
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id,
+        text: msg.message,
+        user: msg.user.username,
+        userId: msg.userId,
+        timestamp: msg.createdAt.getTime(),
+        type: "chat",
+        company: msg.user.company,
+      }));
+
+      this.sendToClient(ws, {
+        type: "load_more_messages",
+        messages: formattedMessages,
+        total: totalCount,
+        page,
+        hasMore: (page * limit) < totalCount,
+        timestamp: Date.now(),
+      });
+
+      console.log(`📨 Sent page ${page} of messages: ${formattedMessages.length} messages, total: ${totalCount}`);
+    } catch (error) {
+      console.error("❌ Error sending more messages:", error.message);
+      this.sendError(ws, "Failed to load more messages");
+    }
+  }
+
   async sendChatHistory(ws, { page = 1, limit = 50, companyId = null } = {}) {
     try {
       const skip = (page - 1) * limit;
@@ -244,7 +538,7 @@ class WebSocketManager {
       const filterCompanyId = companyId || client?.companyId;
 
       if (!filterCompanyId) {
-        this.sendError(ws, "Unable to determine company for chat history");
+        this.sendError(ws, "");
         return;
       }
 
@@ -304,21 +598,39 @@ class WebSocketManager {
     try {
       const { text, userId } = payload;
       const client = this.clients.get(senderWs.id);
+      
       // Validation
-      if (!text || text.trim().length === 0) {
+      if (!text || typeof text !== 'string' || text.trim().length === 0) {
         this.sendError(senderWs, "Message cannot be empty");
         return;
       }
 
-      if (!userId) {
+      if (!userId || !Number.isInteger(parseInt(userId))) {
         this.sendError(senderWs, "User not authenticated");
+        return;
+      }
+
+      if (!client?.userId || client.userId !== parseInt(userId)) {
+        this.sendError(senderWs, "User authentication mismatch");
+        return;
+      }
+
+      // Sanitize message content
+      const sanitizedText = this.sanitizeInput(text);
+      if (sanitizedText.length === 0) {
+        this.sendError(senderWs, "Message content is invalid");
+        return;
+      }
+
+      if (sanitizedText.length > 2000) { // Reasonable limit for chat messages
+        this.sendError(senderWs, "Message too long. Maximum 2000 characters.");
         return;
       }
 
       // Save message to database
       const savedMessage = await prisma.chatMessage.create({
         data: {
-          message: text.trim(),
+          message: sanitizedText,
           userId: parseInt(userId),
         },
         include: {
@@ -351,7 +663,7 @@ class WebSocketManager {
       // Broadcast only to clients from the same company
       this.broadcast(broadcastMessage, null, savedMessage.user.company.id);
 
-      console.log(`💬 Message saved and broadcasted to company ${savedMessage.user.company.name}: ${savedMessage.user.username}: ${savedMessage.message}`);
+      console.log(`💬 Message saved and broadcasted to company ${savedMessage.user.company.name}: ${savedMessage.user.username}: ${savedMessage.message.substring(0, 50)}...`);
     } catch (error) {
       console.error("❌ Error handling chat message:", error.message);
       this.sendError(senderWs, "Failed to save message");
@@ -471,20 +783,59 @@ class WebSocketManager {
   async shutdown() {
     console.log("🛑 Shutting down WebSocket server...");
 
+    // Clear intervals
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
     }
 
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+
+    // Close all client connections gracefully
+    const closePromises = [];
     this.wss.clients.forEach(ws => {
-      ws.close(1001, "Server shutting down");
+      if (ws.readyState === WebSocket.OPEN) {
+        closePromises.push(new Promise(resolve => {
+          ws.once('close', resolve);
+          ws.close(1001, "Server shutting down");
+        }));
+      }
     });
 
+    // Wait for all connections to close (with timeout)
+    try {
+      await Promise.race([
+        Promise.all(closePromises),
+        new Promise(resolve => setTimeout(resolve, 5000)) // 5 second timeout
+      ]);
+    } catch (error) {
+      console.error("❌ Error closing connections:", error.message);
+    }
+
+    // Clear client tracking
+    this.clients.clear();
+    this.rateLimitMap.clear();
+
+    // Close WebSocket server
     this.wss.close(async () => {
       console.log("✅ WebSocket server closed");
-      await prisma.$disconnect();
-      console.log("✅ Database disconnected");
+      try {
+        await prisma.$disconnect();
+        console.log("✅ Database disconnected");
+      } catch (error) {
+        console.error("❌ Error disconnecting database:", error.message);
+      }
       process.exit(0);
     });
+
+    // Force exit after 10 seconds if graceful shutdown fails
+    setTimeout(() => {
+      console.log("⚠️ Force exiting due to shutdown timeout");
+      process.exit(1);
+    }, 10000);
   }
 }
 

@@ -7,21 +7,21 @@ const geistSans = Geist({
 });
 
 const loadingPhrases = [
-  "Preparing your automotive experience...",
-  "Starting the engine...",
-  "Shifting into gear...",
-  "Warming up the engine...",
-  "Loading vehicle data...",
-  "Revving up the platform...",
-  "Checking under the hood...",
-  "Fueling up the system...",
-  "Accelerating performance...",
-  "Fine-tuning the experience...",
-  "Calibrating systems...",
-  "Getting everything road-ready...",
+  "Getting things ready...",
+//   "Starting the engine...",
+//   "Shifting into gear...",
+//   "Warming up the engine...",
+//   "Loading vehicle data...",
+//   "Revving up the platform...",
+//   "Checking under the hood...",
+//   "Fueling up the system...",
+//   "Accelerating performance...",
+//   "Fine-tuning the experience...",
+//   "Calibrating systems...",
+  //"Getting everything road-ready...",
 ];
 
-export function Loader({ overlay = false }) {
+export function Loader({ overlay = true }) {
   const [currentPhrase, setCurrentPhrase] = useState(loadingPhrases[0]);
 
   useEffect(() => {
@@ -32,9 +32,14 @@ export function Loader({ overlay = false }) {
     return () => clearInterval(interval);
   }, []);
 
+  const overlayClasses = overlay
+    ? "fixed inset-0 z-50 flex items-center justify-center"
+    : "min-h-screen flex items-center justify-center";
+
   return (
-    <div className={`${geistSans.variable} font-sans min-h-screen flex items-center justify-center`} style={{ background: "transparent" }}>
-      <div className="flex flex-col items-center justify-center gap-6">
+    <div className={`${geistSans.variable} font-sans ${overlayClasses}`}>
+      {/* Transparent background only behind loader */}
+      <div className="flex flex-col items-center justify-center gap-6 bg-[var(--background)]  p-6  rounded-2xl shadow-lg" style={{opacity: 0.9,width: '250px',}}>
         {/* Car Drifting Animation Container */}
         <div className="relative w-32 h-32">
           {/* Drift Track Circle */}
@@ -43,6 +48,18 @@ export function Loader({ overlay = false }) {
             style={{
               borderColor: "var(--primary)",
               animation: "rotateDriftTrack 3s linear infinite",
+            }}
+          ></div>
+
+          {/* Car Element */}
+          <div
+            className="absolute w-6 h-6 rounded-sm opacity-90"
+            style={{
+              background: "var(--primary)",
+              animation: "driftCar 3s linear infinite",
+              transformOrigin: "56px 56px",
+              left: "8px",
+              top: "8px",
             }}
           ></div>
 
@@ -83,7 +100,11 @@ export function Loader({ overlay = false }) {
           <p className="text-lg font-medium mb-1" style={{ color: "var(--foreground)" }}>
             Loading
           </p>
-          <p className="text-sm opacity-75 transition-all duration-500 min-h-[20px]" style={{ color: "var(--secondary-foreground)" }} key={currentPhrase}>
+          <p 
+            className="text-sm opacity-75 transition-all duration-500 min-h-[20px]" 
+            style={{ color: "var(--secondary-foreground)" }} 
+            key={currentPhrase}
+          >
             {currentPhrase}
           </p>
         </div>

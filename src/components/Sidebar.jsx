@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2, Shield, Car, ChevronDown, ChevronRight, Settings } from "lucide-react";
+import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2, Shield, Car, ChevronDown, ChevronRight, Settings, CheckCircle } from "lucide-react";
 
 // Create context for sidebar state
 const SidebarContext = createContext({
@@ -15,6 +15,8 @@ const SidebarContext = createContext({
 export const useSidebar = () => useContext(SidebarContext);
 
 export default function Sidebar({ children }) {
+  const { session, status } = useAuth();
+
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -87,6 +89,7 @@ const getAllSidebarSections = () => [
         label: "General Chat",
         icon: <MessageCircle size={20} />,
         href: "/chat",
+       
       },
       {
         id: "user",
@@ -119,6 +122,7 @@ const getAllSidebarSections = () => [
             id: "manage-status",
             label: "Manage Status",
             href: "/status",
+            icon: <CheckCircle size={16} />,
             roles: ["Admin", "Sadmin"],
           }
         ]
@@ -346,14 +350,19 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                                     }));
                                   }}
                                   className={`
-                                    block px-3 py-2 rounded-lg text-sm transition-all duration-200 relative
+                                    flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 relative
                                     ${isSubActive 
                                       ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg" 
                                       : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
                                     }
                                   `}
                                 >
-                                  {subItem.label}
+                                  {subItem.icon && (
+                                    <div className="flex-shrink-0">
+                                      {subItem.icon}
+                                    </div>
+                                  )}
+                                  <span>{subItem.label}</span>
                                   {isSubActive && <div className="absolute -left-2 top-2 w-1 h-6 bg-white rounded-r-full"></div>}
                                 </Link>
                               );
@@ -363,6 +372,8 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                     </div>
                   );
                 }
+                if(session?.role === "Sadmin" && item.label==='General Chat')
+                  return null;
 
                 // Regular menu item
                 return (

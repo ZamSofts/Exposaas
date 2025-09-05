@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API, CustomSelect, MultiSelect, CustomButton } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomSelect, MultiSelect, CustomButton, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
@@ -28,6 +28,7 @@ export default function Userss() {
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [customLoader, setCustomLoader] = useState(false);
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
@@ -106,14 +107,6 @@ export default function Userss() {
   };
 
   const editData = async () => {
-    if (!username || !password || rolesId.length === 0) {
-      setError(!username ? "Name is required" : !password ? "Password is required" : "Please select a role");
-      return;
-    }
-    if (username == "ad") {
-      setError("Username cannot be 'ad'");
-      return;
-    }
     if (edit === 0) {
       const newUser = {
         username,
@@ -130,10 +123,11 @@ export default function Userss() {
         setError("Username cannot be 'ad'");
         return;
       }
-
+      setCustomLoader(true);
       const data = await API("PUT", "user", newUser);
       if (data.error) {
         setError(data.error);
+        setCustomLoader(false);
         return;
       }
     } else {
@@ -144,9 +138,11 @@ export default function Userss() {
         companyId: Number(companyId),
         rolesId: rolesId,
       };
+      setCustomLoader(true)
       const data = await API("POST", `user`, updatedUser);
       if (data.error) {
         setError(data.error);
+        setCustomLoader(false);
         return;
       }
     }
@@ -158,16 +154,19 @@ export default function Userss() {
     setError("");
     setRolesId([]);
     setEdit(null);
+    setCustomLoader(false);
   };
 
   const loadEdit = async id => {
+    setCustomLoader(true);
     const data = await API("GET", `user?id=${id}`);
-    setIsLoading;
+    setIsLoading(false);
     setUserName(data.username);
     setPassword(data.password);
     setCompanyId(data.companyId);
     setRolesId(data.rolesId);
     setEdit(id);
+    setCustomLoader(false);
   };
 
   const deleteIt = async id => {
@@ -178,27 +177,19 @@ export default function Userss() {
       type: "danger",
     });
     if (!confirmed) return;
-
+    setCustomLoader(true);
     const data = await API("DELETE", `user?id=${id}`);
     if (data.error) {
       setError(data.error);
+      setCustomLoader(false);
       return;
     }
     loadData();
+    setCustomLoader(false);
   };
 
   const togglePasswordVisibility = id => {
     setVisiblePasswords(prev => (prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]));
-  };
-  const getRoleName = roleId => {
-    const rolename = roles.find(r => r.id === roleId);
-    if (!rolename) return "Unknown";
-    return rolename.name;
-  };
-  const getCompanyName = CompanyId => {
-    const companyName = companies.find(c => c.id === CompanyId);
-    if (!companyName) return "Unknown";
-    return companyName.name;
   };
 
   return (
@@ -208,7 +199,9 @@ export default function Userss() {
       </Head>
 
       <Sidebar>
-        <div className="p-8 bg-[var(--background)] min-h-screen">
+        <div className="p-8 bg-[var(--background)] min-h-screen relative">
+          {customLoader && <Loader />}
+
           {/* Header Section */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
@@ -278,7 +271,6 @@ export default function Userss() {
                     </div>
                   </div>
                   <Error message={error} />
-
                   <div className="flex gap-3">
                     <CustomButton title={edit === 0 ? "Add User" : "Save Changes"} onClick={editData} className="btn-primary" />
 
@@ -308,6 +300,7 @@ export default function Userss() {
             </div>
           </div>
           <Error message={error} />
+          {customLoader && <Loader />}
 
           {/* DataTable with JSX children */}
           <DataTable

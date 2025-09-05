@@ -19,11 +19,11 @@ export default function ChatPage() {
 
   // Don't render anything while loading or if not authenticated
   if (status === "loading") {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+    return <div className="flex justify-center items-center h-screen"></div>;
   }
 
   if (status !== "authenticated" || !session) {
-    return <div className="flex justify-center items-center h-screen">Please log in to access chat.</div>;
+    return <div className="flex justify-center items-center h-screen"></div>;
   }
 
   return <ChatContent userInfo={userInfo} />;
@@ -33,6 +33,7 @@ function ChatContent({ userInfo }) {
   const { username, userId, companyId } = userInfo;
   const wsRef = useRef(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const connectingRef = useRef(false);
   const connectionAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef(null);
@@ -45,6 +46,13 @@ function ChatContent({ userInfo }) {
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(1);
   const [loading, setLoading] = useState(true);
+  
+  // Lazy loading states
+  const [page, setPage] = useState(1);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalMessages, setTotalMessages] = useState(0);
+  const MESSAGES_PER_PAGE = 5;
 
   // Component mount/unmount tracking
   useEffect(() => {
@@ -59,14 +67,90 @@ function ChatContent({ userInfo }) {
     };
   }, []);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive (but not when loading more)
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+    // Only auto-scroll for new messages, not when loading more old messages
+    if (!loadingMore) {
+      scrollToBottom();
+    }
+  }, [messages, scrollToBottom, loadingMore]);
+
+  // Load more messages when scrolling to top
+  const loadMoreMessages = useCallback(() => {
+    if (!wsRef.current || !ready || loadingMore || !hasMoreMessages || !userId || !companyId) {
+      console.log("❌ Cannot load more messages:", { 
+        wsReady: !!wsRef.current, 
+        ready, 
+        loadingMore, 
+        hasMoreMessages, 
+        userId: !!userId, 
+        companyId: !!companyId 
+      });
+      return;
+    }
+
+    setLoadingMore(true);
+    const nextPage = page + 1;
+
+    try {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "load_more",
+          userId: userId,
+          companyId: companyId,
+          page: nextPage,
+          limit: MESSAGES_PER_PAGE,
+        })
+      );
+    } catch (error) {
+      console.error("❌ Error sending load more request:", error);
+      setLoadingMore(false);
+      setError("Failed to load more messages");
+    }
+  }, [ready, loadingMore, hasMoreMessages, page, userId, companyId]);
+
+  // Handle scroll events for lazy loading
+  const handleScroll = useCallback((e) => {
+    const container = e.target;
+    const scrollTop = container.scrollTop;
+    const threshold = 200; // Load more when within 200px of top
+
+    if (scrollTop <= threshold && hasMoreMessages && !loadingMore && ready) {
+      const currentScrollHeight = container.scrollHeight;
+      const currentScrollTop = container.scrollTop;
+      
+      // Store current scroll position for maintaining position after load
+      container.dataset.previousScrollHeight = currentScrollHeight;
+      container.dataset.previousScrollTop = currentScrollTop;
+      
+      console.log(`🔄 Loading more messages - Scroll: ${scrollTop}px, Page: ${page + 1}`);
+      loadMoreMessages();
+    }
+  }, [hasMoreMessages, loadingMore, ready, loadMoreMessages, page]);
+
+  // Maintain scroll position after loading more messages
+  useEffect(() => {
+    if (messagesContainerRef.current && !loadingMore && page > 1) {
+      const container = messagesContainerRef.current;
+      const previousScrollHeight = parseInt(container.dataset.previousScrollHeight || '0');
+      const previousScrollTop = parseInt(container.dataset.previousScrollTop || '0');
+      
+      if (previousScrollHeight > 0) {
+        const newScrollHeight = container.scrollHeight;
+        const heightDifference = newScrollHeight - previousScrollHeight;
+        // Maintain position by adjusting scroll
+        container.scrollTop = previousScrollTop + heightDifference;
+        
+        // Clean up data attributes
+        delete container.dataset.previousScrollHeight;
+        delete container.dataset.previousScrollTop;
+      }
+    }
+  }, [messages, loadingMore, page]);
 
   // WebSocket connection with improved error handling
   const connect = useCallback(() => {
@@ -114,7 +198,7 @@ function ChatContent({ userInfo }) {
         setConnectionAttempts(0);
         console.log("🔌 WebSocket connected");
 
-        // Join the chat with user info
+        // Join the chat with user info and request initial messages
         if (userId && username && companyId) {
           ws.send(
             JSON.stringify({
@@ -123,6 +207,8 @@ function ChatContent({ userInfo }) {
               username: username,
               companyId: companyId,
               timestamp: Date.now(),
+              page: 1,
+              limit: MESSAGES_PER_PAGE,
             })
           );
         } else {
@@ -142,8 +228,31 @@ function ChatContent({ userInfo }) {
           }
 
           if (data.type === "chat_history") {
-            setMessages(data.messages || []);
+            const newMessages = data.messages || [];
+            const total = data.total || 0;
+            const currentPage = data.page || 1;
+            
+            setTotalMessages(total);
+            setMessages(newMessages);
+            setPage(1);
+            setHasMoreMessages(total > newMessages.length);
             setLoading(false);
+            setLoadingMore(false);
+            return;
+          }
+
+          if (data.type === "load_more_messages") {
+            const newMessages = data.messages || [];
+            const total = data.total || 0;
+            const currentPage = data.page || 1;
+            
+            setTotalMessages(total);
+            
+            // Prepend older messages to the beginning (they come in desc order, newest first)
+            setMessages(prevMessages => [...newMessages.reverse(), ...prevMessages]);
+            setPage(currentPage);
+            setHasMoreMessages(data.hasMore);
+            setLoadingMore(false);
             return;
           }
 
@@ -153,7 +262,9 @@ function ChatContent({ userInfo }) {
           }
 
           if (data.type === "error") {
+            console.error("❌ Server error:", data.message);
             setError(data.message);
+            setLoadingMore(false); // Reset loading state on error
             return;
           }
 
@@ -172,14 +283,14 @@ function ChatContent({ userInfo }) {
           // Handle chat messages
           if (data.type === "chat") {
             console.log("📨 Received chat message:", data);
-            console.log("👤 Current username:", username);
-            console.log("🔍 Message user:", data.user);
-            console.log("🤔 Is own message:", data.user === username);
 
             setMessages(prev => {
               // Check if message already exists to avoid duplicates
               const exists = prev.some(msg => msg.id === data.id);
-              if (exists) return prev;
+              if (exists) {
+                console.log("⚠️ Duplicate message received, ignoring");
+                return prev;
+              }
 
               return [
                 ...prev,
@@ -193,16 +304,7 @@ function ChatContent({ userInfo }) {
           }
         } catch (parseError) {
           console.error("❌ Error parsing message:", parseError);
-          setMessages(prev => [
-            ...prev,
-            {
-              id: Date.now() + Math.random(),
-              type: "chat",
-              text: event.data,
-              timestamp: Date.now(),
-              user: "System",
-            },
-          ]);
+          setError("Received invalid message from server");
         }
       };
 
@@ -244,10 +346,8 @@ function ChatContent({ userInfo }) {
       console.error("Connection error:", err);
       setLoading(false);
     }
-  }, [userId, username, companyId]); // Removed connectionAttempts from dependencies
-
+  }, [userId, username, companyId]); 
   useEffect(() => {
-    // Add a small delay to prevent double connection in React Strict Mode
     const timer = setTimeout(() => {
       if (userId && username && companyId && shouldConnectRef.current && mountedRef.current) {
         console.log("🔐 User authenticated, connecting WebSocket:", { userId, username, companyId });
@@ -291,13 +391,25 @@ function ChatContent({ userInfo }) {
 
   const sendMessage = useCallback(() => {
     const text = message.trim();
-    if (!text || wsRef.current?.readyState !== WebSocket.OPEN || !userId) {
-      if (!ready) {
-        setError("Cannot send message: not connected to server");
-      }
-      if (!userId) {
-        setError("User not authenticated");
-      }
+    
+    // Enhanced validation
+    if (!text) {
+      setError("Message cannot be empty");
+      return;
+    }
+    
+    if (text.length > 2000) {
+      setError("Message too long. Maximum 2000 characters.");
+      return;
+    }
+    
+    if (wsRef.current?.readyState !== WebSocket.OPEN) {
+      setError("Cannot send message: not connected to server");
+      return;
+    }
+    
+    if (!userId || !username || !companyId) {
+      setError("User authentication required");
       return;
     }
 
@@ -318,7 +430,7 @@ function ChatContent({ userInfo }) {
       setError("Failed to send message");
       console.error("Send error:", err);
     }
-  }, [message, ready, userId, username, companyId]);
+  }, [message, userId, username, companyId]);
 
   const handleKeyPress = useCallback(
     e => {
@@ -337,15 +449,7 @@ function ChatContent({ userInfo }) {
     });
   }, []);
 
-  if (status === "loading") {
-    return (
-      <Sidebar>
-        <div className="flex items-center justify-center min-h-screen bg-[var(--background)]">
-          <div className="text-[var(--secondary-foreground)]">Loading...</div>
-        </div>
-      </Sidebar>
-    );
-  }
+  
 
   return (
     <>
@@ -385,7 +489,42 @@ function ChatContent({ userInfo }) {
           <Error message={error} />
 
           {/* Messages Container */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-[var(--background)]">
+          <div 
+            ref={messagesContainerRef}
+            className="flex-1 overflow-y-auto p-6 space-y-4 bg-[var(--background)]"
+            onScroll={handleScroll}
+          >
+            {/* Loading more indicator */}
+            {loadingMore && (
+              <div className="flex justify-center py-4">
+                <div className="flex items-center gap-2 px-4 py-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--primary)]"></div>
+                  <span className="text-sm text-[var(--secondary-foreground)]">Loading more messages...</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Show message count info */}
+            {messages.length > 0 && !hasMoreMessages && (
+              <div className="flex justify-center py-2">
+                <div className="px-3 py-1 bg-[var(--secondary)] rounded-full">
+                  <span className="text-xs text-[var(--secondary-foreground)]">
+                    {totalMessages > 0 ? `Showing all ${totalMessages} messages` : 'Beginning of conversation'}
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* Show load more info */}
+            {messages.length > 0 && hasMoreMessages && !loadingMore && (
+              <div className="flex justify-center py-2">
+                <div className="px-3 py-1 bg-[var(--primary)]/10 rounded-full border border-[var(--primary)]/20">
+                  <span className="text-xs text-[var(--primary)]">
+                    Scroll up to load more messages ({totalMessages - messages.length} remaining)
+                  </span>
+                </div>
+              </div>
+            )}
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 <MessageCircle className="w-16 h-16 text-[var(--secondary-foreground)] mb-4" />
@@ -426,29 +565,52 @@ function ChatContent({ userInfo }) {
 
           {/* Input Section */}
           <div className="bg-[var(--surface)] border-t border-[var(--border)] p-4">
-            <div className="flex gap-3 items-end">
+            <div className="flex gap-3 items-start">
               <div className="flex-1">
                 <textarea
-                  className="w-full px-4 py-3 bg-[var(--input)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--secondary-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent resize-none"
+                  className={`w-full px-4 py-3 bg-[var(--input)] border rounded-lg text-[var(--foreground)] placeholder-[var(--secondary-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent resize-none ${
+                    message.length > 2000 ? 'border-[var(--error)]' : 'border-[var(--border)]'
+                  }`}
                   value={message}
-                  onChange={e => setMessage(e.target.value)}
+                  onChange={e => {
+                    const newValue = e.target.value;
+                    if (newValue.length <= 2100) { // Allow slight overflow for warning
+                      setMessage(newValue);
+                    }
+                  }}
                   onKeyDown={handleKeyPress}
                   placeholder="Type your message..."
                   rows={1}
-                  style={{ minHeight: "44px", maxHeight: "120px" }}
+                  maxLength={2100}
+                  style={{ minHeight: "48px", maxHeight: "120px" }}
                   onInput={e => {
                     e.target.style.height = "auto";
                     e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
                   }}
                 />
+                <div className="flex justify-between items-center mt-1">
+                  <span className="text-xs text-[var(--secondary-foreground)]">
+                    Press Enter to send, Shift+Enter for new line
+                  </span>
+                  <span className={`text-xs ${
+                    message.length > 2000 ? 'text-[var(--error)]' : 
+                    message.length > 1800 ? 'text-[var(--warning)]' : 
+                    'text-[var(--secondary-foreground)]'
+                  }`}>
+                    {message.length}/2000
+                  </span>
+                </div>
               </div>
-              <CustomButton title="Send" onClick={sendMessage} disabled={!ready || !message.trim()} className="btn-primary px-6 py-3 flex items-center gap-2" icon={<Send className="w-4 h-4" />} />
+              <CustomButton 
+                title="Send" 
+                onClick={sendMessage} 
+                disabled={!ready || !message.trim() || message.length > 2000} 
+                className="btn-primary px-6 py-3 flex items-center gap-2 h-12 min-h-[48px]" 
+                icon={<Send className="w-4 h-4" />} 
+              />
             </div>
 
-            <div className="flex items-center justify-between mt-3 text-xs text-[var(--secondary-foreground)]">
-              <span>Connected as: {username}</span>
-              <span>Press Enter to send, Shift+Enter for new line</span>
-            </div>
+            
           </div>
         </div>
       </Sidebar>
