@@ -4,7 +4,27 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { LayoutDashboard, Truck, MessageCircle, Users, Bookmark, Contact, Star, Bug, Moon, Sun, LogOut, Menu, Building2, Shield, Car, ChevronDown, ChevronRight, Settings, CheckCircle } from "lucide-react";
+import {
+  LayoutDashboard,
+  Truck,
+  MessageCircle,
+  Users,
+  Bookmark,
+  Contact,
+  Star,
+  Bug,
+  Moon,
+  Sun,
+  LogOut,
+  Menu,
+  Building2,
+  Shield,
+  Car,
+  ChevronDown,
+  ChevronRight,
+  Settings,
+  CheckCircle,
+} from "lucide-react";
 
 // Create context for sidebar state
 const SidebarContext = createContext({
@@ -51,6 +71,11 @@ export default function Sidebar({ children }) {
 // Helper function to filter items based on user role
 const filterItemsByRole = (items, userRole) => {
   return items.filter(item => {
+    // Check if role is excluded
+    if (item.excludeRoles && item.excludeRoles.length > 0 && userRole && item.excludeRoles.includes(userRole)) {
+      return false;
+    }
+
     // If no roles specified, show to everyone
     if (!item.roles || item.roles.length === 0) return true;
     // If user has no role, only show items with no role restrictions
@@ -89,7 +114,7 @@ const getAllSidebarSections = () => [
         label: "General Chat",
         icon: <MessageCircle size={20} />,
         href: "/chat",
-       
+        excludeRoles: ["Sadmin"],
       },
       {
         id: "user",
@@ -124,8 +149,8 @@ const getAllSidebarSections = () => [
             href: "/status",
             icon: <CheckCircle size={16} />,
             roles: ["Admin", "Sadmin"],
-          }
-        ]
+          },
+        ],
       },
     ],
   },
@@ -169,14 +194,14 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const { theme, toggleTheme } = useTheme();
   const router = useRouter();
-  const { session, status } = useAuth();
+  const { session } = useAuth();
   const [dropdownStates, setDropdownStates] = useState({});
 
   // Toggle dropdown state
-  const toggleDropdown = (itemId) => {
+  const toggleDropdown = itemId => {
     setDropdownStates(prev => ({
       ...prev,
-      [itemId]: !prev[itemId]
+      [itemId]: !prev[itemId],
     }));
   };
 
@@ -249,10 +274,13 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
       </div>
 
       {/* Navigation */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-4" style={{
-        scrollbarWidth: 'thin',
-        scrollbarColor: 'var(--border) transparent'
-      }}>
+      <div
+        className="flex-1 overflow-y-auto overflow-x-hidden py-4"
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "var(--border) transparent",
+        }}
+      >
         <style jsx>{`
           div::-webkit-scrollbar {
             width: 6px;
@@ -291,9 +319,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                           text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]
                         `}
                       >
-                        <div className="flex-shrink-0 w-5 h-5 transition-transform duration-200 group-hover:scale-110">
-                          {item.icon}
-                        </div>
+                        <div className="flex-shrink-0 w-5 h-5 transition-transform duration-200 group-hover:scale-110">{item.icon}</div>
 
                         <span
                           className={`
@@ -311,11 +337,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                             ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
                           `}
                         >
-                          {isDropdownOpen ? (
-                            <ChevronDown size={16} className="transition-transform duration-200" />
-                          ) : (
-                            <ChevronRight size={16} className="transition-transform duration-200" />
-                          )}
+                          {isDropdownOpen ? <ChevronDown size={16} className="transition-transform duration-200" /> : <ChevronRight size={16} className="transition-transform duration-200" />}
                         </div>
                       </button>
 
@@ -330,6 +352,11 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                         <div className="ml-8 space-y-1 py-1">
                           {item.subItems
                             .filter(subItem => {
+                              // Check if role is excluded
+                              if (subItem.excludeRoles && subItem.excludeRoles.length > 0 && session?.role && subItem.excludeRoles.includes(session.role)) {
+                                return false;
+                              }
+
                               // Filter sub-items by role
                               if (!subItem.roles || subItem.roles.length === 0) return true;
                               if (!session?.role) return false;
@@ -346,22 +373,19 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                                     // Close the dropdown when clicking on a sub-item
                                     setDropdownStates(prev => ({
                                       ...prev,
-                                      [item.id]: false
+                                      [item.id]: false,
                                     }));
                                   }}
                                   className={`
                                     flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 relative
-                                    ${isSubActive 
-                                      ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg" 
-                                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
+                                    ${
+                                      isSubActive
+                                        ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg"
+                                        : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
                                     }
                                   `}
                                 >
-                                  {subItem.icon && (
-                                    <div className="flex-shrink-0">
-                                      {subItem.icon}
-                                    </div>
-                                  )}
+                                  {subItem.icon && <div className="flex-shrink-0">{subItem.icon}</div>}
                                   <span>{subItem.label}</span>
                                   {isSubActive && <div className="absolute -left-2 top-2 w-1 h-6 bg-white rounded-r-full"></div>}
                                 </Link>
@@ -372,8 +396,6 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                     </div>
                   );
                 }
-                if(session?.role === "Sadmin" && item.label==='General Chat')
-                  return null;
 
                 // Regular menu item
                 return (
@@ -406,8 +428,6 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                     >
                       {item.label}
                     </span>
-
-                   
 
                     {/* Active indicator */}
                     {isActive && <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full"></div>}
