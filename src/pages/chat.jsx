@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Head from "next/head";
-import { useAuth, CustomButton, Error } from "@/hooks/wrapper";
+import { useAuth, CustomButton, Error ,Loader as customLoader} from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import { MessageCircle, Send, Users, Wifi, WifiOff } from "lucide-react";
+import { Loader, MessageCircle, Send, Users, Wifi, WifiOff } from "lucide-react";
 
 export default function ChatPage() {
   const { session, status } = useAuth();
@@ -46,13 +46,15 @@ function ChatContent({ userInfo }) {
   const [connectionAttempts, setConnectionAttempts] = useState(0);
   const [onlineUsers, setOnlineUsers] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+
   
   // Lazy loading states
   const [page, setPage] = useState(1);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalMessages, setTotalMessages] = useState(0);
-  const MESSAGES_PER_PAGE = 5;
+  const MESSAGES_PER_PAGE = 10;
 
   // Component mount/unmount tracking
   useEffect(() => {
@@ -178,6 +180,7 @@ function ChatContent({ userInfo }) {
     }
 
     connectingRef.current = true;
+    setConnecting(true);
     console.log("🔌 Starting WebSocket connection...");
 
     try {
@@ -192,6 +195,7 @@ function ChatContent({ userInfo }) {
         }
         
         connectingRef.current = false; // Reset connecting flag
+        setConnecting(false);
         setReady(true);
         setError("");
         connectionAttemptsRef.current = 0; // Reset connection attempts
@@ -310,6 +314,7 @@ function ChatContent({ userInfo }) {
 
       ws.onclose = event => {
         connectingRef.current = false; // Reset connecting flag
+        setConnecting(false);
         setReady(false);
         console.log("❌ WebSocket closed, code:", event.code);
 
@@ -333,6 +338,7 @@ function ChatContent({ userInfo }) {
 
       ws.onerror = err => {
         connectingRef.current = false; // Reset connecting flag
+        setConnecting(false);
         console.error("❌ WebSocket error:", err);
         setError("Failed to connect to chat server");
         
@@ -342,6 +348,7 @@ function ChatContent({ userInfo }) {
       };
     } catch (err) {
       connectingRef.current = false; // Reset connecting flag
+      setConnecting(false);
       setError("Failed to establish WebSocket connection");
       console.error("Connection error:", err);
       setLoading(false);
@@ -424,6 +431,7 @@ function ChatContent({ userInfo }) {
 
     try {
       wsRef.current.send(JSON.stringify(payload));
+      setTotalMessages(prev => prev + 1);
       setMessage("");
       setError("");
     } catch (err) {
@@ -478,8 +486,27 @@ function ChatContent({ userInfo }) {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  {ready ? <Wifi className="w-5 h-5 text-[var(--success)]" /> : <WifiOff className="w-5 h-5 text-[var(--error)]" />}
-                  <span className={`text-sm ${ready ? "text-[var(--success)]" : "text-[var(--error)]"}`}>{ready ? "Connected" : "Disconnected"}</span>
+                  {connecting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[var(--warning)]"></div>
+                      <span className="text-sm text-[var(--warning)]">Connecting...</span>
+                    </>
+                  ) : ready ? (
+                    <>
+                      <Wifi className="w-5 h-5 text-[var(--success)]" />
+                      <span className="text-sm text-[var(--success)]">Connected</span>
+                    </>
+                  ) : (
+                    <>
+                      <WifiOff className="w-5 h-5 text-[var(--error)]" />
+                      <span className="text-sm text-[var(--error)]">Disconnected</span>
+                    </>
+                  )}
+                  {connectionAttempts > 0 && !ready && !connecting && (
+                    <span className="text-xs text-[var(--secondary-foreground)]">
+                      (Attempt {connectionAttempts}/5)
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -487,13 +514,44 @@ function ChatContent({ userInfo }) {
 
           {/* Error Display */}
           <Error message={error} />
+          
+          {/* Loading overlay when connecting for the first time or loading messages */}
+          {(loading || (connecting && messages.length === 0)) && (
+            <div className="flex-1 flex items-center justify-center bg-[var(--background)]">
+              <div className="text-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]"></div>
+                    <MessageCircle className="w-6 h-6 text-[var(--primary)] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold text-[var(--foreground)]">
+                      {connecting ? "Connecting to chat..." : "Loading messages..."}
+                    </h3>
+                    <p className="text-sm text-[var(--secondary-foreground)]">
+                      {connecting 
+                        ? "Establishing connection to the chat server" 
+                        : "Please wait while we load your chat history"
+                      }
+                    </p>
+                    {connectionAttempts > 0 && (
+                      <p className="text-xs text-[var(--warning)]">
+                        Connection attempt {connectionAttempts}/5
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Messages Container */}
-          <div 
-            ref={messagesContainerRef}
-            className="flex-1 overflow-y-auto p-6 space-y-4 bg-[var(--background)]"
-            onScroll={handleScroll}
-          >
+          {/* Messages Container - only show when not in initial loading state */}
+          {!(loading || (connecting && messages.length === 0)) && (
+            <div 
+              ref={messagesContainerRef}
+              className="flex-1 overflow-y-auto p-6 space-y-4 bg-[var(--background)]"
+              onScroll={handleScroll}
+            >
             {/* Loading more indicator */}
             {loadingMore && (
               <div className="flex justify-center py-4">
@@ -562,6 +620,7 @@ function ChatContent({ userInfo }) {
             })}
             <div ref={messagesEndRef} />
           </div>
+          )}
 
           {/* Input Section */}
           <div className="bg-[var(--surface)] border-t border-[var(--border)] p-4">
@@ -570,7 +629,7 @@ function ChatContent({ userInfo }) {
                 <textarea
                   className={`w-full px-4 py-3 bg-[var(--input)] border rounded-lg text-[var(--foreground)] placeholder-[var(--secondary-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent resize-none ${
                     message.length > 2000 ? 'border-[var(--error)]' : 'border-[var(--border)]'
-                  }`}
+                  } ${(loading || connecting) ? 'opacity-50' : ''}`}
                   value={message}
                   onChange={e => {
                     const newValue = e.target.value;
@@ -579,9 +638,14 @@ function ChatContent({ userInfo }) {
                     }
                   }}
                   onKeyDown={handleKeyPress}
-                  placeholder="Type your message..."
+                  placeholder={
+                    loading ? "Loading messages..." :
+                    connecting ? "Connecting to chat..." :
+                    "Type your message..."
+                  }
                   rows={1}
                   maxLength={2100}
+                  disabled={loading || connecting}
                   style={{ minHeight: "48px", maxHeight: "120px" }}
                   onInput={e => {
                     e.target.style.height = "auto";
@@ -590,7 +654,10 @@ function ChatContent({ userInfo }) {
                 />
                 <div className="flex justify-between items-center mt-1">
                   <span className="text-xs text-[var(--secondary-foreground)]">
-                    Press Enter to send, Shift+Enter for new line
+                    {loading || connecting ? 
+                      (connecting ? "Establishing connection..." : "Loading chat history...") :
+                      "Press Enter to send, Shift+Enter for new line"
+                    }
                   </span>
                   <span className={`text-xs ${
                     message.length > 2000 ? 'text-[var(--error)]' : 
@@ -602,9 +669,9 @@ function ChatContent({ userInfo }) {
                 </div>
               </div>
               <CustomButton 
-                title="Send" 
+                title={loading ? "Loading..." : connecting ? "Connecting..." : "Send"} 
                 onClick={sendMessage} 
-                disabled={!ready || !message.trim() || message.length > 2000} 
+                disabled={!ready || !message.trim() || message.length > 2000 || loading || connecting} 
                 className="btn-primary px-6 py-3 flex items-center gap-2 h-12 min-h-[48px]" 
                 icon={<Send className="w-4 h-4" />} 
               />
