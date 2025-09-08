@@ -47,6 +47,8 @@ function ChatContent({ userInfo }) {
   const [onlineUsers, setOnlineUsers] = useState(1);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
 
   
   // Lazy loading states
@@ -66,20 +68,61 @@ function ChatContent({ userInfo }) {
       console.log("📍 Chat component unmounting");
       mountedRef.current = false;
       shouldConnectRef.current = false;
+      
+      // Clean up scroll timeout
+      if (window.scrollTimeoutId) {
+        clearTimeout(window.scrollTimeoutId);
+      }
     };
   }, []);
 
   // Auto-scroll to bottom when new messages arrive (but not when loading more)
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((immediate = false) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: immediate ? "instant" : "smooth",
+        block: "end" 
+      });
+    }
+  }, []);
+
+  // Check if user is near bottom of chat
+  const checkIfNearBottom = useCallback(() => {
+    if (!messagesContainerRef.current) return false;
+    
+    const container = messagesContainerRef.current;
+    const threshold = 100; // pixels from bottom
+    const isNear = container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+    setIsNearBottom(isNear);
+    return isNear;
   }, []);
 
   useEffect(() => {
-    // Only auto-scroll for new messages, not when loading more old messages
-    if (!loadingMore) {
-      scrollToBottom();
+    // Auto-scroll for new messages, but only if:
+    // 1. Not loading more messages
+    // 2. Either initial loading OR (user is near bottom AND not actively scrolling)
+    if (!loadingMore && (loading || (isNearBottom && !isUserScrolling))) {
+      // Small delay to ensure DOM is updated after loading state changes
+      const scrollTimeout = setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+      
+      return () => clearTimeout(scrollTimeout);
     }
-  }, [messages, scrollToBottom, loadingMore]);
+  }, [messages, scrollToBottom, loadingMore, loading, isNearBottom, isUserScrolling]);
+
+  // Ensure scroll to bottom only when initially loading finishes
+  useEffect(() => {
+    // This only runs when loading changes from true to false (initial load complete)
+    if (!loading && messages.length > 0) {
+      const initialScrollTimeout = setTimeout(() => {
+        scrollToBottom(true); // immediate scroll for initial load
+        setIsNearBottom(true); // User is now at bottom
+      }, 100);
+      
+      return () => clearTimeout(initialScrollTimeout);
+    }
+  }, [loading, scrollToBottom]); // Only depend on loading state change
 
   // Load more messages when scrolling to top
   const loadMoreMessages = useCallback(() => {
@@ -115,11 +158,23 @@ function ChatContent({ userInfo }) {
     }
   }, [ready, loadingMore, hasMoreMessages, page, userId, companyId]);
 
-  // Handle scroll events for lazy loading
+  // Handle scroll events for lazy loading and position tracking
   const handleScroll = useCallback((e) => {
     const container = e.target;
     const scrollTop = container.scrollTop;
     const threshold = 200; // Load more when within 200px of top
+    
+    // Check if user is near bottom (for auto-scroll logic)
+    checkIfNearBottom();
+    
+    // Mark that user is actively scrolling (to prevent auto-scroll interference)
+    setIsUserScrolling(true);
+    
+    // Clear the scrolling flag after a delay
+    clearTimeout(window.scrollTimeoutId);
+    window.scrollTimeoutId = setTimeout(() => {
+      setIsUserScrolling(false);
+    }, 150);
 
     if (scrollTop <= threshold && hasMoreMessages && !loadingMore && ready) {
       const currentScrollHeight = container.scrollHeight;
@@ -132,7 +187,7 @@ function ChatContent({ userInfo }) {
       console.log(`🔄 Loading more messages - Scroll: ${scrollTop}px, Page: ${page + 1}`);
       loadMoreMessages();
     }
-  }, [hasMoreMessages, loadingMore, ready, loadMoreMessages, page]);
+  }, [hasMoreMessages, loadingMore, ready, loadMoreMessages, page, checkIfNearBottom]);
 
   // Maintain scroll position after loading more messages
   useEffect(() => {
@@ -242,6 +297,13 @@ function ChatContent({ userInfo }) {
             setHasMoreMessages(total > newMessages.length);
             setLoading(false);
             setLoadingMore(false);
+            
+            // Force immediate scroll to bottom after loading initial chat history
+            setTimeout(() => {
+              scrollToBottom(true); // immediate scroll
+              setIsNearBottom(true); // Mark user as being at bottom
+              setIsUserScrolling(false); // Reset scrolling flag
+            }, 100);
             return;
           }
 
