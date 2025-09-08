@@ -32,7 +32,7 @@ export default function Userss() {
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
+  const [perPage, setPerPage] = useState(5);
   const [search, setSearch] = useState("");
 
   // Sorting state managed by parent
@@ -107,23 +107,23 @@ export default function Userss() {
   };
 
   const editData = async () => {
-    if (edit === 0) {
-      const newUser = {
-        username,
-        password,
-        companyId: session?.role != "Sadmin" ? Number(session?.companyId) : Number(companyId),
-        roleIds: rolesId,
-      };
-      if (!newUser.username || !newUser.password || !newUser.companyId || newUser.roleIds.length === 0) {
-        setError(!newUser.username ? "Name is required" : !newUser.password ? "Password is required" : !newUser.companyId ? "Please select a company" : "Please select a role");
-        return;
-      }
+    const newUser = {
+      username,
+      password,
+      companyId: session?.role != "Sadmin" ? Number(session?.companyId) : Number(companyId),
+      rolesId,
+    };
+    if (!newUser.username || !newUser.password || !newUser.companyId || newUser.rolesId.length === 0) {
+      setError(!newUser.username ? "Name is required" : !newUser.password ? "Password is required" : !newUser.companyId ? "Please select a company" : "Please select a role");
+      return;
+    }
 
-      if (username == "ad") {
-        setError("Username cannot be 'ad'");
-        return;
-      }
-      setCustomLoader(true);
+    if (username == "ad") {
+      setError("Username cannot be 'ad'");
+      return;
+    }
+    setCustomLoader(true);
+    if (edit === 0) {
       const data = await API("PUT", "user", newUser);
       if (data.error) {
         setError(data.error);
@@ -131,14 +131,7 @@ export default function Userss() {
         return;
       }
     } else {
-      const updatedUser = {
-        id: edit,
-        username,
-        password,
-        companyId: Number(companyId),
-        rolesId: rolesId,
-      };
-      setCustomLoader(true)
+      const updatedUser = {...newUser,id: edit};
       const data = await API("POST", `user`, updatedUser);
       if (data.error) {
         setError(data.error);
@@ -147,19 +140,19 @@ export default function Userss() {
       }
     }
 
+    resetForm();
     loadData();
-    setUserName("");
-    setPassword("");
-    setCompanyId("");
-    setError("");
-    setRolesId([]);
-    setEdit(null);
-    setCustomLoader(false);
   };
 
   const loadEdit = async id => {
     setCustomLoader(true);
     const data = await API("GET", `user?id=${id}`);
+    if(data.error)
+    {
+      setError(data.error)
+      setCustomLoader(false)
+      return
+    }
     setIsLoading(false);
     setUserName(data.username);
     setPassword(data.password);
@@ -190,6 +183,17 @@ export default function Userss() {
 
   const togglePasswordVisibility = id => {
     setVisiblePasswords(prev => (prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]));
+  };
+
+  const resetForm = () => {
+    setUserName("");
+    setPassword("");
+    setCompanyId("");
+    setError("");
+    setRolesId([]);
+    setEdit(null);
+    setCustomLoader(false);
+    setIsLoading(false);
   };
 
   return (
@@ -276,7 +280,7 @@ export default function Userss() {
 
                     <CustomButton
                       title="Cancel"
-                      onClick={() => setEdit(null)}
+                      onClick={() => resetForm()}
                       className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
                     />
                   </div>

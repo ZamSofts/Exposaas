@@ -11,11 +11,16 @@ export const useAuth = (roles = []) => {
       router.push("/");
       return;
     }
-    if (roles.length > 0 && status !== "loading" && session?.user && !roles.includes(session.user.role)) {
-      router.push("/");
-      return;
+    if (roles.length > 0 && status !== "loading" && session?.user) {
+      const hasRole = roles.includes(session.user.role);
+      const hasPermission = session.user.permissions?.some(p => roles.includes(p));
+
+      if (!hasRole && !hasPermission) {
+        router.push("/");
+        return;
+      }
     }
   }, [status, session, router]);
 
-  return { session: session?.user, status }; 
+  return { session: session?.user, status };
 };

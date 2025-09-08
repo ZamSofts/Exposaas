@@ -128,7 +128,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ user: formatted, total });
     }
     if (req.method === "PUT") {
-      const { username, password, companyId, roleIds } = req.body;
+      const { username, password, companyId, rolesId } = req.body;
       if (username === "") {
         return res.status(400).json({ error: "Username is required" });
       }
@@ -151,7 +151,7 @@ export default async function handler(req, res) {
           password,
           companyId: Number(companyId),
           roles: {
-            create: roleIds.map((roleId) => ({ roleId })),
+            create: rolesId.map((roleId) => ({ roleId })),
           },
         },
         include: {
@@ -164,6 +164,11 @@ export default async function handler(req, res) {
         message: "User created successfully",
       });
     }
+
+
+
+
+
     if (req.method === "POST") {
       const { id, username, password, companyId, rolesId } = req.body;
       if (!username) {
@@ -175,7 +180,7 @@ export default async function handler(req, res) {
       if (!companyId) {
         return res.status(400).json({ error: "Company is required" });
       }
-
+      console.log('rolesId', rolesId)
       const d = await prisma.user.findFirst({
         where: { username, id: { not: id } },
       });

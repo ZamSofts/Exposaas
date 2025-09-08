@@ -49,18 +49,33 @@ export default async function handler(req, res) {
         return res.status(200).json(role);
       }
 
+      // Build where clause based on user role
+      let whereClause = {
+        name: {
+          contains: search,
+          mode: "insensitive",
+        },
+      };
+
+      // Add company filtering logic
+      if (session.role === "Sadmin") {
+        // Sadmin sees all roles (global + all company roles)
+        // No additional filtering needed
+      } else {
+        // Company users see only global roles (companyId: null) + their company roles
+        whereClause.OR = [
+          { companyId: null }, // Global roles created by Sadmin
+          { companyId: session.companyId }, // Company-specific roles
+        ];
+      }
+
       // All
       const [role, total] = await Promise.all([
         prisma.role.findMany({
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { [sortBy]: sortOrder },
-          where: {
-            name: {
-              contains: search,
-              mode: "insensitive",
-            },
-          },
+          where: whereClause,
           include: {
             permissions: {
               select: { permissionId: true },
@@ -68,7 +83,7 @@ export default async function handler(req, res) {
           },
         }),
         prisma.role.count({
-          where: { name: { contains: search, mode: "insensitive" } },
+          where: whereClause,
         }),
       ]);
 
@@ -82,7 +97,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PUT") {
-      const { name, permissions } = req.body;
+      const { name, permissions, companyId } = req.body;
       if (name === "") {
         return res.status(400).json({ error: "Name is required" });
       }
@@ -92,16 +107,23 @@ export default async function handler(req, res) {
           .json({ error: "At least one permission is required" });
       }
 
+      // Check for duplicate role name within the same scope (company or global)
+      const whereClause = companyId === undefined || companyId === null
+        ? { name, companyId: null } 
+        : { name, companyId };
+
       const d = await prisma.role.findFirst({
-        where: { name },
+        where: whereClause,
         select: { name: true },
       });
       if (d) {
-        return res.status(409).json({ error: "Role already exists" });
+        return res.status(409).json({ error: "Role already exists in this scope" });
       }
+      
       await prisma.role.create({
         data: {
           name,
+          companyId: companyId || null, // null for global roles
           permissions: {
             create: permissions.map((permissionId) => ({
               permissionId,
@@ -115,26 +137,34 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { id, name, permissions } = req.body; // permissions = [7, 3, ...]
+      const { id, name, permissions, companyId } = req.body; // permissions = [7, 3, ...]
 
       if (name === "") {
         return res.status(400).json({ error: "Name is required" });
       }
 
+      // Check for duplicate role name within the same scope (company or global)
+      const whereClause = companyId === undefined || companyId === null
+        ? { name, companyId: null, id: { not: id } } 
+        : { name, companyId, id: { not: id } };
+
       const d = await prisma.role.findFirst({
-        where: { name, id: { not: id } },
+        where: whereClause,
       });
       if (d) {
         return res
           .status(409)
-          .json({ error: "Role name already exists", d, id });
+          .json({ error: "Role name already exists in this scope", d, id });
       }
 
       await prisma.$transaction(async (tx) => {
-        // Always update role name
+        // Update role name and companyId
         await tx.role.update({
           where: { id },
-          data: { name },
+          data: { 
+            name,
+            companyId: companyId || null // null for global roles
+          },
         });
 
         // Check if permissions array is provided
@@ -179,8 +209,11 @@ export default async function handler(req, res) {
     if (req.method === "DELETE") {
       const { id } = req.query;
 
+      // Delete all related records first to avoid foreign key constraint violations
       await prisma.rolePermission.deleteMany({ where: { roleId: Number(id) } });
+      await prisma.userRole.deleteMany({ where: { roleId: Number(id) } });
 
+      // Now delete the role itself
       await prisma.role.delete({
         where: { id: Number(id) },
       });

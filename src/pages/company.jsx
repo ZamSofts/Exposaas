@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API,Loader } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Building2, Edit, Trash2 } from "lucide-react";
 
-
 export default function Company() {
-  const {session} = useAuth();
+  const { session } = useAuth();
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
@@ -43,6 +42,8 @@ export default function Company() {
 
   const loadData = async () => {
     setIsLoading(true);
+    // Resets all form and stats to initial state
+
     const params = new URLSearchParams({
       page: currentPage.toString(),
       limit: perPage.toString(),
@@ -69,7 +70,7 @@ export default function Company() {
     setSortOrder(order);
   };
 
-  const handleSearch = (search) => {
+  const handleSearch = search => {
     setSearch(search);
     setCurrentPage(1); // Reset to first page on search
   };
@@ -89,23 +90,23 @@ export default function Company() {
       const data = await API("PUT", "company", { name });
       if (data.error) {
         setError(data.error);
+        setCustomLoader(false);
         return;
       }
     } else {
       const data = await API("POST", `company`, { id: edit, name });
       if (data.error) {
         setError(data.error);
+        setCustomLoader(false);
         return;
       }
     }
 
     loadData();
-    setName("");
-    setEdit(null);
-    setCustomLoader(false);
+    resetForm();
   };
 
-  const loadEdit = async (id) => {
+  const loadEdit = async id => {
     setCustomLoader(true);
     const data = await API("GET", `company?id=${id}`);
     if (data.error) {
@@ -117,7 +118,7 @@ export default function Company() {
     setCustomLoader(false);
   };
 
-  const deleteIt = async (id) => {
+  const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete Company",
       message: "Are you sure you want to delete this company? This action cannot be undone.",
@@ -135,8 +136,8 @@ export default function Company() {
     setCustomLoader(false);
   };
 
-  const toggleStatus = async (id) => {
-    const company = companies.find((c) => c.id === id);
+  const toggleStatus = async id => {
+    const company = companies.find(c => c.id === id);
     if (!company) return;
 
     const newStatus = company.status === "active" ? "inactive" : "active";
@@ -151,10 +152,19 @@ export default function Company() {
     const data = await API("POST", `company`, { id, status: newStatus, name: company.name });
     if (data.error) {
       setError(data.error);
+      setCustomLoader(false);
       return;
     }
     loadData();
     setCustomLoader(false);
+  };
+
+  const resetForm = () => {
+    setName("");
+    setEdit(null);
+    setError("");
+    setCustomLoader(false);
+    setIsLoading(false);
   };
 
   return (
@@ -194,8 +204,8 @@ export default function Company() {
                     <input
                       type="text"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyDown={(e) => {
+                      onChange={e => setName(e.target.value)}
+                      onKeyDown={e => {
                         if (e.key === "Enter") {
                           editData();
                         }
@@ -216,10 +226,11 @@ export default function Company() {
                     </button>
                     <button
                       onClick={() => {
-                        setEdit(null);
+                        resetForm();
                       }}
                       className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)]
-                               text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200">
+                               text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
+                    >
                       Cancel
                     </button>
                   </div>
@@ -279,7 +290,8 @@ export default function Company() {
             onPageChange={handlePageChange}
             title="Companies"
             sortBy={sortBy}
-            sortOrder={sortOrder}>
+            sortOrder={sortOrder}
+          >
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
@@ -293,7 +305,7 @@ export default function Company() {
 
             {/* Table Body with data rows */}
             <tbody>
-              {companies.map((company) => (
+              {companies.map(company => (
                 <tr key={company.id} className="hover:bg-[var(--input)] transition-colors duration-200">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{company.id.toString().padStart(3, "0")}</span>
@@ -310,29 +322,26 @@ export default function Company() {
                     <span
                       onClick={() => toggleStatus(company.id)}
                       className={`inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                        ${
-                          company.status === "active"
-                            ? "bg-[var(--success)]/10 text-[var(--success)]"
-                            : "bg-[var(--warning)]/10 text-[var(--warning)]"
-                        }`}>
+                        ${company.status === "active" ? "bg-[var(--success)]/10 text-[var(--success)]" : "bg-[var(--warning)]/10 text-[var(--warning)]"}`}
+                    >
                       {company.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                    {new Date(company.createdAt).toLocaleString("en-GB")}
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(company.createdAt).toLocaleString("en-GB")}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => loadEdit(company.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200">
+                                 hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
+                      >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(company.id)}
                         className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
-                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200">
+                               hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>

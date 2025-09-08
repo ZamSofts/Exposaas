@@ -15,6 +15,7 @@ model Company {
   status    CompanyStatus @default(active)
   users     User[]
   vehicles  Vehicle[]
+  roles     Role[]
 }
 
 model User {
@@ -33,6 +34,10 @@ model Role {
   name        String           @unique
   permissions RolePermission[]
   users       UserRole[]
+  companyId   Int?
+  company     Company?         @relation(fields: [companyId], references: [id])
+
+  @@map("Role")
 }
 
 model Permission {

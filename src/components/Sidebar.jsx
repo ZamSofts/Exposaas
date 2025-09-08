@@ -68,8 +68,8 @@ export default function Sidebar({ children }) {
   );
 }
 
-// Helper function to filter items based on user role
-const filterItemsByRole = (items, userRole) => {
+// Helper function to filter items based on user role and permissions
+const filterItemsByRole = (items, userRole, userPermissions = []) => {
   return items.filter(item => {
     // Check if role is excluded
     if (item.excludeRoles && item.excludeRoles.length > 0 && userRole && item.excludeRoles.includes(userRole)) {
@@ -78,10 +78,12 @@ const filterItemsByRole = (items, userRole) => {
 
     // If no roles specified, show to everyone
     if (!item.roles || item.roles.length === 0) return true;
-    // If user has no role, only show items with no role restrictions
     if (!userRole) return false;
-    // Show item if user's role is in the allowed roles
-    return item.roles.includes(userRole);
+
+    // Custom: allow permission strings in roles array
+    const hasRole = item.roles.some(r => r === userRole);
+    const hasPermission = item.roles.some(r => userPermissions.includes(r));
+    return hasRole || hasPermission;
   });
 };
 
@@ -127,7 +129,8 @@ const getAllSidebarSections = () => [
         label: "Role Management",
         icon: <Shield size={20} />,
         href: "/role",
-        roles: ["Sadmin"],
+        roles: ["view:user"],
+       
       },
       {
         id: "vehicle",
@@ -205,11 +208,11 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
     }));
   };
 
-  // Get filtered sidebar sections based on user role
+  // Get filtered sidebar sections based on user role and permissions
   const sidebarSections = getAllSidebarSections()
     .map(section => ({
       ...section,
-      items: filterItemsByRole(section.items, session?.role),
+      items: filterItemsByRole(section.items, session?.role, session?.permissions),
     }))
     .filter(section => section.items.length > 0); // Remove empty sections
 
@@ -469,7 +472,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           }}
           className={`
           w-full mt-2 flex items-center space-x-3 px-3 py-2.5 rounded-lg 
-          text-[var(--secondary-foreground)] hover:text-[var(--error)] 
+          text-[var(--secondary-foreground] hover:text-[var(--error)] 
           hover:bg-[var(--secondary)] transition-all duration-200
         `}
         >

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API, MultiSelect, CustomButton } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, MultiSelect, CustomButton,Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Shield } from "lucide-react";
@@ -12,7 +12,6 @@ export default function Role() {
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [roles, setRole] = useState([]);
-
   const [static_permissions, setStaticPermissions] = useState([]);
 
   const [name, setName] = useState("");
@@ -22,6 +21,7 @@ export default function Role() {
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [customLoader, setcustomLoader] = useState(false);
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,50 +99,60 @@ export default function Role() {
     setPerPage(perPageValue);
   };
 
+  
   const editData = async () => {
     if (!name || permissions.length === 0) {
-      setError(!name ? "Name is required" : "Please select a Permission");
+      setError(!name ? "Role name is required" : "Please select at least one permission");
       return;
     }
-    if (edit === 0) {
-      const newRole = {
-        name,
-        permissions,
-      };
-      const data = await API("PUT", `role`, newRole);
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
+    setcustomLoader(true);
+    
+    // Build payload based on user role
+    let payload;
+    if (session?.role === "Sadmin") {
+      // Sadmin creates global roles (no companyId)
+      payload = edit === 0
+        ? { name, permissions }
+        : { id: edit, name, permissions };
     } else {
-      const updatedRole = { id: edit, name, permissions };
-
-      const data = await API("POST", `role`, updatedRole);
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
+      // Company users create company-specific roles (with their companyId)
+      payload = edit === 0
+        ? { name, permissions, companyId: session?.companyId }
+        : { id: edit, name, permissions, companyId: session?.companyId };
     }
-
+    
+    let data;
+    if (edit === 0) {
+      data = await API("PUT", "role", payload);
+    } else {
+      data = await API("POST", "role", payload);
+    }
+    if (data.error) {
+      setError(data.error);
+      setcustomLoader(false);
+      return;
+    }
     loadData();
-    setName("");
-    setPermission([]);
-    setEdit(null);
+    resetForm();
   };
 
   const loadEdit = async (id) => {
+    setcustomLoader(true);
     const role = await API("GET", `role?id=${id}`);
     if (!role) {
       setError("User not found");
+      setcustomLoader(false);
       return;
     }
 
     setName(role.name);
     setPermission(role.permissions);
     setEdit(id);
+    setcustomLoader(false);
   };
 
   const deleteIt = async (id) => {
+
     const confirmed = await confirm({
       title: "Delete Role",
       message:
@@ -151,14 +161,15 @@ export default function Role() {
       type: "danger",
     });
     if (!confirmed) return;
-    const newRole = roles.filter((u) => u.id !== id);
-    setRole([...newRole]);
+    setcustomLoader(true);
     const data = await API("DELETE", `role?id=${id}`);
     if (data.error) {
       setError(data.error);
+      setcustomLoader(false);
       return;
     }
     loadData();
+    setcustomLoader(false);
   };
 
   const getPermissionNames = (permissionId) => {
@@ -167,6 +178,15 @@ export default function Role() {
       return "Unknown";
     }
     return permission.name;
+  };
+
+  const resetForm = () => {
+    setName("");
+    setPermission([]);
+    setEdit(null);
+    setError("");
+    setIsLoading(false);
+    setcustomLoader(false);
   };
   return (
     <>
@@ -203,7 +223,7 @@ export default function Role() {
           {/* Add User Modal/Form */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
+              <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
                   {edit === 0 ? "Add New Role" : "Edit Role"}
                 </h3>
@@ -244,7 +264,7 @@ export default function Role() {
 
                     <CustomButton
                       title="Cancel"
-                      onClick={() => setEdit(null)}
+                      onClick={resetForm}
                       className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
                     />
                   </div>
@@ -272,6 +292,8 @@ export default function Role() {
             </div>
           </div>
           <Error message={error} />
+
+          {customLoader && <Loader />}
           {/* DataTable with JSX children */}
           <DataTable
             data={roles}

@@ -2,7 +2,47 @@ const { PrismaClient } = require("../src/generated/prisma");
 const prisma = new PrismaClient();
 
 async function main() {
-  const permissions = ["add:user", "edit:user", "delete:user", "view:user", "view:vehicle", "add:vehicle", "edit:vehicle", "delete:vehicle", "add:csv"];
+const permissions = [
+  // User
+  "view:user",
+  "edit:user",
+  "add:user",
+  "delete:user",
+
+  // Role
+  "edit:role",
+  "add:role",
+  "delete:role",
+
+  // Company
+  "view:company",
+  "edit:company",
+  "add:company",
+  "delete:company",
+
+  // Vehicle
+  "view:vehicle",
+  "edit:vehicle",
+  "add:vehicle",
+  "delete:vehicle",
+
+  // Brand
+  "edit:brand",
+  "add:brand",
+  "delete:brand",
+
+  // Permission
+  "view:permission",
+  "edit:permission",
+  "delete:permission",
+
+  // Add Vehicle (CSV upload)
+  "view:addVehicle",
+  "add:csv",
+  "edit:addVehicle",
+  "delete:addVehicle",
+];
+
   const VehicleStatus = [
     "In Transit to Yard",
     "Awaiting Inspection",
