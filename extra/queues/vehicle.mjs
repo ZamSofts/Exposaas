@@ -8,11 +8,14 @@ dotenv.config();
 const connection = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
   retryDelayOnFailover: 100,
-  maxRetriesPerRequest: null,
   lazyConnect: true,
   keepAlive: 30000,
   family: 4,
-  tls: {}, // Upstash requires TLS
+  enableReadyCheck: false,
+  reconnectOnError: err => {
+    const targetError = "READONLY";
+    return err.message.includes(targetError);
+  },
 });
 console.log("Worker connecting to:", process.env.REDIS_URL);
 
