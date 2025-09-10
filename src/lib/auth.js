@@ -30,8 +30,10 @@ export const authOptions = {
               return null;
             }
 
-           const user = await prisma.user.findUnique({
-              where: { username: credentials?.username },
+           const user = await prisma.user.findFirst({
+              where: { 
+                username: { equals: credentials?.username, mode: "insensitive" }
+              },
               include: {
                 company: { select: { name: true } },
                 roles: {
@@ -52,6 +54,7 @@ export const authOptions = {
 
             const roleNames = user.roles.map((ur) => ur.role.name);
             const userPermissions = user.roles.flatMap((ur) => ur.role.permissions.map((rp) => rp.permission.name));
+            
 
             return {
               id: user.id.toString(),

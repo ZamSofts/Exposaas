@@ -130,6 +130,7 @@ export default function Company() {
     const data = await API("DELETE", `company?id=${id}`);
     if (data.error) {
       setError(data.error);
+      setCustomLoader(false);
       return;
     }
     loadData();

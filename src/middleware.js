@@ -87,6 +87,7 @@ export async function middleware(request) {
 
     // Check if permission is required for this endpoint
     if (PERMISSIONS[basePath] && PERMISSIONS[basePath][method]) {
+      
       const requiredPermission = PERMISSIONS[basePath][method];
       const userPermissions = token.permissions || [];
 

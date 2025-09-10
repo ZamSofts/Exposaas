@@ -123,13 +123,14 @@ const getAllSidebarSections = () => [
         label: "User Management",
         icon: <Users size={20} />,
         href: "/user",
+        roles:["view:user"]
       },
       {
         id: "role",
         label: "Role Management",
         icon: <Shield size={20} />,
         href: "/role",
-        roles: ["view:user"],
+        roles: ["view:permission"],
        
       },
       {
@@ -137,7 +138,7 @@ const getAllSidebarSections = () => [
         label: "Vehicle Management",
         icon: <Car size={20} />,
         href: "/vehicle",
-        roles: ["Admin"],
+        roles: ["view:vehicle"],
       },
       {
         id: "extras",

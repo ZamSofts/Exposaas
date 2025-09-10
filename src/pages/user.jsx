@@ -7,7 +7,7 @@ import DataTable from "@/components/ui/DataTable";
 import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
 
 export default function Userss() {
-  const { session, status } = useAuth(["Sadmin", "Admin"]);
+  const { session, status } = useAuth(["Sadmin", "Admin","view:user"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 

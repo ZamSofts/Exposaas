@@ -107,17 +107,28 @@ export default async function handler(req, res) {
           .json({ error: "At least one permission is required" });
       }
 
-      // Check for duplicate role name within the same scope (company or global)
+      // Check if role name is "Sadmin" (case-insensitive)
+      if (name.toLowerCase() === "sadmin") {
+        return res.status(400).json({ error: "Role name cannot be 'Sadmin'. This is a reserved system role." });
+      }
+
+      // Check for duplicate role name within the same scope (company or global) - case insensitive
       const whereClause = companyId === undefined || companyId === null
-        ? { name, companyId: null } 
-        : { name, companyId };
+        ? { 
+            name: { equals: name, mode: "insensitive" }, 
+            companyId: null 
+          } 
+        : { 
+            name: { equals: name, mode: "insensitive" }, 
+            companyId 
+          };
 
       const d = await prisma.role.findFirst({
         where: whereClause,
         select: { name: true },
       });
       if (d) {
-        return res.status(409).json({ error: "Role already exists in this scope" });
+        return res.status(409).json({ error: "Role already exists" });
       }
       
       await prisma.role.create({
@@ -137,16 +148,45 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { id, name, permissions, companyId } = req.body; // permissions = [7, 3, ...]
+      const { id, name, permissions } = req.body; // permissions = [7, 3, ...] - removed companyId
 
       if (name === "") {
         return res.status(400).json({ error: "Name is required" });
       }
 
-      // Check for duplicate role name within the same scope (company or global)
-      const whereClause = companyId === undefined || companyId === null
-        ? { name, companyId: null, id: { not: id } } 
-        : { name, companyId, id: { not: id } };
+      // Check if role name is "Sadmin" (case-insensitive)
+      if (name.toLowerCase() === "sadmin") {
+        return res.status(400).json({ error: "Role name cannot be 'Sadmin'. This is a reserved system role." });
+      }
+
+      // Get the existing role to check within the same scope (preserve original companyId)
+      const existingRole = await prisma.role.findUnique({
+        where: { id },
+        select: { companyId: true }
+      });
+
+      if (!existingRole) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+
+      // Check if user has permission to edit this role
+      if (session.role !== "Sadmin") {
+        // Company users can only edit roles that belong to their company
+        // Global roles (companyId === null) can only be edited by Sadmin
+        if (existingRole.companyId === null) {
+          return res.status(403).json({ error: "Only Sadmin can edit global roles" });
+        }
+        if (existingRole.companyId !== session.companyId) {
+          return res.status(403).json({ error: "You can only edit roles from your company" });
+        }
+      }
+
+      // Check for duplicate role name within the same scope as the existing role - case insensitive
+      const whereClause = {
+        name: { equals: name, mode: "insensitive" },
+        companyId: existingRole.companyId, // Use the existing role's companyId
+        id: { not: id }
+      };
 
       const d = await prisma.role.findFirst({
         where: whereClause,
@@ -158,12 +198,12 @@ export default async function handler(req, res) {
       }
 
       await prisma.$transaction(async (tx) => {
-        // Update role name and companyId
+        // Update only role name - preserve original companyId
         await tx.role.update({
           where: { id },
           data: { 
-            name,
-            companyId: companyId || null // null for global roles
+            name
+            // DO NOT update companyId - preserve original ownership
           },
         });
 
@@ -208,6 +248,28 @@ export default async function handler(req, res) {
 
     if (req.method === "DELETE") {
       const { id } = req.query;
+
+      // Get the existing role to check permissions
+      const existingRole = await prisma.role.findUnique({
+        where: { id: Number(id) },
+        select: { companyId: true, name: true }
+      });
+
+      if (!existingRole) {
+        return res.status(404).json({ error: "Role not found" });
+      }
+
+      // Check if user has permission to delete this role
+      if (session.role !== "Sadmin") {
+        // Company users can only delete roles that belong to their company
+        // Global roles (companyId === null) can only be deleted by Sadmin
+        if (existingRole.companyId === null) {
+          return res.status(403).json({ error: "Only Sadmin can delete global roles" });
+        }
+        if (existingRole.companyId !== session.companyId) {
+          return res.status(403).json({ error: "You can only delete roles from your company" });
+        }
+      }
 
       // Delete all related records first to avoid foreign key constraint violations
       await prisma.rolePermission.deleteMany({ where: { roleId: Number(id) } });

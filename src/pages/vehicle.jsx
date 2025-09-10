@@ -6,7 +6,7 @@ import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
 
 export default function VehiclesPage() {
-  const { session, status } = useAuth(["Admin"]);
+  const { session, status } = useAuth(["view:vehicle"]);
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [vehicles, setVehicles] = useState([]);

@@ -57,6 +57,53 @@ export default async function handler(req, res) {
 
       // ---- Specific fields ----
       if (selectFields) {
+        // Additional filter to hide Admin users based on user role
+        let roleFilter = {};
+        if (session.role !== "Sadmin") {
+          // Get Admin role IDs
+          const adminRoles = await prisma.role.findMany({
+            where: { 
+              name: { 
+                contains: "admin",
+                mode: "insensitive"
+              }
+            },
+            select: { id: true }
+          });
+          
+          // Check if current user is an admin
+          const currentUserData = await prisma.user.findUnique({
+            where: { id: Number(session.id) },
+            include: {
+              roles: {
+                include: {
+                  role: { select: { id: true, name: true } }
+                }
+              }
+            }
+          });
+
+          const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => 
+            adminRoles.some(adminRole => adminRole.id === userRole.roleId)
+          );
+          
+          if (adminRoles.length > 0) {
+            if (isCurrentUserAdmin) {
+              // Admin users: Show other admins + non-admins (show everyone in their company)
+              // No additional filtering needed - they can see all users in their company
+            } else {
+              // Non-admin users: Hide all admin users
+              roleFilter = {
+                roles: {
+                  none: {
+                    roleId: { in: adminRoles.map(role => role.id) }
+                  }
+                }
+              };
+            }
+          }
+        }
+
         const users = await prisma.user.findMany({
           select: {
             ...selectFields,
@@ -64,6 +111,7 @@ export default async function handler(req, res) {
           },
           where: {
             ...filterByCompany,
+            ...roleFilter,
             username: { not: session.name },
             
           },
@@ -80,6 +128,54 @@ export default async function handler(req, res) {
       }
 
       // ---- All with pagination ----
+      
+      // Additional filter to hide Admin users based on user role
+      let roleFilter = {};
+      if (session.role !== "Sadmin") {
+        // Get Admin role IDs
+        const adminRoles = await prisma.role.findMany({
+          where: { 
+            name: { 
+              contains: "admin",
+              mode: "insensitive"
+            }
+          },
+          select: { id: true }
+        });
+        
+        // Check if current user is an admin
+        const currentUserData = await prisma.user.findUnique({
+          where: { id: Number(session.id) },
+          include: {
+            roles: {
+              include: {
+                role: { select: { id: true, name: true } }
+              }
+            }
+          }
+        });
+
+        const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => 
+          adminRoles.some(adminRole => adminRole.id === userRole.roleId)
+        );
+        
+        if (adminRoles.length > 0) {
+          if (isCurrentUserAdmin) {
+            // Admin users: Show other admins + non-admins (show everyone in their company)
+            // No additional filtering needed - they can see all users in their company
+          } else {
+            // Non-admin users: Hide all admin users
+            roleFilter = {
+              roles: {
+                none: {
+                  roleId: { in: adminRoles.map(role => role.id) }
+                }
+              }
+            };
+          }
+        }
+      }
+
       const [users, total] = await Promise.all([
         prisma.user.findMany({
           skip: (page - 1) * limit,
@@ -87,6 +183,7 @@ export default async function handler(req, res) {
           orderBy: { [sortBy]: sortOrder },
           where: {
             ...filterByCompany,
+            ...roleFilter,
             username: {
               contains: search,
               mode: "insensitive",
@@ -101,6 +198,7 @@ export default async function handler(req, res) {
         prisma.user.count({
           where: {
             ...filterByCompany,
+            ...roleFilter,
             username: { contains: search, mode: "insensitive" ,not: session.name},
           },
         }),
@@ -139,11 +237,13 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Company is required" });
       }
       const d = await prisma.user.findFirst({
-        where: { username },
+        where: { 
+          username: { equals: username, mode: "insensitive" }
+        },
         select: { username: true },
       });
       if (d) {
-        res.status(409).json({ error: "Username already exists" });
+        return res.status(409).json({ error: "Username already exists" });
       }
       await prisma.user.create({
         data: {
@@ -180,9 +280,11 @@ export default async function handler(req, res) {
       if (!companyId) {
         return res.status(400).json({ error: "Company is required" });
       }
-      console.log('rolesId', rolesId)
       const d = await prisma.user.findFirst({
-        where: { username, id: { not: id } },
+        where: { 
+          username: { equals: username, mode: "insensitive" }, 
+          id: { not: id } 
+        },
       });
       if (d) {
         return res.status(409).json({ error: "Username already exists" });
