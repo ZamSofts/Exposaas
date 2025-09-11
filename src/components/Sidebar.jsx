@@ -139,6 +139,7 @@ const getAllSidebarSections = () => [
         icon: <Car size={20} />,
         href: "/vehicle",
         roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
       },
       {
         id: "extras",

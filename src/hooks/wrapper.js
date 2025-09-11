@@ -11,6 +11,7 @@ export { CustomButton } from "@/components/ui/CustomButton";
 export { Toast } from "@/components/ui/CustomToast";
 export { FilePreviewer } from "@/components/ui/FilePreviewer";
 export { Loader } from "@/components/ui/Loader";
+export { VehicleAddForm } from "@/components/ui/VehicleAddForm";
 
 export const API = async (method, name, d = {}, isFile= false) => {
   if (method == "GET" || method == "DELETE") {

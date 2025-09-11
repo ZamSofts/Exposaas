@@ -334,12 +334,22 @@ export default async function handler(req, res) {
     }
     if (req.method === "DELETE") {
       const { id } = req.query;
-      await prisma.userRole.deleteMany({ where: { userId: Number(id) } });
-      await prisma.user.delete({
-        where: { id: Number(id) },
-      });
+      const userId = Number(id);
+      
+      // Delete all associated data in the correct order
+      await prisma.$transaction([
+        // Delete user roles first
+        prisma.userRole.deleteMany({ where: { userId } }),
+        
+        // Delete all chat messages associated with this user
+        prisma.chatMessage.deleteMany({ where: { userId } }),
+        
+        // Finally delete the user
+        prisma.user.delete({ where: { id: userId } })
+      ]);
+      
       res.status(200).json({
-        message: "User deleted successfully",
+        message: "User and all associated data deleted successfully",
       });
     }
   } catch (error) {

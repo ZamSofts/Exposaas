@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API, CustomSelect, MultiSelect, CustomButton, Loader } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomSelect, MultiSelect, CustomButton, Loader, Toast } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
 
 export default function Userss() {
-  const { session, status } = useAuth(["Sadmin", "Admin","view:user"]);
+  const { session, status } = useAuth(["Sadmin", "Admin", "view:user"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 
@@ -29,6 +29,7 @@ export default function Userss() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
+  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
@@ -49,6 +50,9 @@ export default function Userss() {
     loadInitialData();
   }, [status, session]);
 
+  const showToast = (message, type = "success") => {
+    setToast({ id: Date.now(), message, type });
+  };
   const loadInitialData = async () => {
     try {
       setIsLoading(true);
@@ -131,7 +135,7 @@ export default function Userss() {
         return;
       }
     } else {
-      const updatedUser = {...newUser,id: edit};
+      const updatedUser = { ...newUser, id: edit };
       const data = await API("POST", `user`, updatedUser);
       if (data.error) {
         setError(data.error);
@@ -147,11 +151,10 @@ export default function Userss() {
   const loadEdit = async id => {
     setCustomLoader(true);
     const data = await API("GET", `user?id=${id}`);
-    if(data.error)
-    {
-      setError(data.error)
-      setCustomLoader(false)
-      return
+    if (data.error) {
+      setError(data.error);
+      setCustomLoader(false);
+      return;
     }
     setIsLoading(false);
     setUserName(data.username);
@@ -165,7 +168,7 @@ export default function Userss() {
   const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete User",
-      message: "Are you sure you want to delete this user? This action cannot be undone.",
+      message: "Are you sure you want to delete this user? This action will permanently delete the user account and all associated chat messages. This cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
@@ -174,9 +177,11 @@ export default function Userss() {
     const data = await API("DELETE", `user?id=${id}`);
     if (data.error) {
       setError(data.error);
+      showToast(data.error, 'error');
       setCustomLoader(false);
       return;
     }
+    showToast(data.message, 'success');
     loadData();
     setCustomLoader(false);
   };
@@ -401,6 +406,7 @@ export default function Userss() {
 
       {/* Confirmation Modal */}
       <ConfirmComponent />
+      <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile, putMultipleFiles } from "@/lib/blob.mjs";
+import { processPayments, processPaymentOperations } from "./vehiclePayments.js";
 import multer from "multer";
 
 const upload = multer({
@@ -21,7 +22,7 @@ const upload = multer({
     ];
     cb(allowed.includes(file.mimetype) ? null : new Error("Invalid file type"), allowed.includes(file.mimetype));
   },
-}).array("documents", 15);
+}).any(); // Accept any field names for maximum flexibility
 
 export const config = { api: { bodyParser: false } };
 
@@ -32,7 +33,19 @@ const parseFormData = req =>
       if (err) {
         reject(err);
       } else {
-        resolve({ files: req.files || [], body: req.body || {} });
+        // When using .any(), files are in req.files as an array, not grouped by field name
+        // We need to group them by field name manually
+        const filesByField = {};
+        if (req.files && Array.isArray(req.files)) {
+          req.files.forEach(file => {
+            if (!filesByField[file.fieldname]) {
+              filesByField[file.fieldname] = [];
+            }
+            filesByField[file.fieldname].push(file);
+          });
+        }
+        
+        resolve({ files: filesByField, body: req.body || {} });
       }
     });
   });
@@ -74,6 +87,7 @@ const uploadFilesToAzure = async (files, vehicleId, folderPath = "vehicle/") => 
   }
 };
 
+// Helper function to validate vehicle data
 const validateVehicle = async ({ chassisNumber, brandId, companyId, statusId, vehicleId = null }) => {
   if (!chassisNumber || !brandId || !companyId || !statusId) {
     throw new Error("Missing required fields");
@@ -116,6 +130,7 @@ const includeRelations = {
   brand: { select: { name: true } },
   status: { select: { name: true } },
   documents: { select: { id: true, Url: true, createdAt: true } },
+  payments: { select: { id: true, name: true, date: true, remarks: true, url: true } },
 };
 
 export default async function handler(req, res) {
@@ -172,7 +187,7 @@ export default async function handler(req, res) {
       }
 
       case "PUT": {
-        const { name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
+        const { name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber, payments } = req.body;
         await validateVehicle({ chassisNumber, brandId, companyId, statusId });
 
         const vehicle = await prisma.vehicle.create({
@@ -189,7 +204,8 @@ export default async function handler(req, res) {
         });
 
         // Handle document uploads
-        const uploadResult = await uploadFilesToAzure(req.files, vehicle.id, "vehicle/");
+        const documentFiles = req.files.documents || [];
+        const uploadResult = await uploadFilesToAzure(documentFiles, vehicle.id, "vehicle/");
         
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
@@ -201,23 +217,40 @@ export default async function handler(req, res) {
           });
         }
 
+        // Handle payment processing
+        let paymentResult = { paymentsProcessed: 0, paymentErrors: [] };
+        if (payments) {
+          try {
+            const paymentsData = JSON.parse(payments);
+            paymentResult = await processPayments(vehicle.id, paymentsData, req.files, session);
+          } catch (paymentError) {
+            console.error("❌ Payment processing failed:", paymentError);
+            paymentResult.paymentErrors.push({
+              error: paymentError.message,
+              context: "Payment data parsing"
+            });
+          }
+        }
+
         const response = { 
           message: "Vehicle created successfully", 
           vehicleId: vehicle.id,
-          documentsUploaded: uploadResult.documentsUploaded
+          documentsUploaded: uploadResult.documentsUploaded,
+          paymentsProcessed: paymentResult.paymentsProcessed,
         };
 
         // Include upload errors if any
-        if (uploadResult.errors.length > 0) {
-          response.uploadErrors = uploadResult.errors;
-          response.message += ` (${uploadResult.errors.length} files failed to upload)`;
+        const allErrors = [...uploadResult.errors, ...paymentResult.paymentErrors];
+        if (allErrors.length > 0) {
+          response.errors = allErrors;
+          response.message += ` (${allErrors.length} operations had errors)`;
         }
 
         return res.status(201).json(response);
       }
 
       case "POST": {
-        const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber, documentsToDelete } = req.body;
+        const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber, documentsToDelete, paymentOperations } = req.body;
         const vehicleId = Number(id);
         if (!vehicleId) return res.status(400).json({ error: "Valid vehicle ID required" });
 
@@ -291,7 +324,8 @@ export default async function handler(req, res) {
         }
 
         // Handle new document uploads
-        const uploadResult = await uploadFilesToAzure(req.files, vehicleId, "vehicle/");
+        const documentFiles = req.files.documents || [];
+        const uploadResult = await uploadFilesToAzure(documentFiles, vehicleId, "vehicle/");
         
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
@@ -302,15 +336,32 @@ export default async function handler(req, res) {
             }))
           });
         }
+
+        // Handle payment operations
+        let paymentResult = { paymentsProcessed: 0, paymentsDeleted: 0, paymentErrors: [] };
+        if (paymentOperations) {
+          try {
+            const operations = JSON.parse(paymentOperations);
+            paymentResult = await processPaymentOperations(vehicleId, operations, req.files, session);
+          } catch (paymentError) {
+            console.error("❌ Payment operations failed:", paymentError);
+            paymentResult.paymentErrors.push({
+              error: paymentError.message,
+              context: "Payment operations parsing"
+            });
+          }
+        }
         
         const response = {
           message: "Vehicle updated successfully",
           documentsUploaded: uploadResult.documentsUploaded,
-          documentsDeleted: documentsDeleted
+          documentsDeleted: documentsDeleted,
+          paymentsProcessed: paymentResult.paymentsProcessed,
+          paymentsDeleted: paymentResult.paymentsDeleted,
         };
 
         // Include any errors
-        const allErrors = [...uploadResult.errors, ...deletionErrors];
+        const allErrors = [...uploadResult.errors, ...deletionErrors, ...paymentResult.paymentErrors];
         if (allErrors.length > 0) {
           response.errors = allErrors;
           response.message += ` (${allErrors.length} operations had errors)`;
@@ -322,28 +373,37 @@ export default async function handler(req, res) {
       case "DELETE": {
         if (!id) return res.status(400).json({ error: "Vehicle ID required" });
         
-        // First, get all documents associated with this vehicle BEFORE deletion
-        const vehicleDocuments = await prisma.vehicleDocument.findMany({
-          where: { vehicleId: id },
-          select: { id: true, Url: true }
-        });
+        // First, get all documents and payments associated with this vehicle BEFORE deletion
+        const [vehicleDocuments, vehiclePayments] = await Promise.all([
+          prisma.vehicleDocument.findMany({
+            where: { vehicleId: id },
+            select: { id: true, Url: true }
+          }),
+          prisma.vehiclePayments.findMany({
+            where: { vehicleId: id },
+            select: { id: true, url: true }
+          })
+        ]);
 
-        // Delete the vehicle (cascade will automatically delete documents from database)
+        // Delete the vehicle (cascade will automatically delete documents and payments from database)
         await prisma.vehicle.delete({ where: { id } });
 
-        // Clean up documents from Azure Blob Storage one by one
+        // Clean up documents from Azure Blob Storage
         let documentsDeleted = 0;
+        let paymentsDeleted = 0;
         const deletionErrors = [];
         
+        // Delete vehicle documents from Azure
         if (vehicleDocuments.length > 0) {
           for (const doc of vehicleDocuments) {
             try {
               await deleteFile(doc.Url);
               documentsDeleted++;
-              console.log(`✅ Deleted from Azure: ${doc.Url}`);
+              console.log(`✅ Deleted document from Azure: ${doc.Url}`);
             } catch (error) {
-              console.error(`❌ Failed to delete from Azure: ${doc.Url}`, error);
+              console.error(`❌ Failed to delete document from Azure: ${doc.Url}`, error);
               deletionErrors.push({
+                type: "document",
                 docUrl: doc.Url,
                 error: error.message
               });
@@ -351,9 +411,30 @@ export default async function handler(req, res) {
           }
         }
 
+        // Delete payment files from Azure
+        if (vehiclePayments.length > 0) {
+          for (const payment of vehiclePayments) {
+            if (payment.url) {
+              try {
+                await deleteFile(payment.url);
+                paymentsDeleted++;
+                console.log(`✅ Deleted payment file from Azure: ${payment.url}`);
+              } catch (error) {
+                console.error(`❌ Failed to delete payment file from Azure: ${payment.url}`, error);
+                deletionErrors.push({
+                  type: "payment",
+                  fileUrl: payment.url,
+                  error: error.message
+                });
+              }
+            }
+          }
+        }
+
         const response = { 
           message: "Vehicle deleted successfully",
-          documentsDeleted: documentsDeleted 
+          documentsDeleted: documentsDeleted,
+          paymentsDeleted: paymentsDeleted
         };
 
         if (deletionErrors.length > 0) {
