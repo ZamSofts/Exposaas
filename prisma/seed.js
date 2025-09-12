@@ -55,10 +55,9 @@ const permissions = [
     "At Destination Port",
     "Awaiting Customs Clearance",
     "Cleared for Pickup",
-    "Delivered",
-    "-"
+    "Delivered", 
   ];
-  const Brand = ["Toyota", "Honda", "Nissan", "Ford", "Chevrolet", "BMW", "Mercedes-Benz", "Audi", "Volkswagen", "Hyundai","-"];
+  const Brand = ["-","Toyota", "Honda", "Nissan", "Ford", "Chevrolet", "BMW", "Mercedes-Benz", "Audi", "Volkswagen", "Hyundai"];
   try {
     await prisma.permission.deleteMany();
     await prisma.vehicleStatus.deleteMany();
