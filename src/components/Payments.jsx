@@ -7,16 +7,20 @@ import { Plus, Edit, Trash2, DollarSign, FileUp, Calendar, Building2 } from "luc
 const DocumentPreview = ({ document, onPreview, onRemove, onFileChange }) => {
   const currentDoc = document.file || document.existing;
   const isNewFile = !!document.file;
-  
+
   const getPreviewElement = () => {
     if (isNewFile) {
       const isImage = document.file.type?.includes("image");
       const isPdf = document.file.type === "application/pdf";
-      
+
       if (isImage) {
         return <img src={URL.createObjectURL(document.file)} alt={document.file.name} className="w-full h-full object-cover" />;
       } else if (isPdf) {
-        return <div className="text-red-500"><FileUp className="w-6 h-6" /></div>;
+        return (
+          <div className="text-red-500">
+            <FileUp className="w-6 h-6" />
+          </div>
+        );
       } else {
         return <FileUp className="w-6 h-6 text-[var(--primary)]" />;
       }
@@ -24,21 +28,25 @@ const DocumentPreview = ({ document, onPreview, onRemove, onFileChange }) => {
       const fileName = currentDoc?.fileName || "";
       const isImage = fileName.toLowerCase().match(/\.(jpg|jpeg|png)$/);
       const isPdf = fileName.toLowerCase().includes(".pdf");
-      
+
       if (isImage) {
         return (
           <img
             src={currentDoc.url}
             alt={fileName}
             className="w-full h-full object-cover"
-            onError={(e) => {
+            onError={e => {
               e.target.style.display = "none";
               e.target.nextSibling.style.display = "flex";
             }}
           />
         );
       } else if (isPdf) {
-        return <div className="text-red-500"><FileUp className="w-6 h-6" /></div>;
+        return (
+          <div className="text-red-500">
+            <FileUp className="w-6 h-6" />
+          </div>
+        );
       } else {
         return <FileUp className="w-6 h-6 text-[var(--primary)]" />;
       }
@@ -49,20 +57,14 @@ const DocumentPreview = ({ document, onPreview, onRemove, onFileChange }) => {
     <div className="border border-[var(--border)] rounded-lg bg-[var(--surface)] p-4">
       <div className="flex items-start gap-4">
         {/* Document Preview */}
-        <div className="flex-shrink-0 w-16 h-16 border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--input)] flex items-center justify-center">
-          {getPreviewElement()}
-        </div>
+        <div className="flex-shrink-0 w-16 h-16 border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--input)] flex items-center justify-center">{getPreviewElement()}</div>
 
         {/* Document Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-[var(--foreground)] truncate">
-                {isNewFile ? document.file.name : currentDoc?.fileName || "Document"}
-              </p>
-              <p className="text-xs text-[var(--secondary-foreground)] mt-1">
-                {isNewFile ? `${(document.file.size / 1024).toFixed(1)} KB` : "Existing document"}
-              </p>
+              <p className="text-sm font-medium text-[var(--foreground)] truncate">{isNewFile ? document.file.name : currentDoc?.fileName || "Document"}</p>
+              <p className="text-xs text-[var(--secondary-foreground)] mt-1">{isNewFile ? `${(document.file.size / 1024).toFixed(1)} KB` : "Existing document"}</p>
             </div>
 
             {/* Action Buttons */}
@@ -70,28 +72,30 @@ const DocumentPreview = ({ document, onPreview, onRemove, onFileChange }) => {
               {/* Preview Button */}
               <button
                 type="button"
-                onClick={() => onPreview(
-                  isNewFile ? URL.createObjectURL(document.file) : currentDoc.url,
-                  isNewFile ? document.file.name : currentDoc.fileName
-                )}
+                onClick={() => onPreview(isNewFile ? URL.createObjectURL(document.file) : currentDoc.url, isNewFile ? document.file.name : currentDoc.fileName)}
                 className="p-1 text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded"
                 title="Preview document"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                  />
                 </svg>
               </button>
 
               {/* Remove Button */}
-              <button
-                type="button"
-                onClick={onRemove}
-                className="p-1 text-[var(--error)] hover:bg-[var(--error)]/10 rounded"
-                title="Remove document"
-              >
+              <button type="button" onClick={onRemove} className="p-1 text-[var(--error)] hover:bg-[var(--error)]/10 rounded" title="Remove document">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                  />
                 </svg>
               </button>
             </div>
@@ -130,11 +134,11 @@ export default function Payments({ vehicleId }) {
 
   // Simplified document state
   const [documentState, setDocumentState] = useState({
-    file: null,           // New file to upload
-    existing: null,       // Existing document info
-    original: null,       // Original document for undo
-    shouldRemove: false,  // Flag to remove existing document
-    preview: null         // Preview modal state
+    file: null, // New file to upload
+    existing: null, // Existing document info
+    original: null, // Original document for undo
+    shouldRemove: false, // Flag to remove existing document
+    preview: null, // Preview modal state
   });
 
   // Pagination and search states
@@ -175,7 +179,7 @@ export default function Payments({ vehicleId }) {
   };
 
   // Document helper functions
-  const validateFile = (file) => {
+  const validateFile = file => {
     const allowedTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
     const allowedExtensions = ["pdf", "jpg", "jpeg", "png", "doc", "docx"];
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
@@ -191,7 +195,7 @@ export default function Payments({ vehicleId }) {
     return null;
   };
 
-  const updateDocument = (updates) => {
+  const updateDocument = updates => {
     setDocumentState(prev => ({ ...prev, ...updates }));
   };
 
@@ -201,7 +205,7 @@ export default function Payments({ vehicleId }) {
       existing: null,
       original: null,
       shouldRemove: false,
-      preview: null
+      preview: null,
     });
   };
 
@@ -289,7 +293,7 @@ export default function Payments({ vehicleId }) {
     setError("");
   };
 
-  const handleSubmit = async () => {
+  const editData = async () => {
     // Validation
     if (!name) {
       setError("Payment name is required");
@@ -328,16 +332,10 @@ export default function Payments({ vehicleId }) {
         formData.append("removeDocument", "true");
       }
 
-      // Submit to API
       const isCreating = edit === 0;
       if (!isCreating) formData.append("id", edit);
-      
-      const response = await API(
-        isCreating ? "PUT" : "POST", 
-        "vehiclePayments", 
-        formData, 
-        true
-      );
+
+      const response = await API(isCreating ? "PUT" : "POST", "vehiclePayments", formData, true);
 
       if (response.error) {
         setError(response.error);
@@ -347,13 +345,11 @@ export default function Payments({ vehicleId }) {
 
       // Success message
       const baseMessage = isCreating ? "Payment created successfully" : "Payment updated successfully";
-      const docMessage = response.fileUploaded ? " with new document" : 
-                        response.documentRemoved ? " and document removed" : "";
-      
+      const docMessage = response.fileUploaded ? " with new document" : response.documentRemoved ? " and document removed" : "";
+
       showToast(baseMessage + docMessage + "!", "success");
       resetForm();
       loadData();
-
     } catch (error) {
       setError("An unexpected error occurred");
       showToast("An unexpected error occurred", "error");
@@ -366,7 +362,7 @@ export default function Payments({ vehicleId }) {
     try {
       setCustomLoader(true);
       const data = await API("GET", `vehiclePayments?id=${id}`);
-      
+
       if (data.error) {
         setError(data.error);
         showToast(data.error, "error");
@@ -390,7 +386,7 @@ export default function Payments({ vehicleId }) {
           existing: fileData,
           original: fileData,
           shouldRemove: false,
-          preview: null
+          preview: null,
         });
       } else {
         resetDocument();
@@ -416,7 +412,7 @@ export default function Payments({ vehicleId }) {
     if (!confirmed) return;
 
     try {
-        setCustomLoader(true);
+      setCustomLoader(true);
       const data = await API("DELETE", `vehiclePayments?id=${id}`);
       if (data.error) {
         setError(data.error);
@@ -469,8 +465,6 @@ export default function Payments({ vehicleId }) {
         </div>
       </div>
 
-
-
       {/* Add/Edit Payment Modal */}
       {edit !== null && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -485,17 +479,8 @@ export default function Payments({ vehicleId }) {
                 </div>
                 <div>
                   <label className="input-label">Amount *</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    value={amount} 
-                    onChange={e => setAmount(e.target.value)} 
-                    placeholder="0.00" 
-                    className="input-style" 
-                  />
-                  <p className="text-xs text-[var(--secondary-foreground)] mt-1">
-                    Use positive for payments (+100.00), negative for expenses (-200.00)
-                  </p>
+                  <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="input-style" />
+                  <p className="text-xs text-[var(--secondary-foreground)] mt-1">Use positive for payments (+100.00), negative for expenses (-200.00)</p>
                 </div>
                 <div>
                   <label className="input-label">Payment Date</label>
@@ -525,7 +510,6 @@ export default function Payments({ vehicleId }) {
                       </div>
                     </div>
                   </div>
-
                 ) : shouldShowRemovalState() ? (
                   /* Document Removed State */
                   <div className="border border-[var(--border)] rounded-lg bg-[var(--surface)] p-4">
@@ -533,7 +517,12 @@ export default function Payments({ vehicleId }) {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-[var(--error)]/10 flex items-center justify-center">
                           <svg className="w-5 h-5 text-[var(--error)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
                           </svg>
                         </div>
                         <div>
@@ -543,18 +532,20 @@ export default function Payments({ vehicleId }) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => updateDocument({ 
-                          shouldRemove: false, 
-                          existing: documentState.original, 
-                          file: null 
-                        })}
+                        onClick={() =>
+                          updateDocument({
+                            shouldRemove: false,
+                            existing: documentState.original,
+                            file: null,
+                          })
+                        }
                         className="text-[var(--primary)] hover:underline text-sm"
                         title="Undo removal"
                       >
                         Undo
                       </button>
                     </div>
-                    
+
                     {/* Upload new file option */}
                     <div className="mt-3 pt-3 border-t border-[var(--border)]">
                       <label className="relative inline-flex items-center text-sm text-[var(--primary)] hover:underline cursor-pointer">
@@ -563,24 +554,23 @@ export default function Payments({ vehicleId }) {
                       </label>
                     </div>
                   </div>
-
                 ) : (
                   /* Document Preview */
-                  <DocumentPreview 
+                  <DocumentPreview
                     document={documentState}
                     onPreview={(url, fileName) => updateDocument({ preview: { url, fileName } })}
                     onRemove={() => {
                       if (documentState.file) {
                         // Remove new file, keep removal state if there was an original
-                        updateDocument({ 
-                          file: null, 
-                          shouldRemove: edit !== 0 && documentState.original ? true : false 
+                        updateDocument({
+                          file: null,
+                          shouldRemove: edit !== 0 && documentState.original ? true : false,
                         });
                       } else if (documentState.existing && edit !== 0) {
                         // Remove existing file
-                        updateDocument({ 
-                          existing: null, 
-                          shouldRemove: true 
+                        updateDocument({
+                          existing: null,
+                          shouldRemove: true,
                         });
                       }
                       setError("");
@@ -596,7 +586,7 @@ export default function Payments({ vehicleId }) {
               {customLoader && <Loader />}
 
               <div className="flex gap-3">
-                <CustomButton title={edit === 0 ? "Add Payment" : "Save Changes"} onClick={handleSubmit} className="btn-primary" />
+                <CustomButton title={edit === 0 ? "Add Payment" : "Save Changes"} onClick={editData} className="btn-primary" />
                 <CustomButton
                   title="Cancel"
                   onClick={resetForm}
@@ -709,10 +699,9 @@ export default function Payments({ vehicleId }) {
               </td>
 
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className={`text-sm font-semibold ${
-                  payment.amount >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {payment.amount >= 0 ? '+' : ''}{Number(payment.amount).toFixed(2)}
+                <div className={`text-sm font-semibold ${payment.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {payment.amount >= 0 ? "+" : ""}
+                  {Number(payment.amount).toFixed(2)}
                 </div>
               </td>
 
@@ -728,11 +717,11 @@ export default function Payments({ vehicleId }) {
                 {payment.url ? (
                   <button
                     onClick={() =>
-                      updateDocument({ 
+                      updateDocument({
                         preview: {
                           url: payment.url,
                           fileName: payment.url.split("/").pop() || "Document",
-                        }
+                        },
                       })
                     }
                     className="text-[var(--primary)] hover:underline text-sm"
@@ -771,13 +760,7 @@ export default function Payments({ vehicleId }) {
 
       {/* File Preview Modal */}
       {documentState.preview && (
-        <FilePreviewer 
-          url={documentState.preview.url} 
-          fileName={documentState.preview.fileName} 
-          isOpen={true} 
-          onClose={() => updateDocument({ preview: null })} 
-          trigger={null} 
-        />
+        <FilePreviewer url={documentState.preview.url} fileName={documentState.preview.fileName} isOpen={true} onClose={() => updateDocument({ preview: null })} trigger={null} />
       )}
 
       {/* Confirmation Modal */}
