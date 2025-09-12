@@ -126,6 +126,15 @@ const getAllSidebarSections = () => [
         roles:["view:user"]
       },
       {
+        id: "customer",
+        label: "Customer Management",
+        icon: <Users size={20} />,
+        href: "/customer",
+        roles: ["view:customer"],
+        excludeRoles: ["Sadmin"],
+      },
+
+      {
         id: "role",
         label: "Role Management",
         icon: <Shield size={20} />,

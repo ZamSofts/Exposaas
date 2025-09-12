@@ -41,6 +41,12 @@ const permissions = [
   "add:csv",
   "edit:addVehicle",
   "delete:addVehicle",
+
+  // customer
+  "view:customer",
+  "edit:customer",
+  "add:customer",
+  "delete:customer",
 ];
 
   const VehicleStatus = [

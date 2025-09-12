@@ -188,7 +188,7 @@ export default async function handler(req, res) {
       }
 
       case "PUT": {
-        const { name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber } = req.body;
+        const { name, chassisNumber, brandId, remarks, companyId, statusId, customerId, auction, lotNumber } = req.body;
         await validateVehicle({ chassisNumber, brandId, companyId, statusId });
 
         const vehicle = await prisma.vehicle.create({
@@ -201,6 +201,7 @@ export default async function handler(req, res) {
             brandId: Number(brandId),
             companyId: Number(companyId),
             statusId: Number(statusId),
+            customerId: customerId && customerId !== "" ? Number(customerId) : null,
           },
         });
 
@@ -234,7 +235,7 @@ export default async function handler(req, res) {
       }
 
       case "POST": {
-        const { id, name, chassisNumber, brandId, remarks, companyId, statusId, auction, lotNumber, documentsToDelete } = req.body;
+        const { id, name, chassisNumber, brandId, remarks, companyId, statusId, customerId, auction, lotNumber, documentsToDelete } = req.body;
         const vehicleId = Number(id);
         if (!vehicleId) return res.status(400).json({ error: "Valid vehicle ID required" });
 
@@ -248,6 +249,7 @@ export default async function handler(req, res) {
           brandId: Number(brandId),
           companyId: Number(companyId),
           statusId: Number(statusId),
+          customerId: customerId && customerId !== "" ? Number(customerId) : null,
         };
 
         if (name !== "null") {

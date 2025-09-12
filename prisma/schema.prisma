@@ -16,6 +16,21 @@ model Company {
   users     User[]
   vehicles  Vehicle[]
   roles     Role[]
+  customers Customer[]
+}
+
+model Customer {
+  id        Int       @id @default(autoincrement())
+  name      String
+  country   String?
+  uniqueId  String
+  companyId Int
+  company   Company   @relation(fields: [companyId], references: [id])
+  vehicles  Vehicle[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([uniqueId, companyId])
 }
 
 model User {
@@ -77,11 +92,13 @@ model Vehicle {
   companyId     Int
   brandId       Int
   statusId      Int
+  customerId    Int?
   auction       String?
   lotNumber     String?
   brand         Brand         @relation(fields: [brandId], references: [id])
   company       Company       @relation(fields: [companyId], references: [id])
   status        VehicleStatus @relation(fields: [statusId], references: [id])
+  customer      Customer?     @relation(fields: [customerId], references: [id])
   documents     VehicleDocument[]
   payments      VehiclePayments[]
 

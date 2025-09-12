@@ -27,6 +27,12 @@ const PERMISSIONS = {
     PUT: "add:vehicle",
     DELETE: "delete:vehicle",
   },
+   "/api/customer": {
+    GET: "view:customer",
+    POST: "edit:customer",
+    PUT: "add:customer",
+    DELETE: "delete:customer",
+  },
   "/api/brand": {
     GET: "",
     POST: "edit:brand",

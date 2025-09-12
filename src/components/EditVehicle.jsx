@@ -11,6 +11,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
 
   const [brand, setBrand] = useState([]);
   const [vehicleStatus, setVehicleStatus] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [error, setError] = useState("");
   const [customLoader, setCustomLoader] = useState(false);
 
@@ -22,6 +23,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const [auction, setAuction] = useState("");
   const [companyId, setCompanyId] = useState(session?.companyId || null);
   const [statusId, setStatusId] = useState(0);
+  const [customerId, setCustomerId] = useState(null);
   const [remarks, setRemarks] = useState("");
 
   // Vehicle documents upload states
@@ -62,9 +64,14 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setCustomLoader(true);
     setError("");
     try {
-      const [brandData, statusData] = await Promise.all([API("GET", "brand"), API("GET", "vehicleStatus")]);
+      const [brandData, statusData, customerData] = await Promise.all([
+        API("GET", "brand"), 
+        API("GET", "vehicleStatus"),
+        API("GET", "customer?col=id,name")
+      ]);
       setBrand(!brandData.error ? brandData : []);
       setVehicleStatus(!statusData.error ? statusData : []);
+      setCustomers(!customerData.error ? customerData : []);
     } catch {
       setError("Something went wrong");
     } finally {
@@ -88,6 +95,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setChassisNumber(data.chassisNumber);
     setCompanyId(data.companyId);
     setStatusId(data.statusId);
+    setCustomerId(data.customerId || null);
     setLotNumber(data.lotNumber || "");
     setAuction(data.auction || "");
     setRemarks(data.remarks || "");
@@ -180,6 +188,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       formData.append("chassisNumber", chassisNumber);
       formData.append("companyId", Number(session.companyId));
       formData.append("statusId", statusId);
+      formData.append("customerId", customerId || "");
       formData.append("lotNumber", lotNumber);
       formData.append("auction", auction);
       formData.append("remarks", remarks);
@@ -322,6 +331,15 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                     <div>
                       <label className="input-label">Chassis Number *</label>
                       <input type="text" value={chassisNumber} onChange={e => setChassisNumber(e.target.value)} className="input-style" placeholder="Enter chassis number..." />
+                    </div>
+                    <div>
+                      <label className="input-label">Customer</label>
+                      <CustomSelect 
+                        data={customers} 
+                        selectedId={customerId} 
+                        setSelectedId={setCustomerId} 
+                        placeholder="Select customer"
+                      />
                     </div>
                     <div>
                       <label className="input-label">Lot Number</label>
