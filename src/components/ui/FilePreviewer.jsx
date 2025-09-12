@@ -354,17 +354,16 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
   };
 
   const handleMouseDown = (e) => {
-    if (zoom > 1) {
-      setIsDragging(true);
-      setDragStart({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y
-      });
-    }
+    // Allow dragging at any zoom level
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
   };
 
   const handleMouseMove = (e) => {
-    if (isDragging && zoom > 1) {
+    if (isDragging) {
       setPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
@@ -470,7 +469,7 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         style={{ 
-          cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+          cursor: isDragging ? 'grabbing' : 'grab'
         }}
       >
         <img
@@ -496,7 +495,7 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
       {imageLoaded && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-lg">
           <div className="text-xs text-[var(--secondary-foreground)] text-center">
-            {zoom > 1 ? 'Drag to pan • ' : ''}Scroll to zoom • Click buttons to control view
+            Drag to pan • Scroll to zoom • Click buttons to control view
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, CustomButton, Toast, Loader ,VehicleAddForm} from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomButton, Toast, Loader ,EditVehicle} from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
@@ -201,7 +201,7 @@ export default function VehiclesPage() {
   // If we're in form view, render the VehicleForm component
   if (currentView === "form") {
     return (
-      <VehicleAddForm
+      <EditVehicle
         vehicleId={selectedVehicleId}
         onBack={handleBackToList}
         onSuccess={handleFormSuccess}

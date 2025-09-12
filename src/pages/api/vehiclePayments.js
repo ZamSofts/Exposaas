@@ -1,163 +1,408 @@
-import { prisma } from "@/lib/useful";
-import { putFile } from "@/lib/blob.mjs";
+import { prisma, getSession } from "@/lib/useful";
+import { putFile, deleteFile } from "@/lib/blob.mjs";
+import multer from "multer";
 
-// Payment processing functions for vehicle API
-export const processPayments = async (vehicleId, paymentsData, paymentFiles) => {
-  let paymentsProcessed = 0;
-  const paymentErrors = [];
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit per file
+    files: 1, // Maximum 1 file per payment
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "text/csv",
+    ];
+    cb(allowed.includes(file.mimetype) ? null : new Error("Invalid file type"), allowed.includes(file.mimetype));
+  },
+}).single("document"); // Single file upload for payment document
 
-  if (!paymentsData || paymentsData.length === 0) {
-    return { paymentsProcessed: 0, paymentErrors: [] };
+export const config = { api: { bodyParser: false } };
+
+// Utilities
+const parseFormData = req =>
+  new Promise((resolve, reject) => {
+    upload(req, {}, err => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve({ file: req.file, body: req.body || {} });
+      }
+    });
+  });
+
+// File upload function
+const uploadFileToAzure = async (file, folderPath = "payment/") => {
+  if (!file) {
+    return { uploadedFile: null, fileUploaded: false, error: null };
   }
 
   try {
-    // Process each payment
-    for (let i = 0; i < paymentsData.length; i++) {
-      const payment = paymentsData[i];
-      
-      try {
-        let fileUrl = null;
-        
-        // Handle file upload if present
-        if (payment.hasFile && paymentFiles[`paymentFile_${i}`]) {
-          const file = paymentFiles[`paymentFile_${i}`][0];
-          const uploadResult = await putFile(file, "payments/");
-          fileUrl = uploadResult.url;
-          console.log(`✅ Successfully uploaded payment document: ${uploadResult.fileName}`);
-        }
+    const uploadResult = await putFile(file, folderPath);
 
-        // Create payment record
-        await prisma.vehiclePayments.create({
-          data: {
-            vehicleId: vehicleId,
-            name: payment.name,
-            date: new Date(payment.date),
-            remarks: payment.remarks,
-            url: fileUrl,
-          },
-        });
+    console.log(`✅ Successfully uploaded payment document: ${uploadResult.url}`);
 
-        paymentsProcessed++;
-      } catch (paymentError) {
-        console.error(`❌ Failed to process payment ${i}:`, paymentError);
-        paymentErrors.push({
-          paymentIndex: i,
-          paymentName: payment.name,
-          error: paymentError.message
-        });
-      }
-    }
+    return {
+      uploadedFile: {
+        url: uploadResult.url,
+        fileName: file.originalname,
+        fileSize: file.buffer.length,
+        mimeType: file.mimetype,
+      },
+      fileUploaded: true,
+      error: null,
+    };
   } catch (error) {
-    console.error("❌ Payment processing failed:", error);
-    paymentErrors.push({
-      error: error.message,
-      context: "Payment processing"
-    });
+    console.error("❌ Upload failed:", error);
+    return {
+      uploadedFile: null,
+      fileUploaded: false,
+      error: { fileName: file.originalname, error: error.message },
+    };
   }
-
-  return { paymentsProcessed, paymentErrors };
 };
 
-export const processPaymentOperations = async (vehicleId, paymentOperations, paymentFiles) => {
-  let paymentsProcessed = 0;
-  let paymentsDeleted = 0;
-  const paymentErrors = [];
-
-  if (!paymentOperations) {
-    return { paymentsProcessed: 0, paymentsDeleted: 0, paymentErrors: [] };
+// Helper function to validate payment data
+const validatePayment = async ({ name, date, vehicleId, paymentId = null }) => {
+  if (!name || !vehicleId) {
+    throw new Error("name and vehicleId are required");
   }
 
+  // Check if vehicle exists and user has access
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { id: Number(vehicleId) },
+    select: { id: true, companyId: true },
+  });
+
+  if (!vehicle) {
+    throw new Error("Vehicle not found");
+  }
+
+  return vehicle;
+};
+
+const getSearchFilter = search => {
+  if (!search) return {};
+
+  const searchConditions = [];
+
+  // Search by ID (exact match if numeric)
+  if (!isNaN(Number(search))) {
+    searchConditions.push({ id: { equals: Number(search) } });
+  }
+
+  // Search by name (case insensitive)
+  searchConditions.push({ name: { contains: search, mode: "insensitive" } });
+
+  // Search by remarks (case insensitive, handle null)
+  searchConditions.push({
+    remarks: {
+      not: null,
+      contains: search,
+      mode: "insensitive",
+    },
+  });
+
+  return { OR: searchConditions };
+};
+
+const getOrderBy = (sortBy, sortOrder) =>
+  ({
+    vehicleName: { vehicle: { name: sortOrder } },
+    paymentId: { id: sortOrder },
+    paymentName: { name: sortOrder },
+    paymentDate: { date: sortOrder },
+    paymentRemarks: { remarks: sortOrder },
+  }[sortBy] || { [sortBy]: sortOrder });
+
+export default async function handler(req, res) {
+  const session = await getSession(req, res);
+
   try {
-    // Delete payments
-    if (paymentOperations.toDelete && paymentOperations.toDelete.length > 0) {
-      const deleteResult = await prisma.vehiclePayments.deleteMany({
-        where: {
-          id: { in: paymentOperations.toDelete },
-          vehicleId: vehicleId // Ensure payments belong to this vehicle
+    // Handle file uploads for PUT and POST methods
+    if (["PUT", "POST"].includes(req.method)) {
+      const { file, body } = await parseFormData(req);
+      req.file = file;
+      req.body = body;
+    }
+
+    const id = Number(req.query.id);
+    const vehicleId = Number(req.query.vehicleId);
+    const { page = 1, limit = 10, search = "", sortBy = "id", sortOrder = "desc", col } = req.query;
+    const selectFields = col ? Object.fromEntries(col.split(",").map(c => [c, true])) : undefined;
+    const userFilter = session.role === "Sadmin" ? {} : { vehicle: { companyId: session?.companyId } };
+
+    if (req.method === "GET") {
+      // Single payment
+      if (id) {
+        const payment = await prisma.vehiclePayments.findUnique({
+          where: { id },
+          include: { vehicle: { select: { companyId: true } } },
+        });
+
+        if (!payment) {
+          return res.status(404).json({ error: "Payment not found" });
         }
+
+        // Remove vehicle data from response, keep only payment data
+        const { vehicle, ...paymentData } = payment;
+        return res.json(paymentData);
+      }
+
+      // Payments for specific vehicle
+      if (vehicleId) {
+        // Check if user has access to this vehicle
+        const vehicle = await prisma.vehicle.findUnique({
+          where: { id: vehicleId },
+          select: { companyId: true },
+        });
+
+        if (!vehicle) {
+          return res.status(404).json({ error: "Vehicle not found or access denied" });
+        }
+
+        // Build where clause for vehicle payments with search
+        const searchFilter = getSearchFilter(search.trim().toLowerCase());
+        const whereClause = searchFilter.OR
+          ? {
+              AND: [{ vehicleId }, searchFilter],
+            }
+          : { vehicleId };
+
+        // Get payments with pagination support
+        if (page && limit) {
+          const [payments, total] = await Promise.all([
+            prisma.vehiclePayments.findMany({
+              skip: (page - 1) * limit,
+              take: Number(limit),
+              where: whereClause,
+              orderBy: getOrderBy(sortBy, sortOrder),
+            }),
+            prisma.vehiclePayments.count({ where: whereClause }),
+          ]);
+
+          return res.json({ payments, total });
+        } else {
+          // Get all payments without pagination
+          const payments = await prisma.vehiclePayments.findMany({
+            where: whereClause,
+            orderBy: getOrderBy(sortBy, sortOrder),
+          });
+
+          return res.json(payments);
+        }
+      }
+
+      const searchFilter = getSearchFilter(search.trim().toLowerCase());
+      const where = searchFilter.OR
+        ? {
+            AND: [userFilter, searchFilter],
+          }
+        : userFilter;
+
+      // Specific fields
+      if (selectFields) {
+        const payments = await prisma.vehiclePayments.findMany({
+          select: selectFields,
+          where,
+          orderBy: getOrderBy(sortBy, sortOrder),
+        });
+        return res.json(payments);
+      }
+
+      // Paginated list
+      const [payments, total] = await Promise.all([
+        prisma.vehiclePayments.findMany({
+          skip: (page - 1) * limit,
+          take: Number(limit),
+          where,
+          orderBy: getOrderBy(sortBy, sortOrder),
+        }),
+        prisma.vehiclePayments.count({ where }),
+      ]);
+      return res.json({ payments, total });
+    }
+
+    if (req.method === "PUT") {
+      const { name, date, remarks, vehicleId } = req.body;
+
+      const vehicle = await validatePayment({ name, date, vehicleId });
+
+      // Handle file upload
+      let fileUrl = null;
+      let uploadError = null;
+
+      if (req.file) {
+        const uploadResult = await uploadFileToAzure(req.file, "payment/");
+
+        if (uploadResult.fileUploaded) {
+          fileUrl = uploadResult.uploadedFile.url;
+        } else {
+          uploadError = uploadResult.error;
+        }
+      }
+
+      const payment = await prisma.vehiclePayments.create({
+        data: {
+          name,
+          date: date ? new Date(date) : null,
+          remarks: remarks || null,
+          vehicleId: Number(vehicleId),
+          url: fileUrl,
+        },
       });
-      paymentsDeleted = deleteResult.count;
+
+      const response = {
+        message: "Payment created successfully",
+        paymentId: payment.id,
+        fileUploaded: !!fileUrl,
+      };
+
+      if (uploadError) {
+        response.fileError = uploadError;
+        response.message += ` (File upload failed)`;
+      }
+
+      return res.status(201).json(response);
     }
 
-    // Update existing payments
-    if (paymentOperations.toUpdate && paymentOperations.toUpdate.length > 0) {
-      for (const payment of paymentOperations.toUpdate) {
-        try {
-          let fileUrl = payment.url; // Keep existing URL by default
-          
-          // Handle file upload if present
-          if (payment.hasFile && payment.fileIndex !== null && paymentFiles[`paymentFile_${payment.fileIndex}`]) {
-            const file = paymentFiles[`paymentFile_${payment.fileIndex}`][0];
-            const uploadResult = await putFile(file, "payments/");
-            fileUrl = uploadResult.url;
-            console.log(`✅ Successfully uploaded payment document: ${uploadResult.fileName}`);
-          }
+    if (req.method === "POST") {
+      const { id, name, date, remarks, vehicleId } = req.body;
+      const paymentId = Number(id);
 
-          await prisma.vehiclePayments.update({
-            where: { id: payment.id },
-            data: {
-              name: payment.name,
-              date: new Date(payment.date),
-              remarks: payment.remarks,
-              url: fileUrl,
-            },
-          });
+      if (!paymentId) {
+        return res.status(400).json({ error: "Valid payment ID required" });
+      }
 
-          paymentsProcessed++;
-        } catch (paymentError) {
-          console.error(`❌ Failed to update payment ${payment.id}:`, paymentError);
-          paymentErrors.push({
-            paymentId: payment.id,
-            paymentName: payment.name,
-            error: paymentError.message
-          });
+      const vehicle = await validatePayment({ name, date, vehicleId, paymentId });
+
+      // Check if payment exists and user has access
+      const existingPayment = await prisma.vehiclePayments.findUnique({
+        where: { id: paymentId },
+        include: { vehicle: { select: { companyId: true } } },
+      });
+
+      if (!existingPayment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+      let fileUrl = existingPayment.url; // Keep existing URL by default
+      let fileUploaded = false;
+      let uploadError = null;
+      let oldFileUrl = null;
+
+      if (req.file) {
+        const uploadResult = await uploadFileToAzure(req.file, "payment/");
+
+        if (uploadResult.fileUploaded) {
+          oldFileUrl = existingPayment.url; // Store old URL for cleanup
+          fileUrl = uploadResult.uploadedFile.url;
+          fileUploaded = true;
+        } else {
+          uploadError = uploadResult.error;
         }
       }
-    }
 
-    // Create new payments
-    if (paymentOperations.toCreate && paymentOperations.toCreate.length > 0) {
-      for (const payment of paymentOperations.toCreate) {
+      const updatedPayment = await prisma.vehiclePayments.update({
+        where: { id: paymentId },
+        data: {
+          name,
+          date: date ? new Date(date) : null,
+          remarks: remarks || null,
+          vehicleId: Number(vehicleId),
+          url: fileUrl,
+        },
+      });
+
+      // Clean up old file if a new one was uploaded
+      if (oldFileUrl && fileUploaded) {
         try {
-          let fileUrl = null;
-          
-          // Handle file upload if present
-          if (payment.hasFile && payment.fileIndex !== null && paymentFiles[`paymentFile_${payment.fileIndex}`]) {
-            const file = paymentFiles[`paymentFile_${payment.fileIndex}`][0];
-            const uploadResult = await putFile(file, "payments/");
-            fileUrl = uploadResult.url;
-            console.log(`✅ Successfully uploaded payment document: ${uploadResult.fileName}`);
-          }
-
-          await prisma.vehiclePayments.create({
-            data: {
-              vehicleId: vehicleId,
-              name: payment.name,
-              date: new Date(payment.date),
-              remarks: payment.remarks,
-              url: fileUrl,
-            },
-          });
-
-          paymentsProcessed++;
-        } catch (paymentError) {
-          console.error(`❌ Failed to create payment:`, paymentError);
-          paymentErrors.push({
-            paymentName: payment.name,
-            error: paymentError.message
-          });
+          await deleteFile(oldFileUrl);
+          console.log(`✅ Deleted old payment file from Azure: ${oldFileUrl}`);
+        } catch (error) {
+          console.error(`❌ Failed to delete old payment file from Azure: ${oldFileUrl}`, error);
         }
       }
+
+      const response = {
+        message: "Payment updated successfully",
+        fileUploaded: fileUploaded,
+      };
+
+      if (uploadError) {
+        response.fileError = uploadError;
+        response.message += ` (File upload failed)`;
+      }
+
+      return res.json(response);
     }
+
+    if (req.method === "DELETE") {
+      if (!id) return res.status(400).json({ error: "Payment ID required" });
+
+      // Get payment with vehicle info before deletion
+      const payment = await prisma.vehiclePayments.findUnique({
+        where: { id },
+        include: { vehicle: { select: { companyId: true } } },
+      });
+
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+
+      // Delete the payment from database
+      await prisma.vehiclePayments.delete({ where: { id } });
+
+      // Clean up file from Azure Blob Storage if it exists
+      let fileDeleted = false;
+      let fileDeletionError = null;
+
+      if (payment.url) {
+        try {
+          await deleteFile(payment.url);
+          fileDeleted = true;
+          console.log(`✅ Deleted payment file from Azure: ${payment.url}`);
+        } catch (error) {
+          console.error(`❌ Failed to delete payment file from Azure: ${payment.url}`, error);
+          fileDeletionError = {
+            fileUrl: payment.url,
+            error: error.message,
+          };
+        }
+      }
+
+      const response = {
+        message: "Payment deleted successfully",
+        fileDeleted: fileDeleted,
+      };
+
+      if (fileDeletionError) {
+        response.fileDeletionError = fileDeletionError;
+        response.message += ` (File deletion failed)`;
+      }
+
+      return res.json(response);
+    }
+
+    // Handle unsupported HTTP methods
+    return res.status(405).json({ error: "Method not allowed" });
   } catch (error) {
-    console.error("❌ Payment operations failed:", error);
-    paymentErrors.push({
-      error: error.message,
-      context: "Payment operations"
-    });
+    console.error("API error:", error);
+    const status = error.message.includes("not found")
+      ? 404
+      : error.message.includes("already exists")
+      ? 409
+      : error.message.includes("required")
+      ? 400
+      : error.message.includes("Access denied")
+      ? 403
+      : 500;
+    res.status(status).json({ error: error.message || "Internal server error" });
   }
-
-  return { paymentsProcessed, paymentsDeleted, paymentErrors };
-};
-
-
+}
