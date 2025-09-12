@@ -231,9 +231,19 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PUT") {
-      const { name, date, remarks, vehicleId } = req.body;
+      const { name, amount, date, remarks, vehicleId } = req.body;
 
       const vehicle = await validatePayment({ name, date, vehicleId });
+
+      // Validate amount
+      if (amount === undefined || amount === null || amount === '') {
+        return res.status(400).json({ error: "Amount is required" });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount)) {
+        return res.status(400).json({ error: "Amount must be a valid number" });
+      }
 
       // Handle file upload
       let fileUrl = null;
@@ -252,6 +262,7 @@ export default async function handler(req, res) {
       const payment = await prisma.vehiclePayments.create({
         data: {
           name,
+          amount: parsedAmount,
           date: date ? new Date(date) : null,
           remarks: remarks || null,
           vehicleId: Number(vehicleId),
@@ -274,11 +285,21 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { id, name, date, remarks, vehicleId } = req.body;
+      const { id, name, amount, date, remarks, vehicleId, removeDocument } = req.body;
       const paymentId = Number(id);
 
       if (!paymentId) {
         return res.status(400).json({ error: "Valid payment ID required" });
+      }
+
+      // Validate amount
+      if (amount === undefined || amount === null || amount === '') {
+        return res.status(400).json({ error: "Amount is required" });
+      }
+
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount)) {
+        return res.status(400).json({ error: "Amount must be a valid number" });
       }
 
       const vehicle = await validatePayment({ name, date, vehicleId, paymentId });
@@ -297,11 +318,21 @@ export default async function handler(req, res) {
       let uploadError = null;
       let oldFileUrl = null;
 
+      // Handle document removal
+      if (removeDocument === "true") {
+        oldFileUrl = existingPayment.url; // Store for cleanup
+        fileUrl = null; // Remove the document
+        console.log(`📝 Document removal requested for payment ${paymentId}`);
+      }
+
+      // Handle new file upload (this takes precedence over removal)
       if (req.file) {
         const uploadResult = await uploadFileToAzure(req.file, "payment/");
 
         if (uploadResult.fileUploaded) {
-          oldFileUrl = existingPayment.url; // Store old URL for cleanup
+          if (!oldFileUrl) {
+            oldFileUrl = existingPayment.url; // Store old URL for cleanup if not already set
+          }
           fileUrl = uploadResult.uploadedFile.url;
           fileUploaded = true;
         } else {
@@ -313,6 +344,7 @@ export default async function handler(req, res) {
         where: { id: paymentId },
         data: {
           name,
+          amount: parsedAmount,
           date: date ? new Date(date) : null,
           remarks: remarks || null,
           vehicleId: Number(vehicleId),
@@ -320,8 +352,8 @@ export default async function handler(req, res) {
         },
       });
 
-      // Clean up old file if a new one was uploaded
-      if (oldFileUrl && fileUploaded) {
+      // Clean up old file if a new one was uploaded or document was removed
+      if (oldFileUrl && (fileUploaded || removeDocument === "true")) {
         try {
           await deleteFile(oldFileUrl);
           console.log(`✅ Deleted old payment file from Azure: ${oldFileUrl}`);
@@ -333,6 +365,7 @@ export default async function handler(req, res) {
       const response = {
         message: "Payment updated successfully",
         fileUploaded: fileUploaded,
+        documentRemoved: removeDocument === "true" && !fileUploaded, // Only true if document was removed and no new file uploaded
       };
 
       if (uploadError) {

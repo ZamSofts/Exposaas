@@ -100,6 +100,7 @@ model VehiclePayments {
   id        Int       @id @default(autoincrement())
   vehicleId Int
   name      String
+  amount    Decimal   @db.Decimal(10, 2)
   date      DateTime?
   remarks   String?
   url       String?
