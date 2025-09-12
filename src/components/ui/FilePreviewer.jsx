@@ -23,7 +23,7 @@ export function FilePreviewer({ url, fileName, trigger, className = "", isOpen: 
       if (modalRef.current && !modalRef.current.contains(event.target)) {
         // Stop propagation to prevent interfering with parent modals
         event.stopPropagation();
-        event.preventDefault();
+       // event.preventDefault();
         setIsOpen(false);
       }
     };
@@ -198,7 +198,7 @@ export function FilePreviewer({ url, fileName, trigger, className = "", isOpen: 
             // Only close if clicking the backdrop, not the modal content
             if (e.target === e.currentTarget) {
               e.stopPropagation();
-              e.preventDefault();
+              //e.preventDefault();
               setIsOpen(false);
             }
           }}
@@ -389,7 +389,7 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
   }, [isDragging, dragStart]);
 
   const handleWheel = (e) => {
-    e.preventDefault();
+   //e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setZoom(prev => Math.min(Math.max(prev * delta, 0.1), 5));
     setFitToScreen(false);
