@@ -2,6 +2,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 export { useAuth };
 export { useTheme };
+
 export { default as Error } from "@/components/ui/Error";
 export { useConfirm } from "@/components/ui/ConfirmModal";
 export { default as Skeleton } from "@/components/ui/Skeleton";
@@ -11,6 +12,7 @@ export { CustomButton } from "@/components/ui/CustomButton";
 export { Toast } from "@/components/ui/CustomToast";
 export { FilePreviewer } from "@/components/ui/FilePreviewer";
 export { Loader } from "@/components/ui/Loader";
+export { EditVehicle } from "@/components/EditVehicle";
 
 export const API = async (method, name, d = {}, isFile= false) => {
   if (method == "GET" || method == "DELETE") {
@@ -36,4 +38,16 @@ export const API = async (method, name, d = {}, isFile= false) => {
     body: JSON.stringify(d),
   });
   return await data.json();
+};
+
+
+
+export const isAllowed = (required = [], session) => {
+  if (!session || !Array.isArray(required) || required.length === 0) return false;
+  const permissions = Array.isArray(session.permissions) ? session.permissions : [];
+  const roles = Array.isArray(session.roles) ? session.roles : [];
+  for (const item of required) {
+    if (permissions.includes(item) || roles.includes(item)) return true;
+  }
+  return false;
 };

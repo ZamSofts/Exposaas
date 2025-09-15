@@ -2,7 +2,7 @@ import React from "react";
 import Select from "react-select";
 import { customStyles } from "./reactSelectStyles.js"; 
 
-export const MultiSelect=({ roles, rolesId, setRolesId,placeholder = "Select options..." })=> {
+export const MultiSelect=({ roles, rolesId, setRolesId, placeholder = "Select options...", onDropdownToggle })=> {
 
 
   return (
@@ -19,6 +19,8 @@ export const MultiSelect=({ roles, rolesId, setRolesId,placeholder = "Select opt
       onChange={(selected) =>
         setRolesId(selected ? selected.map((s) => s.value) : [])
       }
+      onMenuOpen={() => onDropdownToggle && onDropdownToggle(true)}
+      onMenuClose={() => onDropdownToggle && onDropdownToggle(false)}
       className="basic-multi-select"
       placeholder={placeholder}
 

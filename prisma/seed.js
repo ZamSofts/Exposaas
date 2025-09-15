@@ -2,7 +2,34 @@ const { PrismaClient } = require("../src/generated/prisma");
 const prisma = new PrismaClient();
 
 async function main() {
-  const permissions = ["add:user", "edit:user", "delete:user", "view:user", "view:vehicle", "add:vehicle", "edit:vehicle", "delete:vehicle", "add:csv"];
+  const permissions = [
+    // User
+    "view:user",
+    "edit:user",
+    "add:user",
+    "delete:user",
+
+    // Role
+    "view:role",
+    "edit:role",
+    "add:role",
+    "delete:role",
+
+    // Vehicle
+    "view:vehicle",
+    "edit:vehicle",
+    "add:vehicle",
+    "delete:vehicle",
+
+    // Add Vehicle (CSV upload)
+    "add:csv",
+    // customer
+    "view:customer",
+    "edit:customer",
+    "add:customer",
+    "delete:customer",
+  ];
+
   const VehicleStatus = [
     "In Transit to Yard",
     "Awaiting Inspection",
@@ -17,7 +44,7 @@ async function main() {
     "Cleared for Pickup",
     "Delivered",
   ];
-  const Brand = ["Toyota", "Honda", "Nissan", "Ford", "Chevrolet", "BMW", "Mercedes-Benz", "Audi", "Volkswagen", "Hyundai"];
+  const Brand = ["-", "Toyota", "Honda", "Nissan", "Ford", "Chevrolet", "BMW", "Mercedes-Benz", "Audi", "Volkswagen", "Hyundai"];
   try {
     await prisma.permission.deleteMany();
     await prisma.vehicleStatus.deleteMany();
@@ -29,6 +56,44 @@ async function main() {
       where: { name: p },
       update: {}, // do nothing if already exists
       create: { name: p },
+    });
+  }
+
+  const vehiclePermission = await prisma.permission.findUnique({
+    where: { name: "view:vehicle" },
+  });
+
+  let customerRole = await prisma.role.findFirst({
+  where: {
+    name: {
+      equals: "Customer",
+      mode: "insensitive", 
+    },
+    companyId: null,
+  },
+});
+
+  if (!customerRole) {
+    customerRole = await prisma.role.create({
+      data: {
+        name: "Customer",
+        companyId: null,
+      },
+    });
+  }
+  if (vehiclePermission) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: customerRole.id,
+          permissionId: vehiclePermission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: customerRole.id,
+        permissionId: vehiclePermission.id,
+      },
     });
   }
 

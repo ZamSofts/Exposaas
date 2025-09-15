@@ -1,44 +1,28 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer, Toast, Loader } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
 
 export default function VehiclesPage() {
-  const { session, status } = useAuth(["Admin"]);
+  const { session, status } = useAuth(["view:vehicle"]);
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [vehicles, setVehicles] = useState([]);
-  const [brand, setBrand] = useState([]);
-  const [vehicleStatus, setVehicleStatus] = useState([]);
   const [error, setError] = useState("");
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
 
-  // Form states
-  const [name, setName] = useState("");
-  const [brandId, setBrandId] = useState(null);
-  const [chassisNumber, setChassisNumber] = useState("");
-  const [lotNumber, setLotNumber] = useState("");
-  const [auction, setAuction] = useState("");
-  const [companyId, setCompanyId] = useState(session?.companyId || null);
-  const [statusId, setStatusId] = useState(0);
-  const [remarks, setRemarks] = useState("");
   const [csvFile, setCsvFile] = useState(null);
   const [csvFileModal, setCsvFileModal] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Vehicle documents upload states
-  const [vehicleDocuments, setVehicleDocuments] = useState([]);
-  const [documentsToDelete, setDocumentsToDelete] = useState([]); // Track documents to delete
-  const [previewFile, setPreviewFile] = useState(null); // State for file preview
-
   const [edit, setEdit] = useState(null);
+  const [currentView, setCurrentView] = useState("list");
 
   // Modal refs for click outside
-  const vehicleModalRef = useRef(null);
   const csvModalRef = useRef(null);
 
   // Pagination and search states
@@ -50,12 +34,6 @@ export default function VehiclesPage() {
 
   // Toast state
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
-  useEffect(() => {
-    if (status === "authenticated" && session) {
-      setCompanyId(Number(session.companyId));
-      loadInitialData();
-    }
-  }, [status, session]);
 
   useEffect(() => {
     loadData();
@@ -64,13 +42,6 @@ export default function VehiclesPage() {
   // Handle click outside modal to close
   useEffect(() => {
     const handleClickOutside = event => {
-      // Check if the click target is part of a FilePreviewer modal
-      const isFilePreviewer = event.target.closest("[data-file-previewer-modal]");
-      if (isFilePreviewer) return;
-
-      if (vehicleModalRef.current && !vehicleModalRef.current.contains(event.target)) {
-        resetForm();
-      }
       if (csvModalRef.current && !csvModalRef.current.contains(event.target)) {
         resetForm();
       }
@@ -84,20 +55,6 @@ export default function VehiclesPage() {
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
-  };
-
-  const loadInitialData = async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      const [brandData, statusData] = await Promise.all([API("GET", "brand"), API("GET", "vehicleStatus")]);
-      setBrand(!brandData.error ? brandData : []);
-      setVehicleStatus(!statusData.error ? statusData : []);
-    } catch {
-      setError("Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   const loadData = async () => {
@@ -149,67 +106,6 @@ export default function VehiclesPage() {
     setError("");
   };
 
-  // Handle vehicle document uploads
-  const handleDocumentChange = e => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    if (vehicleDocuments.length + files.length > 15) {
-      showToast("You can upload a maximum of 15 files.", "error");
-      setError("You can upload a maximum of 15 files.");
-      return;
-    }
-
-    const validFiles = [];
-    const invalidFiles = [];
-    const allowedTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-    const allowedExtensions = ["pdf", "jpg", "jpeg", "png", "doc", "docx"];
-
-    files.forEach(file => {
-      const fileExtension = file.name.split(".").pop()?.toLowerCase();
-      if (allowedExtensions.includes(fileExtension) && allowedTypes.includes(file.type)) {
-        if (file.size > 5 * 1024 * 1024) {
-          // 5MB limit
-          showToast(`File ${file.name} exceeds the 5MB size limit.`, "error");
-          setError(`File ${file.name} exceeds the 5MB size limit.`);
-          invalidFiles.push(file.name);
-        } else {
-          validFiles.push({
-            id: Date.now() + Math.random(),
-            file,
-            name: file.name,
-            size: file.size,
-            type: file.type,
-          });
-        }
-      } else {
-        invalidFiles.push(file.name);
-      }
-    });
-
-    if (invalidFiles.length > 0) {
-      setError(`Invalid files: ${invalidFiles.join(", ")}. Only PDF, JPG, PNG, DOC, DOCX files are allowed! and must be under 5MB.`);
-    } else {
-      setError("");
-    }
-
-    setVehicleDocuments(prev => [...prev, ...validFiles]);
-    // Reset the input value to allow selecting the same files again
-    e.target.value = "";
-  };
-
-  const removeDocument = fileId => {
-    const documentToRemove = vehicleDocuments.find(doc => doc.id === fileId);
-
-    // If it's an existing document from the database, add it to delete list
-    if (documentToRemove && documentToRemove.isExisting) {
-      setDocumentsToDelete(prev => [...prev, documentToRemove.id]);
-    }
-
-    // Remove from current documents list
-    setVehicleDocuments(prev => prev.filter(file => file.id !== fileId));
-    setError("");
-  };
-
   // Fake progress bar for CSV upload
   const uploadCsv = async () => {
     if (!csvFile) {
@@ -225,7 +121,6 @@ export default function VehiclesPage() {
         setUploadProgress(Math.floor(fakeProgress));
       }
     }, 200);
-    setCustomLoader(true);
     const formData = new FormData();
     formData.append("file", csvFile);
     const response = await API("POST", "addVehicle", formData, true);
@@ -244,105 +139,13 @@ export default function VehiclesPage() {
     setCsvFileModal(false);
     setCsvFile(null);
     setError("");
-    setCustomLoader(false);
     loadData();
-  };
-
-  const editData = async () => {
-    if (!brandId || !chassisNumber || !statusId) {
-      setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
-      return;
-    }
-
-    setCustomLoader(true);
-    setError("");
-
-    try {
-      const formData = new FormData();
-      formData.append("name", name);
-      formData.append("brandId", brandId);
-      formData.append("chassisNumber", chassisNumber);
-      formData.append("companyId", Number(session.companyId));
-      formData.append("statusId", statusId);
-      formData.append("lotNumber", lotNumber);
-      formData.append("auction", auction);
-      formData.append("remarks", remarks);
-
-      // Only append new files (not existing documents)
-      const newFiles = vehicleDocuments.filter(docObj => !docObj.isExisting && docObj.file);
-      newFiles.forEach(docObj => {
-        formData.append("documents", docObj.file);
-      });
-
-      let response;
-      if (edit === 0) {
-        response = await API("PUT", "vehicle", formData, true);
-      } else {
-        formData.append("id", edit);
-        formData.append("documentsToDelete", JSON.stringify(documentsToDelete));
-        response = await API("POST", "vehicle", formData, true);
-      }
-
-      if (response.error) {
-        setError(response.error);
-        showToast(response.error, "error");
-        return;
-      }
-
-      showToast(
-        edit === 0
-          ? `Vehicle added successfully! ${response.documentsUploaded || 0} document(s) uploaded.`
-          : `Vehicle updated successfully! ${response.documentsUploaded || 0} document(s) uploaded, ${response.documentsDeleted || 0} document(s) deleted.`,
-        "success"
-      );
-      loadData();
-      resetForm();
-    } catch (error) {
-      setError("An unexpected error occurred");
-      showToast("An unexpected error occurred", "error");
-    } finally {
-      setCustomLoader(false);
-    }
-  };
-
-  const loadEdit = async id => {
-    setCustomLoader(true);
-    const data = await API("GET", `vehicle?id=${id}`);
-    if (data.error) {
-      setError(data.error);
-      showToast(data.error, "error");
-      setCustomLoader(false);
-      return;
-    }
-    setName(data.name);
-    setBrandId(data.brandId);
-    setChassisNumber(data.chassisNumber);
-    setCompanyId(data.companyId);
-    setStatusId(data.statusId);
-    setLotNumber(data.lotNumber || "");
-    setAuction(data.auction || "");
-    setRemarks(data.remarks || "");
-    setEdit(id);
-    setDocumentsToDelete([]); // Clear delete list when loading
-
-    // Map existing documents to the format expected by the frontend
-    const existingDocs = (data.documents || []).map(doc => ({
-      id: doc.id,
-      name: doc.Url.split("/").pop(), // Extract filename from URL
-      docUrl: doc.Url,
-      isExisting: true, // Flag to identify existing documents
-      size: 0, // Unknown size for existing documents
-      type: doc.Url.toLowerCase().includes(".jpg") || doc.Url.toLowerCase().includes(".jpeg") || doc.Url.toLowerCase().includes(".png") ? "image" : "document",
-    }));
-    setVehicleDocuments(existingDocs);
-
-    setCustomLoader(false);
   };
 
   const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete Vehicle",
-      message: "Are you sure you want to delete this vehicle? This will also permanently delete all associated documents. This action cannot be undone.",
+      message: "Are you sure you want to delete this vehicle? This will also permanently delete all associated documents and Payments. This action cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });
@@ -364,22 +167,38 @@ export default function VehiclesPage() {
   };
 
   const resetForm = () => {
-    setName("");
-    setBrandId(null);
-    setChassisNumber("");
-    setCompanyId(Number(session?.companyId));
-    setStatusId(0);
-    setLotNumber("");
-    setAuction("");
-    setRemarks("");
     setError("");
     setEdit(null);
     setCsvFile(null);
     setCsvFileModal(false);
-    setVehicleDocuments([]);
-    setDocumentsToDelete([]); // Clear documents to delete
     setCustomLoader(false);
   };
+
+  // View management functions
+  const handleAddVehicle = () => {
+    setEdit(0); // 0 for new vehicle
+    setCurrentView("form");
+  };
+
+  const handleEditVehicle = vehicleId => {
+    setEdit(vehicleId);
+    setCurrentView("form");
+  };
+
+  const handleBackToList = () => {
+    setCurrentView("list");
+    setEdit(null);
+    loadData(); // Refresh the list
+  };
+
+  const handleFormSuccess = () => {
+    handleBackToList();
+  };
+
+  // If we're in form view, render the VehicleForm component
+  if (currentView === "form") {
+    return <EditVehicle vehicleId={edit} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
+  }
 
   return (
     <>
@@ -396,121 +215,8 @@ export default function VehiclesPage() {
               </div>
               <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicles Management</h1>
             </div>
-            <CustomButton title="Add Vehicle" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
+            {isAllowed(["add:vehicle"], session) ? <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} /> : null}
           </div>
-
-          {/* Add/Edit Vehicle Modal */}
-          {edit != null && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-2 sm:p-4 z-50">
-              <div ref={vehicleModalRef} className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-4 sm:p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto relative">
-                <h3 className="text-lg sm:text-xl font-semibold mb-6">{edit === 0 ? "Add New Vehicle" : "Edit Vehicle"}</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                  <div>
-                    <label className="input-label">Vehicle Name</label>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} className="input-style" placeholder="Enter vehicle name..." />
-                  </div>
-                  <div>
-                    <label className="input-label">Brand</label>
-                    <CustomSelect data={brand} selectedId={brandId} setSelectedId={setBrandId} />
-                  </div>
-
-                  <div>
-                    <label className="input-label">Current Status</label>
-                    <CustomSelect data={vehicleStatus} selectedId={statusId} setSelectedId={setStatusId} />
-                  </div>
-                  <div>
-                    <label className="input-label">Chassis Number</label>
-                    <input type="text" value={chassisNumber} onChange={e => setChassisNumber(e.target.value)} className="input-style" placeholder="Enter chassis number..." />
-                  </div>
-                  <div>
-                    <label className="input-label">Lot Number</label>
-                    <input type="text" value={lotNumber} onChange={e => setLotNumber(e.target.value)} className="input-style" placeholder="Enter lot number..." />
-                  </div>
-                  <div>
-                    <label className="input-label">Auction</label>
-                    <input type="text" value={auction} onChange={e => setAuction(e.target.value)} className="input-style" placeholder="Enter auction..." />
-                  </div>
-
-                  {/* Remarks - Full Width */}
-                  <div className="col-span-1 md:col-span-3">
-                    <label className="input-label">Remarks</label>
-                    <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="input-style" placeholder="Enter remarks..." rows={3} />
-                  </div>
-
-                  {/* Vehicle Documents Upload Section - Full Width */}
-                  <div className="col-span-1 md:col-span-3">
-                    <label className="input-label">Vehicle Documents</label>
-                    <div className="vehicle-doc-style">
-                      {/* Add Document Tile */}
-                      <div className="relative">
-                        <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple onChange={handleDocumentChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                        <div className="vehicle-doc-upload-button">
-                          <Plus className="w-6 h-6 text-[var(--secondary-foreground)] mb-1" />
-                          <span className="text-xs text-[var(--secondary-foreground)] text-center px-1">Add Documents</span>
-                        </div>
-                      </div>
-
-                      {/* Document Tiles */}
-                      {vehicleDocuments.map(docObj => (
-                        <div key={docObj.id} className="relative group">
-                          <div className="vehicle-doc-display">
-                            <div
-                              className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-[var(--secondary)]/30 rounded transition-colors"
-                              onClick={() =>
-                                setPreviewFile({
-                                  url: docObj.isExisting ? docObj.docUrl : URL.createObjectURL(docObj.file),
-                                  fileName: docObj.name,
-                                })
-                              }
-                            >
-                              {/* Handle existing documents vs new uploads */}
-                              {docObj.isExisting ? (
-                                // Existing document from database
-                                docObj.type === "image" ? (
-                                  <img src={docObj.docUrl} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
-                                ) : (
-                                  <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
-                                )
-                              ) : // New uploaded file
-                              docObj.type && docObj.type.includes("image") ? (
-                                <img src={URL.createObjectURL(docObj.file)} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
-                              ) : (
-                                <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
-                              )}
-                              <div className="text-xs text-[var(--foreground)] text-center break-words leading-tight">
-                                {docObj.name && docObj.name.length > 15 ? docObj.name.substring(0, 12) + "..." : docObj.name || ""}
-                              </div>
-                              <div className="text-xs text-[var(--secondary-foreground)] mt-1">{docObj.isExisting ? "Existing" : `${(docObj.size / 1024).toFixed(1)} KB`}</div>
-                            </div>
-                            {/* Remove Button */}
-                            <button onClick={() => removeDocument(docObj.id)} className="vehicle-doc-remove-button">
-                              ×
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Document Info */}
-                    {vehicleDocuments.length > 0 && (
-                      <div className="mt-2 p-2 bg-[var(--surface)] rounded text-xs text-[var(--secondary-foreground)]">
-                        <span className="font-medium">{vehicleDocuments.length} document(s) selected</span>
-                        <span className="ml-2">({(vehicleDocuments.reduce((acc, doc) => acc + doc.size, 0) / 1024).toFixed(1)} KB total)</span>
-                      </div>
-                    )}
-                    <p className="text-xs text-[var(--secondary-foreground)] mt-1">Supported formats: PDF, JPG, PNG, DOC, DOCX (Max size per file: 10MB)</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <Error message={error} />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 justify-end mt-6">
-                  <CustomButton title={edit === 0 ? "Add Vehicle" : "Save Changes"} onClick={editData} className="btn-primary w-full sm:w-auto text-center justify-center flex items-center gap-2" />
-                  <CustomButton title="Cancel" onClick={resetForm} className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] rounded-lg w-full sm:w-auto text-center justify-center" />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* CSV Upload Modal */}
           {csvFileModal && (
@@ -564,13 +270,19 @@ export default function VehiclesPage() {
 
           <Error message={error} />
           {customLoader && <Loader />}
+
           <div className="relative">
-            <div className="absolute right-0 top-0 hidden md:block">
-              <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
-            </div>
-            <div className="block md:hidden mb-3">
-              <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
-            </div>
+            {isAllowed(["add:csv"],session) ? (
+              <>
+                <div className="absolute right-0 top-0 hidden md:block">
+                  <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
+                </div>
+                <div className="block md:hidden mb-3">
+                  <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
+                </div>
+              </>
+            ) : null}
+
             <DataTable
               data={vehicles}
               total={total}
@@ -594,7 +306,7 @@ export default function VehiclesPage() {
                   <th id="status">Status</th>
                   <th id="remarks">Remarks</th>
                   <th id="createdAt">Registered At</th>
-                  <th className="text-right">Actions</th>
+                  {isAllowed(["edit:vehicle"], session) ? <th id="actions">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -624,35 +336,34 @@ export default function VehiclesPage() {
                       <div className="text-sm font-medium text-[var(--foreground)]">{v.auction || "-"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        onClick={() => toggleStatus(v.id)}
-                        className="inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]"
-                      >
-                        {v?.status?.name}
-                      </span>
+                      <span className="inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]">{v?.status?.name}</span>
                     </td>
                     <td className="px-6 py-4 min-w-[100px] max-w-[200px] whitespace-normal">
                       <div className="flex flex-wrap gap-2">
                         <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "-"}</span>
                       </div>
                     </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(v.createdAt).toLocaleString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => loadEdit(v.id)}
-                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteIt(v.id)}
-                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+
+                   {isAllowed(["edit:vehicle"], session) && (
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEditVehicle(v.id)}
+                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteIt(v.id)}
+                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -660,9 +371,6 @@ export default function VehiclesPage() {
           </div>
         </div>
       </Sidebar>
-
-      {/* File Preview Component */}
-      {previewFile && <FilePreviewer url={previewFile.url} fileName={previewFile.fileName} isOpen={true} onClose={() => setPreviewFile(null)} trigger={null} />}
 
       <ConfirmComponent />
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />

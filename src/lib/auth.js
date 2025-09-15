@@ -1,5 +1,4 @@
 import CredentialsProvider from "next-auth/providers/credentials";
-//import { prisma } from "@/lib/db";
 import { prisma } from "@/lib/useful";
 
 export const authOptions = {
@@ -17,7 +16,6 @@ export const authOptions = {
             const permissions=await prisma.permission.findMany({
               select: { name: true },
             });
-            // console.log("Permissions fetched:", permissions.map((p) => p.name));
 
             return {
               id: "1",
@@ -30,8 +28,10 @@ export const authOptions = {
               return null;
             }
 
-           const user = await prisma.user.findUnique({
-              where: { username: credentials?.username },
+           const user = await prisma.user.findFirst({
+              where: { 
+                username: { equals: credentials?.username, mode: "insensitive" }
+              },
               include: {
                 company: { select: { name: true } },
                 roles: {
@@ -52,6 +52,7 @@ export const authOptions = {
 
             const roleNames = user.roles.map((ur) => ur.role.name);
             const userPermissions = user.roles.flatMap((ur) => ur.role.permissions.map((rp) => rp.permission.name));
+            
 
             return {
               id: user.id.toString(),
@@ -91,7 +92,6 @@ export const authOptions = {
         session.user.companyId = token.companyId;
         session.user.permissions = token.permissions;
       }
-      // console.log("session data:", session);
       return session;
     },
   },

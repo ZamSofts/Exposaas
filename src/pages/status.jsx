@@ -40,30 +40,28 @@ export default function StatusPage() {
     }
   };
   const editData = async () => {
-    setCustomLoader(true);
     if (!name.trim()) {
       setError("Status name is required");
       return;
     }
-
+    setCustomLoader(true);
     if (edit === 0) {
       const data = await API("PUT", "status", { name });
       if (data.error) {
         setError(data.error);
+        setCustomLoader(false)
         return;
       }
     } else {
       const data = await API("POST", "status", { id: edit, name });
       if (data.error) {
         setError(data.error);
+        setCustomLoader(false)
         return;
       }
     }
-
+    resetForm()
     loadData();
-    setName("");
-    setEdit(null);
-    setCustomLoader(false);
   };
 
   const loadEdit = async id => {
@@ -71,6 +69,7 @@ export default function StatusPage() {
     const data = await API("GET", `status?id=${id}`);
     if (data.error) {
       setError(data.error);
+      setCustomLoader(false)
       return;
     }
     setName(data.name);
@@ -90,6 +89,7 @@ export default function StatusPage() {
     const data = await API("DELETE", `status?id=${id}`);
     if (data.error) {
       setError(data.error);
+      setCustomLoader(false)
       return;
     }
     loadData();
@@ -148,7 +148,7 @@ export default function StatusPage() {
 
                     <CustomButton
                       title="Cancel"
-                      onClick={() => setEdit(null)}
+                      onClick={() => resetForm()}
                       className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
                     />
                   </div>

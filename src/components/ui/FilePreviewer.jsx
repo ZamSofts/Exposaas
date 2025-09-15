@@ -23,7 +23,7 @@ export function FilePreviewer({ url, fileName, trigger, className = "", isOpen: 
       if (modalRef.current && !modalRef.current.contains(event.target)) {
         // Stop propagation to prevent interfering with parent modals
         event.stopPropagation();
-        event.preventDefault();
+       // event.preventDefault();
         setIsOpen(false);
       }
     };
@@ -198,7 +198,7 @@ export function FilePreviewer({ url, fileName, trigger, className = "", isOpen: 
             // Only close if clicking the backdrop, not the modal content
             if (e.target === e.currentTarget) {
               e.stopPropagation();
-              e.preventDefault();
+              //e.preventDefault();
               setIsOpen(false);
             }
           }}
@@ -354,17 +354,16 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
   };
 
   const handleMouseDown = (e) => {
-    if (zoom > 1) {
-      setIsDragging(true);
-      setDragStart({
-        x: e.clientX - position.x,
-        y: e.clientY - position.y
-      });
-    }
+    // Allow dragging at any zoom level
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
   };
 
   const handleMouseMove = (e) => {
-    if (isDragging && zoom > 1) {
+    if (isDragging) {
       setPosition({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y
@@ -390,7 +389,7 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
   }, [isDragging, dragStart]);
 
   const handleWheel = (e) => {
-    e.preventDefault();
+   //e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setZoom(prev => Math.min(Math.max(prev * delta, 0.1), 5));
     setFitToScreen(false);
@@ -470,7 +469,7 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
         style={{ 
-          cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default'
+          cursor: isDragging ? 'grabbing' : 'grab'
         }}
       >
         <img
@@ -496,7 +495,7 @@ const ImageViewer = ({ url, displayName, setIsLoading, setHasError }) => {
       {imageLoaded && (
         <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2 shadow-lg">
           <div className="text-xs text-[var(--secondary-foreground)] text-center">
-            {zoom > 1 ? 'Drag to pan • ' : ''}Scroll to zoom • Click buttons to control view
+            Drag to pan • Scroll to zoom • Click buttons to control view
           </div>
         </div>
       )}

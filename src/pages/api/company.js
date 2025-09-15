@@ -106,6 +106,17 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
+      // Check if company has users assigned
+      const usersCount = await prisma.user.count({
+        where: { companyId: id },
+      });
+
+      if (usersCount > 0) {
+        return res.status(400).json({
+          error: "Company have users. Please Delete them first",
+        });
+      }
+
       await prisma.company.delete({
         where: { id },
       });

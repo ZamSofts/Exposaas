@@ -114,7 +114,10 @@ const worker = new Worker(
                   create: { name: brandName },
                 });
               }
-              let brandId = brand?.id ?? 1;
+              if( !brand ) {
+                brand = await prisma.brand.findUnique({ where: { name: "-" } });
+              }
+              let brandId = brand?.id;
               await prisma.vehicle.upsert({
                 where: { chassisNumber },
                 update: {
