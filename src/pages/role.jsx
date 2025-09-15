@@ -9,7 +9,7 @@ import PermissionSelector from "@/components/ui/PermissionSelector";
 import { Plus, Edit, Trash2, Shield } from "lucide-react";
 
 export default function Role() {
-  const { session, status } = useAuth(["view:permission"]);
+  const { session, status } = useAuth(["view:role"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
 

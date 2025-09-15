@@ -10,15 +10,10 @@ async function main() {
     "delete:user",
 
     // Role
+    "view:role",
     "edit:role",
     "add:role",
     "delete:role",
-
-    // Company
-    "view:company",
-    "edit:company",
-    "add:company",
-    "delete:company",
 
     // Vehicle
     "view:vehicle",
@@ -26,22 +21,8 @@ async function main() {
     "add:vehicle",
     "delete:vehicle",
 
-    // Brand
-    "edit:brand",
-    "add:brand",
-    "delete:brand",
-
-    // Permission
-    "view:permission",
-    "edit:permission",
-    "delete:permission",
-
     // Add Vehicle (CSV upload)
-    "view:addVehicle",
     "add:csv",
-    "edit:addVehicle",
-    "delete:addVehicle",
-
     // customer
     "view:customer",
     "edit:customer",

@@ -153,9 +153,7 @@ export default function PermissionSelector({
                 <div className="mt-3 grid sm:grid-cols-2 gap-2 text-sm">
                   {filtered.map((p) => {
                     const [action, entity] = p.name.split(":");
-                    const label = `${action.charAt(0).toUpperCase() + action.slice(1)} ${
-                      entity ? entity.charAt(0).toUpperCase() + entity.slice(1) : ""
-                    }`;
+                    const label = `${action.charAt(0).toUpperCase() + action.slice(1)}`;
                     return (
                       <label
                         key={p.id}

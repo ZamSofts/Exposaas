@@ -1,13 +1,31 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Head from "next/head";
 import { useAuth, CustomButton, Error ,Loader as customLoader} from "@/hooks/wrapper";
+import { useRouter } from "next/router";
+import {Loader as CustomLoader} from "@/hooks/wrapper";
+
 import Sidebar from "@/components/Sidebar";
 import { Loader, MessageCircle, Send, Users, Wifi, WifiOff } from "lucide-react";
 
 export default function ChatPage() {
   const { session, status } = useAuth();
+    const router = useRouter();
 
-  // Memoize user info to prevent unnecessary re-renders
+
+
+   useEffect(() => {
+    if (status === "loading") return; // wait until auth is resolved
+
+    if (!session) {
+      router.replace("/");
+      return;
+    }
+
+    if ((session.role).toLowerCase() === "customer") {
+      router.replace("/vehicle");
+    }
+  }, [session, status, router]);
+
   const userInfo = useMemo(
     () => ({
       username: session?.name,
@@ -19,11 +37,11 @@ export default function ChatPage() {
 
   // Don't render anything while loading or if not authenticated
   if (status === "loading") {
-    return <div className="flex justify-center items-center h-screen"></div>;
+    return <CustomLoader />;
   }
 
   if (status !== "authenticated" || !session) {
-    return <div className="flex justify-center items-center h-screen"></div>;
+    return <CustomLoader />;
   }
 
   return <ChatContent userInfo={userInfo} />;

@@ -10,7 +10,7 @@ const PERMISSIONS = {
     DELETE: "delete:user",
   },
   "/api/role": {
-    GET: "",
+    GET: "view:role",
     POST: "edit:role",
     PUT: "add:role",
     DELETE: "delete:role",
@@ -33,29 +33,8 @@ const PERMISSIONS = {
     PUT: "add:customer",
     DELETE: "delete:customer",
   },
-  "/api/brand": {
-    GET: "",
-    POST: "edit:brand",
-    PUT: "add:brand",
-    DELETE: "delete:brand",
-  },
-  "/api/permission": {
-    GET: "view:permission",
-    POST: "edit:permission",
-    PUT: "edit:permission",
-    DELETE: "delete:permission",
-  },
   "/api/addVehicle": {
-    GET: "view:addVehicle",
-    POST: "add:csv",
-    PUT: "edit:addVehicle",
-    DELETE: "delete:addVehicle",
-  },
-  "/api/status": {
-    GET: "",
-    POST: "add:status",
-    PUT: "edit:status",
-    DELETE: "delete:status",
+    POST: "add:csv"
   },
 };
 

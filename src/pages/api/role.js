@@ -53,7 +53,10 @@ export default async function handler(req, res) {
           mode: "insensitive",
         },
         NOT: {
-          name: "customer", // exclude customer role
+          name: {
+            equals: "customer",
+            mode: "insensitive",
+          },
         },
       };
 

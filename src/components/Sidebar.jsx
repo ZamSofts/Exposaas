@@ -140,7 +140,7 @@ const getAllSidebarSections = () => [
         label: "Role Management",
         icon: <Shield size={20} />,
         href: "/role",
-        roles: ["view:permission"],
+        roles: ["view:role"],
        
       },
       {
