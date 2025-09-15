@@ -2,52 +2,52 @@ const { PrismaClient } = require("../src/generated/prisma");
 const prisma = new PrismaClient();
 
 async function main() {
-const permissions = [
-  // User
-  "view:user",
-  "edit:user",
-  "add:user",
-  "delete:user",
+  const permissions = [
+    // User
+    "view:user",
+    "edit:user",
+    "add:user",
+    "delete:user",
 
-  // Role
-  "edit:role",
-  "add:role",
-  "delete:role",
+    // Role
+    "edit:role",
+    "add:role",
+    "delete:role",
 
-  // Company
-  "view:company",
-  "edit:company",
-  "add:company",
-  "delete:company",
+    // Company
+    "view:company",
+    "edit:company",
+    "add:company",
+    "delete:company",
 
-  // Vehicle
-  "view:vehicle",
-  "edit:vehicle",
-  "add:vehicle",
-  "delete:vehicle",
+    // Vehicle
+    "view:vehicle",
+    "edit:vehicle",
+    "add:vehicle",
+    "delete:vehicle",
 
-  // Brand
-  "edit:brand",
-  "add:brand",
-  "delete:brand",
+    // Brand
+    "edit:brand",
+    "add:brand",
+    "delete:brand",
 
-  // Permission
-  "view:permission",
-  "edit:permission",
-  "delete:permission",
+    // Permission
+    "view:permission",
+    "edit:permission",
+    "delete:permission",
 
-  // Add Vehicle (CSV upload)
-  "view:addVehicle",
-  "add:csv",
-  "edit:addVehicle",
-  "delete:addVehicle",
+    // Add Vehicle (CSV upload)
+    "view:addVehicle",
+    "add:csv",
+    "edit:addVehicle",
+    "delete:addVehicle",
 
-  // customer
-  "view:customer",
-  "edit:customer",
-  "add:customer",
-  "delete:customer",
-];
+    // customer
+    "view:customer",
+    "edit:customer",
+    "add:customer",
+    "delete:customer",
+  ];
 
   const VehicleStatus = [
     "In Transit to Yard",
@@ -61,9 +61,9 @@ const permissions = [
     "At Destination Port",
     "Awaiting Customs Clearance",
     "Cleared for Pickup",
-    "Delivered", 
+    "Delivered",
   ];
-  const Brand = ["-","Toyota", "Honda", "Nissan", "Ford", "Chevrolet", "BMW", "Mercedes-Benz", "Audi", "Volkswagen", "Hyundai"];
+  const Brand = ["-", "Toyota", "Honda", "Nissan", "Ford", "Chevrolet", "BMW", "Mercedes-Benz", "Audi", "Volkswagen", "Hyundai"];
   try {
     await prisma.permission.deleteMany();
     await prisma.vehicleStatus.deleteMany();
@@ -75,6 +75,41 @@ const permissions = [
       where: { name: p },
       update: {}, // do nothing if already exists
       create: { name: p },
+    });
+  }
+
+  const vehiclePermission = await prisma.permission.findUnique({
+    where: { name: "view:vehicle" },
+  });
+
+  let customerRole = await prisma.role.findFirst({
+    where: {
+      name: "customer",
+      companyId: null,
+    },
+  });
+
+  if (!customerRole) {
+    customerRole = await prisma.role.create({
+      data: {
+        name: "customer",
+        companyId: null,
+      },
+    });
+  }
+  if (vehiclePermission) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: customerRole.id,
+          permissionId: vehiclePermission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: customerRole.id,
+        permissionId: vehiclePermission.id,
+      },
     });
   }
 

@@ -97,6 +97,7 @@ const getAllSidebarSections = () => [
         label: "Dashboard",
         icon: <LayoutDashboard size={20} />,
         href: "/dashboard",
+        excludeRoles: ["customer"], // Hide from customer
       },
       {
         id: "companies",
@@ -116,7 +117,7 @@ const getAllSidebarSections = () => [
         label: "General Chat",
         icon: <MessageCircle size={20} />,
         href: "/chat",
-        excludeRoles: ["Sadmin"],
+        excludeRoles: ["Sadmin","customer"], // Hide from Sadmin and customer
       },
       {
         id: "user",

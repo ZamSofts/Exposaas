@@ -107,9 +107,9 @@ export default function Role() {
       return;
     }
 
-    // Check if role name is "Sadmin" (case-insensitive)
-    if (name.toLowerCase() === "sadmin") {
-      setError("Role name cannot be 'Sadmin'. This is a reserved system role.");
+    const reserved = ["customer", "sadmin"];
+    if (reserved.includes(name.trim().toLowerCase())) {
+      setError(`Role name cannot be '${name}'. This is a reserved system role.`);
       return;
     }
 

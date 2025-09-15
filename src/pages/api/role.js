@@ -2,7 +2,7 @@ import { prisma, getSession } from "@/lib/useful";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
-/*   if (!["Sadmin", "Admin"].includes(session.role)) {
+  /*   if (!["Sadmin", "Admin"].includes(session.role)) {
     return res.status(403).json({ error: "Only administrators can view users" });
   } */
 
@@ -14,13 +14,10 @@ export default async function handler(req, res) {
     .toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
   const col = req.query.col ? String(req.query.col).split(",") : null;
-  const selectFields =
-    col && col.length > 0
-      ? Object.fromEntries(col.map((c) => [c, true]))
-      : undefined;
+  const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
 
   try {
-    if (req.method === "GET") {      
+    if (req.method === "GET") {
       // LoadEdit
       if (id) {
         const role = await prisma.role.findUnique({
@@ -34,7 +31,7 @@ export default async function handler(req, res) {
 
         const formattedRole = {
           ...role,
-          permissions: role.permissions.map((p) => p.permissionId),
+          permissions: role.permissions.map(p => p.permissionId),
         };
 
         return res.status(200).json(formattedRole);
@@ -54,6 +51,9 @@ export default async function handler(req, res) {
         name: {
           contains: search,
           mode: "insensitive",
+        },
+        NOT: {
+          name: "customer", // exclude customer role
         },
       };
 
@@ -88,9 +88,9 @@ export default async function handler(req, res) {
       ]);
 
       // Flatten permissions for all roles
-      const formattedRoles = role.map((r) => ({
+      const formattedRoles = role.map(r => ({
         ...r,
-        permissions: r.permissions.map((p) => p.permissionId),
+        permissions: r.permissions.map(p => p.permissionId),
       }));
 
       res.status(200).json({ role: formattedRoles, total });
@@ -102,26 +102,26 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Name is required" });
       }
       if (!Array.isArray(permissions) || permissions.length === 0) {
-        return res
-          .status(400)
-          .json({ error: "At least one permission is required" });
+        return res.status(400).json({ error: "At least one permission is required" });
       }
 
-      // Check if role name is "Sadmin" (case-insensitive)
-      if (name.toLowerCase() === "sadmin") {
-        return res.status(400).json({ error: "Role name cannot be 'Sadmin'. This is a reserved system role." });
+      const reserved = ["customer", "sadmin"];
+      if (reserved.includes(name.trim().toLowerCase())) {
+        setError(`Role name cannot be '${name}'. This is a reserved system role.`);
+        return;
       }
 
       // Check for duplicate role name within the same scope (company or global) - case insensitive
-      const whereClause = companyId === undefined || companyId === null
-        ? { 
-            name: { equals: name, mode: "insensitive" }, 
-            companyId: null 
-          } 
-        : { 
-            name: { equals: name, mode: "insensitive" }, 
-            companyId 
-          };
+      const whereClause =
+        companyId === undefined || companyId === null
+          ? {
+              name: { equals: name, mode: "insensitive" },
+              companyId: null,
+            }
+          : {
+              name: { equals: name, mode: "insensitive" },
+              companyId,
+            };
 
       const d = await prisma.role.findFirst({
         where: whereClause,
@@ -130,13 +130,13 @@ export default async function handler(req, res) {
       if (d) {
         return res.status(409).json({ error: "Role already exists" });
       }
-      
+
       await prisma.role.create({
         data: {
           name,
           companyId: companyId || null, // null for global roles
           permissions: {
-            create: permissions.map((permissionId) => ({
+            create: permissions.map(permissionId => ({
               permissionId,
             })),
           },
@@ -148,21 +148,20 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { id, name, permissions } = req.body; // permissions = [7, 3, ...] - removed companyId
-
+      const { id, name, permissions } = req.body;
       if (name === "") {
         return res.status(400).json({ error: "Name is required" });
       }
-
-      // Check if role name is "Sadmin" (case-insensitive)
-      if (name.toLowerCase() === "sadmin") {
-        return res.status(400).json({ error: "Role name cannot be 'Sadmin'. This is a reserved system role." });
+      const reserved = ["customer", "sadmin"];
+      if (reserved.includes(name.trim().toLowerCase())) {
+        setError(`Role name cannot be '${name}'. This is a reserved system role.`);
+        return;
       }
 
       // Get the existing role to check within the same scope (preserve original companyId)
       const existingRole = await prisma.role.findUnique({
         where: { id },
-        select: { companyId: true }
+        select: { companyId: true },
       });
 
       if (!existingRole) {
@@ -185,24 +184,22 @@ export default async function handler(req, res) {
       const whereClause = {
         name: { equals: name, mode: "insensitive" },
         companyId: existingRole.companyId, // Use the existing role's companyId
-        id: { not: id }
+        id: { not: id },
       };
 
       const d = await prisma.role.findFirst({
         where: whereClause,
       });
       if (d) {
-        return res
-          .status(409)
-          .json({ error: "Role name already exists in this scope", d, id });
+        return res.status(409).json({ error: "Role name already exists in this scope", d, id });
       }
 
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async tx => {
         // Update only role name - preserve original companyId
         await tx.role.update({
           where: { id },
-          data: { 
-            name
+          data: {
+            name,
             // DO NOT update companyId - preserve original ownership
           },
         });
@@ -215,13 +212,11 @@ export default async function handler(req, res) {
             select: { permissionId: true },
           });
 
-          const existingIds = existing.map((p) => p.permissionId).sort();
+          const existingIds = existing.map(p => p.permissionId).sort();
           const newIds = [...permissions].sort();
 
           // Compare arrays
-          const isSame =
-            existingIds.length === newIds.length &&
-            existingIds.every((val, idx) => val === newIds[idx]);
+          const isSame = existingIds.length === newIds.length && existingIds.every((val, idx) => val === newIds[idx]);
 
           // Only update if they differ
           if (!isSame) {
@@ -231,7 +226,7 @@ export default async function handler(req, res) {
 
             if (newIds.length > 0) {
               await tx.rolePermission.createMany({
-                data: newIds.map((pid) => ({
+                data: newIds.map(pid => ({
                   roleId: id,
                   permissionId: pid,
                 })),
@@ -252,7 +247,7 @@ export default async function handler(req, res) {
       // Get the existing role to check permissions
       const existingRole = await prisma.role.findUnique({
         where: { id: Number(id) },
-        select: { companyId: true, name: true }
+        select: { companyId: true, name: true },
       });
 
       if (!existingRole) {

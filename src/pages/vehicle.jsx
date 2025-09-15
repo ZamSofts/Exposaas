@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, CustomButton, Toast, Loader ,EditVehicle} from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, CustomButton, Toast, Loader, EditVehicle } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
@@ -20,7 +20,7 @@ export default function VehiclesPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const [edit, setEdit] = useState(null);
-  
+
   // View management
   const [currentView, setCurrentView] = useState("list"); // "list" or "form"
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
@@ -183,7 +183,7 @@ export default function VehiclesPage() {
     setCurrentView("form");
   };
 
-  const handleEditVehicle = (vehicleId) => {
+  const handleEditVehicle = vehicleId => {
     setSelectedVehicleId(vehicleId);
     setCurrentView("form");
   };
@@ -200,13 +200,7 @@ export default function VehiclesPage() {
 
   // If we're in form view, render the VehicleForm component
   if (currentView === "form") {
-    return (
-      <EditVehicle
-        vehicleId={selectedVehicleId}
-        onBack={handleBackToList}
-        onSuccess={handleFormSuccess}
-      />
-    );
+    return <EditVehicle vehicleId={selectedVehicleId} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
   }
 
   return (
@@ -224,7 +218,7 @@ export default function VehiclesPage() {
               </div>
               <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicles Management</h1>
             </div>
-            <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
+            {session?.role === "customer" ? null : <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} />}
           </div>
 
           {/* CSV Upload Modal */}
@@ -279,13 +273,24 @@ export default function VehiclesPage() {
 
           <Error message={error} />
           {customLoader && <Loader />}
+           
           <div className="relative">
-            <div className="absolute right-0 top-0 hidden md:block">
+
+             {session?.role === "customer" ? null : (
+              <>
+               <div className="absolute right-0 top-0 hidden md:block">
               <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
             </div>
             <div className="block md:hidden mb-3">
               <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
+
             </div>
+            </>
+             )}
+           
+
+
+
             <DataTable
               data={vehicles}
               total={total}
@@ -309,7 +314,9 @@ export default function VehiclesPage() {
                   <th id="status">Status</th>
                   <th id="remarks">Remarks</th>
                   <th id="createdAt">Registered At</th>
-                  <th className="text-right">Actions</th>
+                  {session?.role === "customer" ? null : (
+                    <th id="actions">Actions</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -340,7 +347,7 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        onClick={() => toggleStatus(v.id)}
+                        
                         className="inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]"
                       >
                         {v?.status?.name}
@@ -351,7 +358,14 @@ export default function VehiclesPage() {
                         <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "-"}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(v.createdAt).toLocaleString()}</td>
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
+                      {new Date(v.createdAt).toLocaleString()}
+
+
+                    </td>
+
+                    {session?.role === "customer" ? null : (
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -368,6 +382,7 @@ export default function VehiclesPage() {
                         </button>
                       </div>
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

@@ -4,24 +4,23 @@ export default async function handler(req, res) {
   // Session is GUARANTEED to exist because middleware already checked it
   // and would have returned 401 if not authenticated
   const session = await getSession(req, res);
-  
+
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
-  const search = String(req.query.search || "").trim().toLowerCase();
+  const search = String(req.query.search || "")
+    .trim()
+    .toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
   const col = req.query.col ? String(req.query.col).split(",") : null;
-  const selectFields =col && col.length > 0? Object.fromEntries(col.map((c) => [c, true])): undefined;
+  const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
 
   try {
     if (req.method === "GET") {
-
-
       const userCompanyId = session?.companyId;
 
       // filter depends on role
-      const filterByCompany =
-        session.role === "Sadmin" ? {} : { companyId: userCompanyId };
+      const filterByCompany = session.role === "Sadmin" ? {} : { companyId: userCompanyId };
 
       // ---- Load single user ----
       if (id) {
@@ -33,15 +32,12 @@ export default async function handler(req, res) {
           },
         });
 
-        if (
-          !user ||
-          (session.role !== "Sadmin" && user.companyId !== userCompanyId)
-        ) {
+        if (!user || (session.role !== "Sadmin" && user.companyId !== userCompanyId)) {
           return res.status(404).json({ error: "User not found" });
         }
         const rolesnames = await prisma.role.findMany({
-          where: { id: { in: user.roles.map((r) => r.roleId) } },
-          select: {id:true, name: true },
+          where: { id: { in: user.roles.map(r => r.roleId) } },
+          select: { id: true, name: true },
         });
         return res.status(200).json({
           id: user.id,
@@ -49,8 +45,8 @@ export default async function handler(req, res) {
           password: user.password,
           companyId: user.companyId,
           createdAt: user.createdAt,
-          rolesId: user.roles.map((r) => r.roleId),
-          rolesnames: user.roles.map( (r) =>rolesnames.find((role) => role.id === r.roleId)?.name || "Unknown" ),
+          rolesId: user.roles.map(r => r.roleId),
+          rolesnames: user.roles.map(r => rolesnames.find(role => role.id === r.roleId)?.name || "Unknown"),
           company: user.company,
         });
       }
@@ -62,31 +58,29 @@ export default async function handler(req, res) {
         if (session.role !== "Sadmin") {
           // Get Admin role IDs
           const adminRoles = await prisma.role.findMany({
-            where: { 
-              name: { 
+            where: {
+              name: {
                 contains: "admin",
-                mode: "insensitive"
-              }
+                mode: "insensitive",
+              },
             },
-            select: { id: true }
+            select: { id: true },
           });
-          
+
           // Check if current user is an admin
           const currentUserData = await prisma.user.findUnique({
             where: { id: Number(session.id) },
             include: {
               roles: {
                 include: {
-                  role: { select: { id: true, name: true } }
-                }
-              }
-            }
+                  role: { select: { id: true, name: true } },
+                },
+              },
+            },
           });
 
-          const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => 
-            adminRoles.some(adminRole => adminRole.id === userRole.roleId)
-          );
-          
+          const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => adminRoles.some(adminRole => adminRole.id === userRole.roleId));
+
           if (adminRoles.length > 0) {
             if (isCurrentUserAdmin) {
               // Admin users: Show other admins + non-admins (show everyone in their company)
@@ -96,9 +90,9 @@ export default async function handler(req, res) {
               roleFilter = {
                 roles: {
                   none: {
-                    roleId: { in: adminRoles.map(role => role.id) }
-                  }
-                }
+                    roleId: { in: adminRoles.map(role => role.id) },
+                  },
+                },
               };
             }
           }
@@ -113,52 +107,48 @@ export default async function handler(req, res) {
             ...filterByCompany,
             ...roleFilter,
             username: { not: session.name },
-            
           },
           orderBy: { [sortBy]: sortOrder },
         });
 
-      
-        const formatted = users.map((u) => ({
+        const formatted = users.map(u => ({
           ...u,
-          rolesId: u.roles.map((r) => r.roleId),
+          rolesId: u.roles.map(r => r.roleId),
         }));
 
         return res.status(200).json(formatted);
       }
 
       // ---- All with pagination ----
-      
+
       // Additional filter to hide Admin users based on user role
       let roleFilter = {};
       if (session.role !== "Sadmin") {
         // Get Admin role IDs
         const adminRoles = await prisma.role.findMany({
-          where: { 
-            name: { 
+          where: {
+            name: {
               contains: "admin",
-              mode: "insensitive"
-            }
+              mode: "insensitive",
+            },
           },
-          select: { id: true }
+          select: { id: true },
         });
-        
+
         // Check if current user is an admin
         const currentUserData = await prisma.user.findUnique({
           where: { id: Number(session.id) },
           include: {
             roles: {
               include: {
-                role: { select: { id: true, name: true } }
-              }
-            }
-          }
+                role: { select: { id: true, name: true } },
+              },
+            },
+          },
         });
 
-        const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => 
-          adminRoles.some(adminRole => adminRole.id === userRole.roleId)
-        );
-        
+        const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => adminRoles.some(adminRole => adminRole.id === userRole.roleId));
+
         if (adminRoles.length > 0) {
           if (isCurrentUserAdmin) {
             // Admin users: Show other admins + non-admins (show everyone in their company)
@@ -168,9 +158,9 @@ export default async function handler(req, res) {
             roleFilter = {
               roles: {
                 none: {
-                  roleId: { in: adminRoles.map(role => role.id) }
-                }
-              }
+                  roleId: { in: adminRoles.map(role => role.id) },
+                },
+              },
             };
           }
         }
@@ -187,7 +177,7 @@ export default async function handler(req, res) {
             username: {
               contains: search,
               mode: "insensitive",
-              not: session.name
+              not: session.name,
             },
           },
           include: {
@@ -199,27 +189,24 @@ export default async function handler(req, res) {
           where: {
             ...filterByCompany,
             ...roleFilter,
-            username: { contains: search, mode: "insensitive" ,not: session.name},
+            username: { contains: search, mode: "insensitive", not: session.name },
           },
         }),
       ]);
       const rolesnames = await prisma.role.findMany({
         where: {
-          id: { in: users.flatMap((u) => u.roles.map((r) => r.roleId)) },
+          id: { in: users.flatMap(u => u.roles.map(r => r.roleId)) },
         },
         select: { id: true, name: true },
       });
-      const formatted = users.map((u) => ({
+      const formatted = users.map(u => ({
         id: u.id,
         username: u.username,
         password: u.password,
         companyId: u.companyId,
         createdAt: u.createdAt,
-        rolesId: u.roles.map((r) => r.roleId),
-        rolesnames: u.roles.map(
-          (r) =>
-            rolesnames.find((role) => role.id === r.roleId)?.name || "Unknown"
-        ),
+        rolesId: u.roles.map(r => r.roleId),
+        rolesnames: u.roles.map(r => rolesnames.find(role => role.id === r.roleId)?.name || "Unknown"),
         company: u.company,
       }));
 
@@ -237,8 +224,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Company is required" });
       }
       const d = await prisma.user.findFirst({
-        where: { 
-          username: { equals: username, mode: "insensitive" }
+        where: {
+          username: { equals: username, mode: "insensitive" },
         },
         select: { username: true },
       });
@@ -251,7 +238,7 @@ export default async function handler(req, res) {
           password,
           companyId: Number(companyId),
           roles: {
-            create: rolesId.map((roleId) => ({ roleId })),
+            create: rolesId.map(roleId => ({ roleId })),
           },
         },
         include: {
@@ -265,10 +252,6 @@ export default async function handler(req, res) {
       });
     }
 
-
-
-
-
     if (req.method === "POST") {
       const { id, username, password, companyId, rolesId } = req.body;
       if (!username) {
@@ -281,9 +264,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Company is required" });
       }
       const d = await prisma.user.findFirst({
-        where: { 
-          username: { equals: username, mode: "insensitive" }, 
-          id: { not: id } 
+        where: {
+          username: { equals: username, mode: "insensitive" },
+          id: { not: id },
         },
       });
       if (d) {
@@ -308,18 +291,16 @@ export default async function handler(req, res) {
           select: { roleId: true },
         });
 
-        const existingRoleIds = existingRoles.map((r) => r.roleId).sort();
+        const existingRoleIds = existingRoles.map(r => r.roleId).sort();
         const newRoleIds = [...rolesId].sort();
 
-        const rolesChanged =
-          existingRoleIds.length !== newRoleIds.length ||
-          existingRoleIds.some((r, idx) => r !== newRoleIds[idx]);
+        const rolesChanged = existingRoleIds.length !== newRoleIds.length || existingRoleIds.some((r, idx) => r !== newRoleIds[idx]);
 
         if (rolesChanged) {
           transactionOps.push(
             prisma.userRole.deleteMany({ where: { userId: id } }),
             prisma.userRole.createMany({
-              data: rolesId.map((roleId) => ({
+              data: rolesId.map(roleId => ({
                 userId: id,
                 roleId,
               })),
@@ -335,19 +316,31 @@ export default async function handler(req, res) {
     if (req.method === "DELETE") {
       const { id } = req.query;
       const userId = Number(id);
-      
-      // Delete all associated data in the correct order
+
+      const customer = await prisma.customer.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (customer) {
+        const vehicleCount = await prisma.vehicle.count({ where: { customerId: customer.id } });
+        if (vehicleCount > 0) {
+          return res.status(400).json({ error: `Cannot delete customer. ${vehicleCount} vehicle(s) are still associated with this customer. Please reassign or remove the vehicles first.` });
+        }
+      }
+
       await prisma.$transaction([
         // Delete user roles first
         prisma.userRole.deleteMany({ where: { userId } }),
-        
+
         // Delete all chat messages associated with this user
         prisma.chatMessage.deleteMany({ where: { userId } }),
-        
+
+        prisma.customer.deleteMany({ where: { userId } }),
+
         // Finally delete the user
-        prisma.user.delete({ where: { id: userId } })
+        prisma.user.delete({ where: { id: userId } }),
       ]);
-      
+
       res.status(200).json({
         message: "User and all associated data deleted successfully",
       });

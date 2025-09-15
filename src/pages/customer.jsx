@@ -3,15 +3,17 @@ import Head from "next/head";
 import { useConfirm, useAuth, Error, API, CustomButton, Loader, Toast } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
-import { Plus, Edit, Trash2, UserCheck, Building } from "lucide-react";
+import { Plus, Edit, Trash2, UserCheck, Building, EyeOff, Eye } from "lucide-react";
 
 export default function Customers() {
-  const { session} = useAuth(["view:customer"]);
+  const { session } = useAuth(["view:customer"]);
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [customers, setCustomers] = useState([]);
 
   const [name, setName] = useState("");
+  const [username, setUserName] = useState("");
+  const [password, setPassword] = useState("");
   const [country, setCountry] = useState("");
   const [uniqueId, setUniqueId] = useState("");
 
@@ -20,6 +22,8 @@ export default function Customers() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [visiblePasswords, setVisiblePasswords] = useState([]);
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
   // Pagination and search states
@@ -36,12 +40,9 @@ export default function Customers() {
     loadData();
   }, [currentPage, perPage, search, sortBy, sortOrder]);
 
-
-
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
   };
-  
 
   const loadData = async () => {
     setIsLoading(true);
@@ -85,11 +86,23 @@ export default function Customers() {
       name: name.trim(),
       country: country.trim() || null,
       uniqueId: uniqueId.trim(),
+      username: username.trim(),
+      password: password,
       companyId: Number(session?.companyId),
     };
 
-    if (!newCustomer.name || !newCustomer.uniqueId || !newCustomer.companyId) {
-      setError(!newCustomer.name ? "Customer name is required" : !newCustomer.uniqueId ? "Unique ID is required" : "Please select a company");
+    if (!newCustomer.username || !newCustomer.name || !newCustomer.password || !newCustomer.uniqueId || !newCustomer.companyId) {
+      setError(
+        !newCustomer.username
+          ? "Username is required"
+          : !newCustomer.name
+          ? "Customer name is required"
+          : !newCustomer.password
+          ? "Password is required"
+          : !newCustomer.uniqueId
+          ? "Unique ID is required"
+          : "Please select a company"
+      );
       return;
     }
 
@@ -127,8 +140,10 @@ export default function Customers() {
     }
     setIsLoading(false);
     setName(data.name);
+    setUserName(data.username || "");
     setCountry(data.country || "");
     setUniqueId(data.uniqueId);
+    setPassword(data.password || "");
     setEdit(id);
     setCustomLoader(false);
   };
@@ -159,6 +174,8 @@ export default function Customers() {
     setName("");
     setCountry("");
     setUniqueId("");
+    setUserName("");
+    setPassword("");
     setError("");
     setEdit(null);
     setCustomLoader(false);
@@ -197,7 +214,7 @@ export default function Customers() {
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New Customer" : "Edit Customer"}</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2">Customer Name *</label>
+                    <label className="input-label">Name *</label>
                     <input
                       type="text"
                       value={name}
@@ -211,8 +228,24 @@ export default function Customers() {
                       className="input-style"
                       autoFocus
                     />
+                    <label className="input-label">Username</label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={e => setUserName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") {
+                          editData();
+                        }
+                      }}
+                      placeholder="Enter user name..."
+                      className="input-style"
+                      autoFocus
+                    />
 
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2 mt-4">Unique ID *</label>
+                  
+
+                    <label className="input-label">Unique ID *</label>
                     <input
                       type="text"
                       value={uniqueId}
@@ -226,7 +259,7 @@ export default function Customers() {
                       className="input-style"
                     />
 
-                    <label className="block text-sm font-medium text-[var(--secondary-foreground)] mb-2 mt-4">Country</label>
+                    <label className="input-label">Country</label>
                     <input
                       type="text"
                       value={country}
@@ -239,6 +272,29 @@ export default function Customers() {
                       placeholder="Enter country (optional)..."
                       className="input-style"
                     />
+                      <label className="input-label">Password</label>
+                    <div className="relative w-full">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") {
+                            editData();
+                          }
+                        }}
+                        placeholder="Enter password..."
+                        className="input-style"
+                        autoFocus
+                      />
+
+                      {/* Eye Icon */}
+                      <CustomButton
+                        title={showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300"
+                      />
+                    </div>
                   </div>
                   <Error message={error} />
                   <div className="flex gap-3">
@@ -279,7 +335,6 @@ export default function Customers() {
                 </div>
               </div>
             </div>
-            
           </div>
           <Error message={error} />
           {customLoader && <Loader />}
@@ -301,7 +356,7 @@ export default function Customers() {
             <thead className="bg-[var(--secondary)]">
               <tr>
                 <th id="id">ID</th>
-                <th id="name">Customer Name</th>
+                <th id="name">Name</th>
                 <th id="uniqueId">Unique ID</th>
                 <th id="country">Country</th>
                 <th>Vehicles</th>
@@ -335,12 +390,14 @@ export default function Customers() {
                       <span className="text-sm text-[var(--foreground)]">{customer.country || "-"}</span>
                     </div>
                   </td>
-                  
+
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <Building className="w-4 h-4 text-[var(--secondary-foreground)]" />
                       <span className="text-sm font-medium text-[var(--foreground)]">{customer.vehicleCount || 0}</span>
-                      {customer.vehicleCount > 0 && <span className={`inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]`}>Active</span>}
+                      {customer.vehicleCount > 0 && (
+                        <span className={`inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]`}>Active</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(customer.createdAt).toLocaleString("en-GB")}</td>

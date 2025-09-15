@@ -67,11 +67,14 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       const [brandData, statusData, customerData] = await Promise.all([
         API("GET", "brand"), 
         API("GET", "vehicleStatus"),
-        API("GET", "customer?col=id,name")
+        API("GET", "customer?col=id,name,uniqueId")
       ]);
       setBrand(!brandData.error ? brandData : []);
       setVehicleStatus(!statusData.error ? statusData : []);
-      setCustomers(!customerData.error ? customerData : []);
+      setCustomers(!customerData.error ? customerData.map(c => ({
+        id: c.id,
+        name: c.name + "-" + c.uniqueId ,
+      })) : []);
     } catch {
       setError("Something went wrong");
     } finally {
