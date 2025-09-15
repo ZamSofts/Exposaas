@@ -1,5 +1,4 @@
 import CredentialsProvider from "next-auth/providers/credentials";
-//import { prisma } from "@/lib/db";
 import { prisma } from "@/lib/useful";
 
 export const authOptions = {
@@ -17,7 +16,6 @@ export const authOptions = {
             const permissions=await prisma.permission.findMany({
               select: { name: true },
             });
-            // console.log("Permissions fetched:", permissions.map((p) => p.name));
 
             return {
               id: "1",
@@ -94,7 +92,6 @@ export const authOptions = {
         session.user.companyId = token.companyId;
         session.user.permissions = token.permissions;
       }
-      // console.log("session data:", session);
       return session;
     },
   },

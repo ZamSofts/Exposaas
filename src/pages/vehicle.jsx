@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, CustomButton, Toast, Loader, EditVehicle } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
@@ -20,10 +20,7 @@ export default function VehiclesPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const [edit, setEdit] = useState(null);
-
-  // View management
-  const [currentView, setCurrentView] = useState("list"); // "list" or "form"
-  const [selectedVehicleId, setSelectedVehicleId] = useState(null);
+  const [currentView, setCurrentView] = useState("list");
 
   // Modal refs for click outside
   const csvModalRef = useRef(null);
@@ -179,18 +176,18 @@ export default function VehiclesPage() {
 
   // View management functions
   const handleAddVehicle = () => {
-    setSelectedVehicleId(0); // 0 for new vehicle
+    setEdit(0); // 0 for new vehicle
     setCurrentView("form");
   };
 
   const handleEditVehicle = vehicleId => {
-    setSelectedVehicleId(vehicleId);
+    setEdit(vehicleId);
     setCurrentView("form");
   };
 
   const handleBackToList = () => {
     setCurrentView("list");
-    setSelectedVehicleId(null);
+    setEdit(null);
     loadData(); // Refresh the list
   };
 
@@ -200,7 +197,7 @@ export default function VehiclesPage() {
 
   // If we're in form view, render the VehicleForm component
   if (currentView === "form") {
-    return <EditVehicle vehicleId={selectedVehicleId} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
+    return <EditVehicle vehicleId={edit} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
   }
 
   return (
@@ -218,7 +215,7 @@ export default function VehiclesPage() {
               </div>
               <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicles Management</h1>
             </div>
-            {session?.role === "customer" ? null : <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} />}
+            {isAllowed(["add:vehicle"], session) ? <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} /> : null}
           </div>
 
           {/* CSV Upload Modal */}
@@ -273,23 +270,18 @@ export default function VehiclesPage() {
 
           <Error message={error} />
           {customLoader && <Loader />}
-           
+
           <div className="relative">
-
-             {session?.role === "customer" ? null : (
+            {isAllowed(["add:csv"],session) ? (
               <>
-               <div className="absolute right-0 top-0 hidden md:block">
-              <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
-            </div>
-            <div className="block md:hidden mb-3">
-              <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
-
-            </div>
-            </>
-             )}
-           
-
-
+                <div className="absolute right-0 top-0 hidden md:block">
+                  <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
+                </div>
+                <div className="block md:hidden mb-3">
+                  <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
+                </div>
+              </>
+            ) : null}
 
             <DataTable
               data={vehicles}
@@ -314,9 +306,7 @@ export default function VehiclesPage() {
                   <th id="status">Status</th>
                   <th id="remarks">Remarks</th>
                   <th id="createdAt">Registered At</th>
-                  {session?.role === "customer" ? null : (
-                    <th id="actions">Actions</th>
-                  )}
+                  {isAllowed(["edit:vehicle"], session) ? <th id="actions">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -346,42 +336,33 @@ export default function VehiclesPage() {
                       <div className="text-sm font-medium text-[var(--foreground)]">{v.auction || "-"}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        
-                        className="inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]"
-                      >
-                        {v?.status?.name}
-                      </span>
+                      <span className="inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]">{v?.status?.name}</span>
                     </td>
                     <td className="px-6 py-4 min-w-[100px] max-w-[200px] whitespace-normal">
                       <div className="flex flex-wrap gap-2">
                         <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "-"}</span>
                       </div>
                     </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                      {new Date(v.createdAt).toLocaleString()}
 
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(v.createdAt).toLocaleString()}</td>
 
-                    </td>
-
-                    {session?.role === "customer" ? null : (
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => handleEditVehicle(v.id)}
-                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteIt(v.id)}
-                          className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+                   {isAllowed(["edit:vehicle"], session) && (
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEditVehicle(v.id)}
+                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteIt(v.id)}
+                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     )}
                   </tr>
                 ))}

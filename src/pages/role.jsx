@@ -4,6 +4,8 @@ import { useRouter } from "next/router";
 import { useConfirm, useAuth, Error, API, MultiSelect, CustomButton, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
+import PermissionSelector from "@/components/ui/PermissionSelector";
+
 import { Plus, Edit, Trash2, Shield } from "lucide-react";
 
 export default function Role() {
@@ -116,23 +118,17 @@ export default function Role() {
     setcustomLoader(true);
 
     // Use all permissions if Full Access is enabled
-    const finalPermissions = isFullAccess 
-      ? static_permissions.map(permission => permission.id)
-      : permissions;
+    const finalPermissions = isFullAccess ? static_permissions.map(permission => permission.id) : permissions;
 
     // Build payload based on operation type
     let payload;
     if (edit === 0) {
-      // Creating new role - include companyId based on user role
       if (session?.role === "Sadmin") {
-        // Sadmin creates global roles (no companyId)
         payload = { name, permissions: finalPermissions };
       } else {
-        // Company users create company-specific roles (with their companyId)
         payload = { name, permissions: finalPermissions, companyId: session?.companyId };
       }
     } else {
-      // Editing existing role - NEVER change companyId, preserve original ownership
       payload = { id: edit, name, permissions: finalPermissions };
     }
 
@@ -162,12 +158,11 @@ export default function Role() {
 
     setName(role.name);
     setPermission(role.permissions);
-    
+
     // Check if this role has all permissions (Full Access)
-    const hasAllPermissions = static_permissions.length > 0 && 
-      static_permissions.every(permission => role.permissions.includes(permission.id));
+    const hasAllPermissions = static_permissions.length > 0 && static_permissions.every(permission => role.permissions.includes(permission.id));
     setIsFullAccess(hasAllPermissions);
-    
+
     setEdit(id);
     setcustomLoader(false);
   };
@@ -205,9 +200,6 @@ export default function Role() {
     if (session?.role === "Sadmin") {
       return true;
     }
-
-    // Company users can only edit roles that belong to their company
-    // Global roles (companyId === null) are created by Sadmin and cannot be edited by company users
     return role.companyId !== null && role.companyId === session?.companyId;
   };
 
@@ -223,7 +215,7 @@ export default function Role() {
   };
 
   // Handle Full Access toggle
-  const handleFullAccessToggle = (checked) => {
+  const handleFullAccessToggle = checked => {
     setIsFullAccess(checked);
     if (checked) {
       // Select all permissions
@@ -235,12 +227,11 @@ export default function Role() {
   };
 
   // Handle individual permission changes
-  const handlePermissionChange = (selectedPermissions) => {
+  const handlePermissionChange = selectedPermissions => {
     setPermission(selectedPermissions);
-    
+
     // Check if all permissions are selected
-    const allSelected = static_permissions.length > 0 && 
-      static_permissions.every(permission => selectedPermissions.includes(permission.id));
+    const allSelected = static_permissions.length > 0 && static_permissions.every(permission => selectedPermissions.includes(permission.id));
     setIsFullAccess(allSelected);
   };
   return (
@@ -269,12 +260,11 @@ export default function Role() {
           {/* Add User Modal/Form */}
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div 
-                className={`bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md relative transition-all duration-300 ${
-                  isDropdownOpen 
-                    ? 'min-h-[600px] max-h-[80vh] overflow-visible' 
-                    : 'max-h-[90vh] overflow-y-auto'
-                }`}
+              <div
+                className={`bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full 
+    max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-2xl 
+    relative transition-all duration-300
+    ${isDropdownOpen ? "min-h-[600px] max-h-[80vh] overflow-visible" : "max-h-[90vh] overflow-y-auto"}`}
               >
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">{edit === 0 ? "Add New Role" : "Edit Role"}</h3>
                 <div className="space-y-4">
@@ -302,35 +292,11 @@ export default function Role() {
                   </div>
 
                   <div className="relative z-[60]">
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="input-label">Select Permissions</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="fullAccess"
-                          checked={isFullAccess}
-                          onChange={(e) => handleFullAccessToggle(e.target.checked)}
-                          className="input-label"
-                        />
-                        <label htmlFor="fullAccess" className="input-label">
-                          Full Access
-                        </label>
-                      </div>
-                    </div>
-                    <MultiSelect 
-                      roles={static_permissions} 
-                      rolesId={permissions} 
-                      setRolesId={handlePermissionChange}
-                      onDropdownToggle={setIsDropdownOpen}
-                      placeholder={isFullAccess ? "All permissions selected" : "Select permissions..."}
-                    />
-                    {isFullAccess && (
-                      <p className="text-xs text-[var(--primary)] mt-1 flex items-center gap-1">
-                        Full access enabled - all permissions will be granted
-                      </p>
-                    )}
+                    <label className="input-label">Select Permissions</label>
+                    <PermissionSelector static_permissions={static_permissions} permissions={permissions} setPermission={setPermission} isFullAccess={isFullAccess} setIsFullAccess={setIsFullAccess} />
+                    {isFullAccess && <p className="text-xs text-[var(--primary)] mt-1 flex items-center gap-1">Full access enabled - all permissions will be granted</p>}
                   </div>
-                  
+
                   <Error message={error} />
 
                   <div className="flex gap-3 pt-4">

@@ -3,7 +3,7 @@ import Head from "next/head";
 import { useConfirm, useAuth, Error, API, CustomButton, Loader, Toast } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
-import { Plus, Edit, Trash2, UserCheck, Building, EyeOff, Eye } from "lucide-react";
+import { Plus, Edit, Trash2, UserCheck, Building, EyeOff, Eye,Car } from "lucide-react";
 
 export default function Customers() {
   const { session } = useAuth(["view:customer"]);
@@ -331,7 +331,7 @@ export default function Customers() {
                   <p className="text-2xl font-bold text-[var(--foreground)]">{isLoading ? "..." : customers.filter(c => c.vehicleCount > 0).length}</p>
                 </div>
                 <div className="p-3 bg-green-500/10 rounded-lg">
-                  <Building className="w-6 h-6 text-green-500" />
+                  <Car className="w-6 h-6 text-green-500" />
                 </div>
               </div>
             </div>
@@ -393,7 +393,7 @@ export default function Customers() {
 
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <Building className="w-4 h-4 text-[var(--secondary-foreground)]" />
+                      <Car className="w-4 h-4 text-[var(--secondary-foreground)]" />
                       <span className="text-sm font-medium text-[var(--foreground)]">{customer.vehicleCount || 0}</span>
                       {customer.vehicleCount > 0 && (
                         <span className={`inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]`}>Active</span>

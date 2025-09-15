@@ -153,7 +153,7 @@ export default async function handler(req, res) {
       case "GET": {
         // Single vehicle
 
-        if (session.role === "customer") {
+        if (session.role?.toLowerCase() === "customer") {
           const customerid = await prisma.customer.findUnique({ where: { userId: Number(session.id) }, select: { id: true } });
           userFilter.customerId = customerid?.id;
         }

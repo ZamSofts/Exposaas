@@ -155,9 +155,15 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: "Access denied: Cannot create customer for different company" });
       }
       const customerRole = await prisma.role.findFirst({
-        where: { name: "customer", companyId: null },
+        where: {
+          name: {
+            equals: "Customer",
+            mode: "insensitive",
+          },
+          companyId: null,
+        },
       });
-      
+
       if (!customerRole) {
         return res.status(500).json({ error: "System role 'customer' not found. Please run seed." });
       }
@@ -268,17 +274,17 @@ export default async function handler(req, res) {
       if (!customer) {
         return res.status(404).json({ error: "Customer not found" });
       }
-      if (customer.user?.companyId !== session.companyId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
 
       const vehicleCount = await prisma.vehicle.count({ where: { customerId } });
       if (vehicleCount > 0) {
         return res.status(400).json({ error: `Cannot delete customer. ${vehicleCount} vehicle(s) are still associated with this customer. Please reassign or remove the vehicles first.` });
       }
+      await prisma.$transaction([
+        prisma.userRole.deleteMany({ where: { userId: customer.userId } }),
+        prisma.customer.delete({ where: { id: customerId } }),
+        prisma.user.delete({ where: { id: customer.userId } }),
+      ]);
 
-      const deletedCustomer = await prisma.customer.delete({ where: { id: customerId } });
-      await prisma.user.delete({ where: { id: deletedCustomer.userId } });
       return res.status(200).json({ message: "Customer deleted successfully" });
     }
 

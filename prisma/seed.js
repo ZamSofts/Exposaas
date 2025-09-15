@@ -83,16 +83,19 @@ async function main() {
   });
 
   let customerRole = await prisma.role.findFirst({
-    where: {
-      name: "customer",
-      companyId: null,
+  where: {
+    name: {
+      equals: "Customer",
+      mode: "insensitive", 
     },
-  });
+    companyId: null,
+  },
+});
 
   if (!customerRole) {
     customerRole = await prisma.role.create({
       data: {
-        name: "customer",
+        name: "Customer",
         companyId: null,
       },
     });
