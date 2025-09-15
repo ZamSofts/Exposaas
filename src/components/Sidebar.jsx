@@ -117,14 +117,14 @@ const getAllSidebarSections = () => [
         label: "General Chat",
         icon: <MessageCircle size={20} />,
         href: "/chat",
-        excludeRoles: ["Sadmin","Customer"], // Hide from Sadmin and customer
+        excludeRoles: ["Sadmin", "Customer"], // Hide from Sadmin and customer
       },
       {
         id: "user",
         label: "User Management",
         icon: <Users size={20} />,
         href: "/user",
-        roles:["view:user"]
+        roles: ["view:user"],
       },
       {
         id: "customer",
@@ -140,8 +140,7 @@ const getAllSidebarSections = () => [
         label: "Role Management",
         icon: <Shield size={20} />,
         href: "/role",
-        roles: ["view:role"],
-       
+        roles: ["view:role", "Sadmin"],
       },
       {
         id: "vehicle",

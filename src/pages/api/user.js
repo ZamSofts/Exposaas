@@ -179,6 +179,7 @@ export default async function handler(req, res) {
               mode: "insensitive",
               not: session.name,
             },
+            customer: null,
           },
           include: {
             roles: { select: { roleId: true } },
