@@ -97,7 +97,14 @@ const validateVehicle = async ({ chassisNumber, brandId, companyId, statusId, ve
   const [brand, status, existing] = await Promise.all([
     prisma.brand.findUnique({ where: { id: Number(brandId) } }),
     prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } }),
-    prisma.vehicle.findFirst({ where: { chassisNumber, ...(vehicleId && { id: { not: vehicleId } }) } }),
+    prisma.vehicle.findUnique({
+      where: {
+        companyId_chassisNumber: {
+          companyId: Number(companyId),
+          chassisNumber,
+        },
+      },
+    }),
   ]);
 
   if (!brand) throw new Error("Brand not found");

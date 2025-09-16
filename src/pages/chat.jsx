@@ -1,30 +1,11 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Head from "next/head";
 import { useAuth, CustomButton, Error ,Loader as customLoader} from "@/hooks/wrapper";
-import { useRouter } from "next/router";
-import {Loader as CustomLoader} from "@/hooks/wrapper";
-
 import Sidebar from "@/components/Sidebar";
-import { Loader, MessageCircle, Send, Users, Wifi, WifiOff } from "lucide-react";
+import {  MessageCircle, Send, Users, Wifi, WifiOff } from "lucide-react";
 
 export default function ChatPage() {
-  const { session, status } = useAuth();
-    const router = useRouter();
-
-
-
-   useEffect(() => {
-    if (status === "loading") return; // wait until auth is resolved
-
-    if (!session) {
-      router.replace("/");
-      return;
-    }
-
-    if ((session.role).toLowerCase() === "customer") {
-      router.replace("/vehicle");
-    }
-  }, [session, status, router]);
+  const { session, status } = useAuth([],["Customer"]);
 
   const userInfo = useMemo(
     () => ({
@@ -35,13 +16,8 @@ export default function ChatPage() {
     [session?.name, session?.id, session?.companyId]
   );
 
-  // Don't render anything while loading or if not authenticated
-  if (status === "loading") {
-    return <CustomLoader />;
-  }
-
-  if (status !== "authenticated" || !session) {
-    return <CustomLoader />;
+  if (!session) {
+    return <customLoader/>
   }
 
   return <ChatContent userInfo={userInfo} />;
@@ -116,11 +92,8 @@ function ChatContent({ userInfo }) {
   }, []);
 
   useEffect(() => {
-    // Auto-scroll for new messages, but only if:
-    // 1. Not loading more messages
-    // 2. Either initial loading OR (user is near bottom AND not actively scrolling)
     if (!loadingMore && (loading || (isNearBottom && !isUserScrolling))) {
-      // Small delay to ensure DOM is updated after loading state changes
+  
       const scrollTimeout = setTimeout(() => {
         scrollToBottom();
       }, 100);
@@ -129,9 +102,9 @@ function ChatContent({ userInfo }) {
     }
   }, [messages, scrollToBottom, loadingMore, loading, isNearBottom, isUserScrolling]);
 
-  // Ensure scroll to bottom only when initially loading finishes
+ 
   useEffect(() => {
-    // This only runs when loading changes from true to false (initial load complete)
+   
     if (!loading && messages.length > 0) {
       const initialScrollTimeout = setTimeout(() => {
         scrollToBottom(true); // immediate scroll for initial load
@@ -176,16 +149,12 @@ function ChatContent({ userInfo }) {
     }
   }, [ready, loadingMore, hasMoreMessages, page, userId, companyId]);
 
-  // Handle scroll events for lazy loading and position tracking
   const handleScroll = useCallback((e) => {
     const container = e.target;
     const scrollTop = container.scrollTop;
-    const threshold = 200; // Load more when within 200px of top
+    const threshold = 200; 
     
-    // Check if user is near bottom (for auto-scroll logic)
     checkIfNearBottom();
-    
-    // Mark that user is actively scrolling (to prevent auto-scroll interference)
     setIsUserScrolling(true);
     
     // Clear the scrolling flag after a delay
@@ -198,7 +167,6 @@ function ChatContent({ userInfo }) {
       const currentScrollHeight = container.scrollHeight;
       const currentScrollTop = container.scrollTop;
       
-      // Store current scroll position for maintaining position after load
       container.dataset.previousScrollHeight = currentScrollHeight;
       container.dataset.previousScrollTop = currentScrollTop;
       
@@ -207,7 +175,6 @@ function ChatContent({ userInfo }) {
     }
   }, [hasMoreMessages, loadingMore, ready, loadMoreMessages, page, checkIfNearBottom]);
 
-  // Maintain scroll position after loading more messages
   useEffect(() => {
     if (messagesContainerRef.current && !loadingMore && page > 1) {
       const container = messagesContainerRef.current;
@@ -227,7 +194,6 @@ function ChatContent({ userInfo }) {
     }
   }, [messages, loadingMore, page]);
 
-  // WebSocket connection with improved error handling
   const connect = useCallback(() => {
     // Prevent multiple simultaneous connections
     if (connectingRef.current || !mountedRef.current || !shouldConnectRef.current) {
@@ -275,7 +241,6 @@ function ChatContent({ userInfo }) {
         setConnectionAttempts(0);
         console.log("🔌 WebSocket connected");
 
-        // Join the chat with user info and request initial messages
         if (userId && username && companyId) {
           ws.send(
             JSON.stringify({
@@ -298,7 +263,6 @@ function ChatContent({ userInfo }) {
         try {
           const data = JSON.parse(event.data);
 
-          // Handle different message types
           if (data.type === "user_count") {
             setOnlineUsers(data.count);
             return;
@@ -316,11 +280,12 @@ function ChatContent({ userInfo }) {
             setLoading(false);
             setLoadingMore(false);
             
-            // Force immediate scroll to bottom after loading initial chat history
             setTimeout(() => {
-              scrollToBottom(true); // immediate scroll
-              setIsNearBottom(true); // Mark user as being at bottom
-              setIsUserScrolling(false); // Reset scrolling flag
+
+              scrollToBottom(true); 
+              setIsNearBottom(true);
+              setIsUserScrolling(false); 
+      
             }, 100);
             return;
           }
@@ -332,7 +297,6 @@ function ChatContent({ userInfo }) {
             
             setTotalMessages(total);
             
-            // Prepend older messages to the beginning (they come in desc order, newest first)
             setMessages(prevMessages => [...newMessages.reverse(), ...prevMessages]);
             setPage(currentPage);
             setHasMoreMessages(data.hasMore);
@@ -369,7 +333,7 @@ function ChatContent({ userInfo }) {
             console.log("📨 Received chat message:", data);
 
             setMessages(prev => {
-              // Check if message already exists to avoid duplicates
+          
               const exists = prev.some(msg => msg.id === data.id);
               if (exists) {
                 console.log("⚠️ Duplicate message received, ignoring");
@@ -398,7 +362,6 @@ function ChatContent({ userInfo }) {
         setReady(false);
         console.log("❌ WebSocket closed, code:", event.code);
 
-        // Only attempt reconnection if component is still mounted and we should connect
         if (mountedRef.current && shouldConnectRef.current && connectionAttemptsRef.current < 5) {
           connectionAttemptsRef.current += 1;
           setConnectionAttempts(connectionAttemptsRef.current);

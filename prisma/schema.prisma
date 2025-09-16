@@ -83,7 +83,7 @@ model UserRole {
 model Vehicle {
   id            Int           @id @default(autoincrement())
   name          String?
-  chassisNumber String        @unique
+  chassisNumber String        
   remarks       String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -99,6 +99,8 @@ model Vehicle {
   customer      Customer?     @relation(fields: [customerId], references: [id])
   documents     VehicleDocument[]
   payments      VehiclePayments[]
+
+  @@unique([companyId, chassisNumber])
 
 }
 

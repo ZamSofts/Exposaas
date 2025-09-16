@@ -46,7 +46,6 @@ export default async function handler(req, res) {
         return res.status(200).json(role);
       }
 
-      // Build where clause based on user role
       let whereClause = {
         name: {
           contains: search,
@@ -62,10 +61,9 @@ export default async function handler(req, res) {
 
       // Add company filtering logic
       if (session.role === "Sadmin") {
-        // Sadmin sees all roles (global + all company roles)
-        // No additional filtering needed
+
       } else {
-        // Company users see only global roles (companyId: null) + their company roles
+       
         whereClause.OR = [
           { companyId: null }, // Global roles created by Sadmin
           { companyId: session.companyId }, // Company-specific roles
@@ -114,7 +112,6 @@ export default async function handler(req, res) {
         return;
       }
 
-      // Check for duplicate role name within the same scope (company or global) - case insensitive
       const whereClause =
         companyId === undefined || companyId === null
           ? {
@@ -161,7 +158,6 @@ export default async function handler(req, res) {
         return;
       }
 
-      // Get the existing role to check within the same scope (preserve original companyId)
       const existingRole = await prisma.role.findUnique({
         where: { id },
         select: { companyId: true },
@@ -173,8 +169,7 @@ export default async function handler(req, res) {
 
       // Check if user has permission to edit this role
       if (session.role !== "Sadmin") {
-        // Company users can only edit roles that belong to their company
-        // Global roles (companyId === null) can only be edited by Sadmin
+      
         if (existingRole.companyId === null) {
           return res.status(403).json({ error: "Only Sadmin can edit global roles" });
         }
@@ -183,7 +178,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // Check for duplicate role name within the same scope as the existing role - case insensitive
       const whereClause = {
         name: { equals: name, mode: "insensitive" },
         companyId: existingRole.companyId, // Use the existing role's companyId
@@ -198,21 +192,19 @@ export default async function handler(req, res) {
       }
 
       await prisma.$transaction(async tx => {
-        // Update only role name - preserve original companyId
         await tx.role.update({
           where: { id },
           data: {
             name,
-            // DO NOT update companyId - preserve original ownership
           },
         });
 
-        // Check if permissions array is provided
         if (Array.isArray(permissions)) {
-          // Get current permissions from DB
+
           const existing = await tx.rolePermission.findMany({
             where: { roleId: id },
             select: { permissionId: true },
+
           });
 
           const existingIds = existing.map(p => p.permissionId).sort();
