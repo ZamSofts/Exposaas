@@ -16,6 +16,7 @@ model Company {
   users     User[]
   vehicles  Vehicle[]
   roles     Role[]
+  paymentConfirmations PaymentConfirmation[]
 }
 
 model Customer {
@@ -145,6 +146,22 @@ model ChatMessage {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
 }
+
+
+model PaymentConfirmation {
+  id          Int      @id @default(autoincrement())
+  DocumentURL String?  
+  Page        Int      
+  Json        Json     
+  isCorrect   String   
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+}
+
+
 
 enum CompanyStatus {
   active

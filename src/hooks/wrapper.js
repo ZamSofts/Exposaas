@@ -2,7 +2,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 export { useAuth };
 export { useTheme };
-
 export { default as Error } from "@/components/ui/Error";
 export { useConfirm } from "@/components/ui/ConfirmModal";
 export { default as Skeleton } from "@/components/ui/Skeleton";
@@ -13,6 +12,7 @@ export { Toast } from "@/components/ui/CustomToast";
 export { FilePreviewer } from "@/components/ui/FilePreviewer";
 export { Loader } from "@/components/ui/Loader";
 export { EditVehicle } from "@/components/EditVehicle";
+export { InvoiceDataViewer } from "@/components/InvoiceDataViewer";
 
 export const API = async (method, name, d = {}, isFile= false) => {
   if (method == "GET" || method == "DELETE") {
