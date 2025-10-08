@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         DocumentURL: DocumentURL || null,
         Page: pageNum,
         Json: storeJson,
-        isCorrect: isCorrect || "unknown",
+        isCorrect: isCorrect || "",
         companyId,
       },
     });

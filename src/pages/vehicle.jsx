@@ -253,36 +253,14 @@ export default function VehiclesPage() {
     handleBackToList();
   };
 
-  const handleInvoiceSave = async (reviewedData) => {
-    try {
-      setCustomLoader(true);
-      // Here you would typically save the reviewed data to your database
-      // For now, we'll just simulate an API call
-      const response = await API("POST", "saveInvoiceReview", reviewedData);
-      
-      if (response.error) {
-        setError(response.error);
-        showToast(response.error, "error");
-        return;
-      }
-      
-      showToast("Invoice review saved successfully!", "success");
-      handleBackToList();
-    } catch (err) {
-      console.error("Save invoice review error:", err);
-      setError("Failed to save invoice review. Please try again.");
-      showToast("Failed to save invoice review", "error");
-    } finally {
-      setCustomLoader(false);
-    }
-  };
+  
 
   // If we're in form view, render the VehicleForm component
   if (currentView === "form") {
     return <EditVehicle vehicleId={edit} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
   }
   if (isInvoiceDataview) {
-    return <InvoiceDataViewer data={InvoiceResponse} onBack={handleBackToList} onSave={handleInvoiceSave} />;
+    return <InvoiceDataViewer data={InvoiceResponse} onBack={handleBackToList} />;
   }
 
 

@@ -1,21 +1,22 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Head from "next/head";
-import { useAuth, Error, Toast, Loader } from "@/hooks/wrapper";
+import { useAuth, Error, Toast, Loader, useConfirm } from "@/hooks/wrapper";
 import { ArrowLeft, ChevronLeft, ChevronRight, FileUp, Download, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { API } from "../hooks/wrapper";
 
-export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
+export const InvoiceDataViewer = ({ data = null, onBack }) => {
+  const { confirm, ConfirmComponent } = useConfirm();
+
   const [pdfPage, setPdfPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedPageKey, setSelectedPageKey] = useState("page_1");
   const [selectedChassis, setSelectedChassis] = useState(null);
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
   const [chassisReviewStatus, setChassisReviewStatus] = useState({});
-  // Track which pages have been explicitly saved by the user.
-  // Start as not-saved so the user must press Save before moving to another page.
+
   const [savedPages, setSavedPages] = useState({ page_1: false, page_2: false });
-  // Per-page review answer: 'yes' | 'no'
   const [pageReviewStatus, setPageReviewStatus] = useState({});
+  const [feedback, setFeedback] = useState("");
   const [editable, setEditable] = useState({ page_1: [], page_2: [] });
 
   const [error] = useState("");
@@ -38,6 +39,15 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
   }, [data]);
 
   const pageKeys = ["page_1", "page_2"];
+
+  useEffect(() => {
+    const list = (editable && editable[selectedPageKey]) || [];
+    if (list && list.length > 0) {
+      setSelectedChassis(list[0]);
+    } else {
+      setSelectedChassis(null);
+    }
+  }, [selectedPageKey, editable]);
 
   const goPrev = () => setPdfPage(p => Math.max(1, p - 1));
   const goNext = () => setPdfPage(p => Math.min(totalPages, p + 1));
@@ -97,7 +107,7 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
       return next;
     });
     setSelectedChassis(prev => (prev ? { ...prev, charges: (prev.charges || []).map(c => ({ ...c })) } : null));
-    setSavedPages(prev => ({ ...prev, [selectedPageKey]: false }));
+    setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
   };
 
   const addCharge = chassisNum => {
@@ -114,7 +124,7 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
     });
     // update selected chassis if it's the current one
     setSelectedChassis(prev => (prev && prev.chassis_number === chassisNum ? { ...prev, charges: [...(prev.charges || []), { type: "", amount: 0 }] } : prev));
-    setSavedPages(prev => ({ ...prev, [selectedPageKey]: false }));
+    setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
   };
 
   const removeCharge = (chassisNum, idx) => {
@@ -130,52 +140,14 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
       return next;
     });
     setSelectedChassis(prev => (prev && prev.chassis_number === chassisNum ? { ...prev, charges: (prev.charges || []).filter((_, i) => i !== idx) } : prev));
-    setSavedPages(prev => ({ ...prev, [selectedPageKey]: false }));
+    setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
   };
 
-  const handleSaveConfirm = async () => {
-    setIsLoading(true);
-    // Convert amounts back to numbers where possible before saving
-    const normalized = {
-      ...editable,
-      page_1: (editable.page_1 || []).map(p => ({
-        ...p,
-        charges: (p.charges || []).map(c => ({ ...c, amount: c.amount === "" ? null : isNaN(Number(c.amount)) ? c.amount : Number(c.amount) })),
-      })),
-      page_2: (editable.page_2 || []).map(p => ({
-        ...p,
-        charges: (p.charges || []).map(c => ({ ...c, amount: c.amount === "" ? null : isNaN(Number(c.amount)) ? c.amount : Number(c.amount) })),
-      })),
-    };
-
-    const payload = {
-      ...normalized,
-      reviewedAt: new Date().toISOString(),
-      chassisReviewStatus,
-    };
-
-    try {
-      if (onSave) {
-        await onSave(payload);
-      } else {
-        console.log("Save & Confirm payload:", payload);
-        alert("Save & Confirm clicked — check console for payload (UI-only)");
-      }
-    } catch (err) {
-      console.error("Save error:", err);
-      alert("Error saving data. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // build list of chassis grouped by page key for tabs
   const chassisByPage = {
     page_1: editable.page_1 || [],
     page_2: editable.page_2 || [],
   };
 
-  // Find index of selected chassis within currently selected page list
   const selectedPageList = chassisByPage[selectedPageKey] || [];
   const selectedIndexInPage = selectedChassis ? selectedPageList.findIndex(p => p.chassis_number === selectedChassis.chassis_number) : -1;
 
@@ -191,10 +163,24 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
     }
   };
 
-  // Save the currently selected page (used by the Save Page button)
   const saveCurrentPage = async () => {
-    // Normalize current editable pages to full document shape and convert amounts to numbers
-    // Ensure chassis_number appears before charges when serialized and convert amounts
+    // compute page number and chassis count for a friendly confirmation
+    const pageNum = (() => {
+      const parts = String(selectedPageKey || "page_1").split("_");
+      const n = parseInt(parts[1], 10);
+      return isNaN(n) ? 1 : n;
+    })();
+    const chassisCount = (chassisByPage[selectedPageKey] || []).length;
+
+    const confirmed = await confirm({
+      title: `Save Page ${pageNum}`,
+      message: `You're about to save page ${pageNum}. This will record ${chassisCount} chassis item${chassisCount === 1 ? '' : 's'} for review. Do you want to continue?`,
+      confirmText: "Save",
+      cancelText: "Cancel",
+      type: "primary",
+    });
+    if (!confirmed) return;
+
     const normalizePage = pageArr =>
       (pageArr || []).map(p => ({
         chassis_number: p.chassis_number,
@@ -212,35 +198,30 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
     const normalizedPage1 = normalizePage(editable.page_1);
     const normalizedPage2 = normalizePage(editable.page_2);
 
-    // Determine page number as integer (e.g., 'page_1' -> 1)
-    const pageNum = (() => {
-      const parts = String(selectedPageKey || "page_1").split("_");
-      const n = parseInt(parts[1], 10);
-      return isNaN(n) ? 1 : n;
-    })();
-
     const explicit = pageReviewStatus[selectedPageKey];
     const pageList = chassisByPage[selectedPageKey] || [];
     const isPageCorrect = explicit ? explicit === "yes" : pageList.every(i => chassisReviewStatus[i.chassis_number] === "yes");
 
-    // Build JSON that contains only the selected page (server will persist only this page)
     const pageJson = selectedPageKey === "page_1" ? { page_1: normalizedPage1 } : { page_2: normalizedPage2 };
 
     const body = {
       Page: pageNum,
       Json: pageJson,
-      isCorrect: isPageCorrect ? "yes" : "no",
+      isCorrect: feedback,
       CompanyID: data?.companyId || null,
       DocumentURL: data?.blobUrl || null,
     };
     console.log("Saving page", selectedPageKey, "with body:", body);
     try {
       setIsLoading(true);
-
       const res = await API("PUT", "paymentConfirmation", body);
-      // mark this page as saved
+      if (!res || !res.ok) {
+        showToast("Error saving page", "error");
+        return;
+      }
       setSavedPages(prev => ({ ...prev, [selectedPageKey]: true }));
       showToast("Page saved", "success");
+      setFeedback("");
     } catch (err) {
       console.error("Page save error", err);
       showToast("Error saving page", "error");
@@ -248,13 +229,6 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
       setIsLoading(false);
     }
   };
-
-  // Calculate review completion status
-  const allChassis = [...chassisByPage.page_1, ...chassisByPage.page_2];
-  const totalChassisCount = allChassis.length;
-  const reviewedCount = Object.keys(chassisReviewStatus).length;
-  const isAllReviewed = totalChassisCount > 0 && reviewedCount === totalChassisCount;
-  const reviewProgress = totalChassisCount > 0 ? Math.round((reviewedCount / totalChassisCount) * 100) : 0;
 
   const displayError = error ? (typeof error === "string" ? error : error && error.message ? error.message : String(error)) : "";
 
@@ -295,59 +269,6 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
               </div>
               <div className="flex items-center gap-2">
                 {/* PDF Page Navigation */}
-                {data?.blobUrl && !pdfError && (
-                  <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] rounded-lg p-1">
-                    <button
-                      onClick={() => {
-                        if (savedPages[selectedPageKey] !== true) {
-                          showToast("Please save the current page before navigating the PDF.", "error");
-                          return;
-                        }
-                        goPrev();
-                      }}
-                      disabled={pdfPage <= 1 || savedPages[selectedPageKey] !== true}
-                      className="p-1.5 hover:bg-[var(--secondary)] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Previous page"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-
-                    <div className="flex items-center gap-1 px-2 py-1">
-                      <input
-                        type="number"
-                        min="1"
-                        max={totalPages}
-                        value={pdfPage}
-                        onChange={e => {
-                          if (savedPages[selectedPageKey] !== true) {
-                            showToast("Please save the current page before navigating the PDF.", "error");
-                            return;
-                          }
-                          const newPage = Math.max(1, Math.min(totalPages, parseInt(e.target.value) || 1));
-                          setPdfPage(newPage);
-                        }}
-                        className="w-12 px-1 py-0.5 text-sm text-center bg-transparent border border-[var(--border)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)] rounded"
-                      />
-                      <span className="text-xs text-[var(--secondary-foreground)]">/</span>
-                      <span className="text-sm font-medium text-[var(--foreground)]">{totalPages}</span>
-                    </div>
-
-                    <button
-                      onClick={() => {
-                        if (savedPages[selectedPageKey] !== true) {
-                          showToast("Please save the current page before navigating the PDF.", "error");
-                          return;
-                        }
-                        goNext();
-                      }}
-                      disabled={pdfPage >= totalPages || savedPages[selectedPageKey] !== true}
-                      className="p-1.5 hover:bg-[var(--secondary)] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Next page"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
 
                 {/* Action Buttons */}
                 {pdfError && (
@@ -415,9 +336,9 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
                     onLoad={() => {
                       setPdfLoading(false);
                       setPdfError(false);
-                      // Estimate total pages (you could enhance this by actually detecting PDF pages)
+
                       if (totalPages === 1) {
-                        setTotalPages(2); // Default assumption - can be enhanced
+                        setTotalPages(2);
                       }
                     }}
                     onError={() => {
@@ -635,10 +556,10 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
                               <input
                                 type="radio"
                                 name={`page-review-${selectedPageKey}`}
-                                checked={pageReviewStatus[selectedPageKey] === "yes"}
+                                checked={feedback === "yes"}
                                 onChange={() => {
-                                  setPageReviewStatus(prev => ({ ...prev, [selectedPageKey]: "yes" }));
-                                  setSavedPages(prev => ({ ...prev, [selectedPageKey]: false }));
+                                  setFeedback("yes");
+                                  setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
                                 }}
                               />
                               <span className="text-[var(--success)] ml-1">Yes</span>
@@ -647,10 +568,10 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
                               <input
                                 type="radio"
                                 name={`page-review-${selectedPageKey}`}
-                                checked={pageReviewStatus[selectedPageKey] === "no"}
+                                checked={feedback === "no"}
                                 onChange={() => {
-                                  setPageReviewStatus(prev => ({ ...prev, [selectedPageKey]: "no" }));
-                                  setSavedPages(prev => ({ ...prev, [selectedPageKey]: false }));
+                                  setFeedback("no");
+                                  setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
                                 }}
                               />
                               <span className="text-[var(--warning)] ml-1">No</span>
@@ -662,9 +583,12 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
                           <button
                             onClick={saveCurrentPage}
                             disabled={isLoading || (chassisByPage[selectedPageKey] || []).length === 0 || savedPages[selectedPageKey] === true}
-                            className={`px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-md ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                            title={savedPages[selectedPageKey] === true ? "This page is saved" : undefined}
+                            className={`px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-md transition-opacity duration-200 ${
+                              isLoading ? "opacity-50 cursor-not-allowed" : ""
+                            } disabled:opacity-60 disabled:cursor-not-allowed`}
                           >
-                            {isLoading ? "Saving..." : "Save Page"}
+                            {savedPages[selectedPageKey] === true ? "Saved" : isLoading ? "Saving..." : "Save Page"}
                           </button>
                         </div>
                       </div>
@@ -679,6 +603,7 @@ export const InvoiceDataViewer = ({ data = null, onBack, onSave }) => {
         </div>
         <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
       </div>
+      <ConfirmComponent />
     </>
   );
 };
