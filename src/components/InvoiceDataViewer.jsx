@@ -1,10 +1,14 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Head from "next/head";
+import { useRouter } from "next/router";
+
 import { useAuth, Error, Toast, Loader, useConfirm } from "@/hooks/wrapper";
 import { ArrowLeft, ChevronLeft, ChevronRight, FileUp, Download, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { API } from "../hooks/wrapper";
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {
+  const router = useRouter();
+
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [pdfPage, setPdfPage] = useState(1);
@@ -26,8 +30,18 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
   useEffect(() => {
     const base = { ...(data || {}) };
-    base.page_1 = Array.isArray(base.page_1) ? base.page_1.map(p => ({ ...p, charges: (p.charges || []).map(c => ({ ...c, amount: c.amount != null ? String(c.amount) : "" })) })) : [];
-    base.page_2 = Array.isArray(base.page_2) ? base.page_2.map(p => ({ ...p, charges: (p.charges || []).map(c => ({ ...c, amount: c.amount != null ? String(c.amount) : "" })) })) : [];
+    base.page_1 = Array.isArray(base.page_1)
+      ? base.page_1.map(p => ({
+          ...p,
+          charges: (p.charges || []).map(c => ({ ...c, amount: c.amount != null ? String(c.amount) : "", isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm) })),
+        }))
+      : [];
+    base.page_2 = Array.isArray(base.page_2)
+      ? base.page_2.map(p => ({
+          ...p,
+          charges: (p.charges || []).map(c => ({ ...c, amount: c.amount != null ? String(c.amount) : "", isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm) })),
+        }))
+      : [];
     setEditable(base);
     // reset saved state and per-page review
     setSavedPages({ page_1: false, page_2: false });
@@ -117,13 +131,15 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         next[key] = next[key].map(item => ({ ...item, charges: (item.charges || []).map(c => ({ ...c })) }));
         const found = next[key].find(p => p.chassis_number === chassisNum);
         if (found) {
-          found.charges = [...(found.charges || []), { type: "", amount: "" }];
+          found.charges = [...(found.charges || []), { type: "", amount: "", isConfirm: false }];
         }
       }
       return next;
     });
     // update selected chassis if it's the current one
-    setSelectedChassis(prev => (prev && prev.chassis_number === chassisNum ? { ...prev, charges: [...(prev.charges || []), { type: "", amount: 0 }] } : prev));
+    setSelectedChassis(prev =>
+      prev && prev.chassis_number === chassisNum ? { ...prev, charges: [...(prev.charges || []), { type: "", amount: 0, isConfirm: false }] } : prev
+    );
     setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
   };
 
@@ -187,6 +203,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         charges: (p.charges || []).map(c => ({
           type: c.type,
           amount: c.amount === "" ? null : isNaN(Number(c.amount)) ? c.amount : Number(c.amount),
+          isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm),
         })),
         // preserve any other fields but place them after the expected keys
         ...Object.keys(p).reduce((acc, key) => {
@@ -242,7 +259,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={onBack} className="p-3 bg-[var(--surface)] rounded-lg border border-[var(--border)] hover:bg-[var(--secondary)] transition-all duration-200 shadow-sm hover:shadow">
-              <ArrowLeft className="w-5 h-5 text-[var(--foreground)]" />
+             <ArrowLeft className="w-5 h-5 text-[var(--foreground)]" />
             </button>
 
             <div>

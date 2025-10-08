@@ -28,10 +28,10 @@ export default async function handler(req, res) {
 
     if (!pageArr) return res.status(400).json({ error: `Json must include ${pageKey} array or items` });
 
-    // Normalize amounts inside charges
     const normalizeCharges = charges => (charges || []).map(c => ({
       type: c.type,
       amount: c.amount === "" || c.amount == null ? null : (isNaN(Number(c.amount)) ? c.amount : Number(c.amount)),
+      isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm),
     }));
 
     const normalizedPage = pageArr.map(item => ({
