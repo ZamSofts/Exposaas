@@ -152,6 +152,7 @@ export default async function handler(req, res) {
     }
 
     const id = Number(req.query.id);
+    const chassisNumber = req.query.chassisNumber;
     const { page = 1, limit = 10, search = "", sortBy = "id", sortOrder = "asc", col } = req.query;
     const selectFields = col ? Object.fromEntries(col.split(",").map(c => [c, true])) : undefined;
     const userFilter = session.role === "Sadmin" ? {} : { companyId: session?.companyId };
@@ -183,6 +184,12 @@ export default async function handler(req, res) {
             orderBy: getOrderBy(sortBy, sortOrder),
           });
           return res.json(vehicles);
+        }
+
+        if(chassisNumber){
+          const vehicle = await prisma.vehicle.findFirst({ where: { chassisNumber, companyId:session.companyId} });
+          if (!vehicle) return res.status(404).json({ error: "chassis number not found.please first register vehicle" });
+          return res.json(vehicle);
         }
 
         // Paginated list

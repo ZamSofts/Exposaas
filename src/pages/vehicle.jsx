@@ -246,6 +246,8 @@ export default function VehiclesPage() {
   const handleBackToList = () => {
     setCurrentView("list");
     setEdit(null);
+    setInvoiceResponse(null);
+    setIsInvoiceDataView(false);
     loadData(); // Refresh the list
   };
 

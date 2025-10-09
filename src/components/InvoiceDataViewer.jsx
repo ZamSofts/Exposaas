@@ -20,7 +20,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
   const [savedPages, setSavedPages] = useState({ page_1: false, page_2: false });
   const [pageReviewStatus, setPageReviewStatus] = useState({});
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState("yes");
   const [editable, setEditable] = useState({ page_1: [], page_2: [] });
 
   const [error] = useState("");
@@ -214,11 +214,6 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
     const normalizedPage1 = normalizePage(editable.page_1);
     const normalizedPage2 = normalizePage(editable.page_2);
-
-    const explicit = pageReviewStatus[selectedPageKey];
-    const pageList = chassisByPage[selectedPageKey] || [];
-    const isPageCorrect = explicit ? explicit === "yes" : pageList.every(i => chassisReviewStatus[i.chassis_number] === "yes");
-
     const pageJson = selectedPageKey === "page_1" ? { page_1: normalizedPage1 } : { page_2: normalizedPage2 };
 
     const body = {
@@ -228,7 +223,6 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       CompanyID: data?.companyId || null,
       DocumentURL: data?.blobUrl || null,
     };
-    console.log("Saving page", selectedPageKey, "with body:", body);
     try {
       setIsLoading(true);
       const res = await API("PUT", "paymentConfirmation", body);
@@ -236,9 +230,20 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         showToast("Error saving page", "error");
         return;
       }
-      setSavedPages(prev => ({ ...prev, [selectedPageKey]: true }));
+      // mark this page as saved and if all pages are saved, close the viewer via onBack
+      setSavedPages(prev => {
+        const next = { ...prev, [selectedPageKey]: true };
+        const allSaved = pageKeys.every(k => next[k] === true);
+        // call onBack shortly after state update so parent can react
+        if (allSaved) {
+          setTimeout(() => {
+            if (typeof onBack === "function") onBack();
+          }, 200);
+        }
+        return next;
+      });
       showToast("Page saved", "success");
-      setFeedback("");
+      setFeedback("yes");
     } catch (err) {
       console.error("Page save error", err);
       showToast("Error saving page", "error");

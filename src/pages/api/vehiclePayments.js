@@ -231,7 +231,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PUT") {
-      const { name, amount, date, remarks, vehicleId } = req.body;
+      const { name, amount, date, remarks, vehicleId, docURL } = req.body;
 
       const vehicle = await validatePayment({ name, date, vehicleId });
 
@@ -246,7 +246,7 @@ export default async function handler(req, res) {
       }
 
       // Handle file upload
-      let fileUrl = null;
+      let fileUrl = docURL || null;
       let uploadError = null;
 
       if (req.file) {
