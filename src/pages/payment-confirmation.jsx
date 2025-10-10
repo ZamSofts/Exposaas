@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
 import { useAuth, Error, API, Toast, Loader, FilePreviewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
@@ -25,12 +25,15 @@ export default function PaymentConfirmation() {
 
   // Load confirmations and extract unconfirmed charges
   const [unconfirmedCharges, setUnconfirmedCharges] = useState([]);
+  const originalChargesRef = useRef([]);
+
   const [loadingIds, setLoadingIds] = useState([]);
   const [confirmedIds, setConfirmedIds] = useState([]);
 
   useEffect(() => {
     loadConfirmations();
-  }, [currentPage, perPage, search, sortBy, sortOrder]);
+  }, [currentPage, perPage, sortBy, sortOrder]);
+ 
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
@@ -42,7 +45,6 @@ export default function PaymentConfirmation() {
       const params = new URLSearchParams({
         page: currentPage.toString(),
         limit: perPage.toString(),
-        search: search.toString(),
         sortBy: sortBy.toString(),
         sortOrder: sortOrder.toString(),
         flatten: "1",
@@ -57,8 +59,8 @@ export default function PaymentConfirmation() {
       const rows = res.data || [];
       // If backend returned already-flattened charges (flatten mode), use them directly
       if (rows.length > 0 && (rows[0].chassis_number !== undefined || rows[0].confirmationId !== undefined)) {
-        console.log("Using pre-flattened charges from backend:", rows);
         setUnconfirmedCharges(rows);
+        originalChargesRef.current = rows;
         setTotal(res.total || rows.length);
       } else {
         // Collect unconfirmed charges across all returned confirmation rows
@@ -90,9 +92,8 @@ export default function PaymentConfirmation() {
             }
           }
         }
-        console.log("Extracted unconfirmed charges:", charges);
         setUnconfirmedCharges(charges);
-
+        originalChargesRef.current = charges;
         setTotal(res.total || charges.length);
       }
     } catch (err) {
@@ -108,9 +109,22 @@ export default function PaymentConfirmation() {
     setSortOrder(order);
   };
 
-  const handleSearch = search => {
-    setSearch(search);
-    setCurrentPage(1); // Reset to first page on search
+  const handleSearch = value => {
+    // setSearch(value);
+    if (value.trim() === "") {
+      setUnconfirmedCharges(originalChargesRef.current);
+      setTotal(originalChargesRef.current.length);
+    } else {
+      const filtered = originalChargesRef.current.filter(item =>
+        item.chassis_number?.toLowerCase().includes(value.toLowerCase()) ||
+        item.type?.toLowerCase().includes(value.toLowerCase()) ||
+        item.amount?.toString().includes(value) ||
+        item.DocumentURL?.toLowerCase().includes(value.toLowerCase())
+      );
+      setUnconfirmedCharges(filtered);
+      setTotal(filtered.length);
+    }
+    setCurrentPage(1);
   };
 
   const handlePageChange = (page, perPageValue) => {
@@ -128,7 +142,7 @@ export default function PaymentConfirmation() {
       } else {
         const formData = new FormData();
         formData.append("name", item.type);
-        formData.append("amount", item.amount);
+        formData.append("amount", -item.amount);
         formData.append("date", item.createdAt);
         formData.append("vehicleId", checkChassis.id);
         formData.append("docURL", item.DocumentURL);
