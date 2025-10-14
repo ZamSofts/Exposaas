@@ -17,6 +17,7 @@ model Company {
   vehicles  Vehicle[]
   roles     Role[]
   paymentConfirmations PaymentConfirmation[]
+  InvoiceJobs   InvoiceJobs[]
 }
 
 model Customer {
@@ -154,7 +155,20 @@ model PaymentConfirmation {
   Page        Int      
   Json        Json     
   isCorrect   String   
+  invoiceJobId Int?
   companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model InvoiceJobs {
+  id          Int      @id @default(autoincrement())
+  DocumentURL String?       
+  Json        Json     
+  companyId   Int
+  isEvaluated Boolean   @default(false)
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
 

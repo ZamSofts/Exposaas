@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Settings,
   CheckCircle,
+  ReceiptText,
 } from "lucide-react";
 
 // Create context for sidebar state
@@ -151,6 +152,14 @@ const getAllSidebarSections = () => [
         excludeRoles: ["Sadmin"],
       },
       {
+        id: "invoice-jobs",
+        label: "Invoice Jobs",
+        icon: <ReceiptText size={20} />,
+        href: "/InvoiceJobs",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
         id: "payment-confirmation",
         label: "Payment Confirmation",
         icon: <CheckCircle size={20} />,
@@ -163,14 +172,13 @@ const getAllSidebarSections = () => [
         label: "Extras",
         icon: <Settings size={20} />,
         isDropdown: true,
-        roles: ["Sadmin"],
+        roles: ["Sadmin", "admin"],
         subItems: [
           {
             id: "manage-status",
             label: "Manage Status",
             href: "/status",
             icon: <CheckCircle size={16} />,
-            roles: ["Admin", "Sadmin"],
           },
         ],
       },

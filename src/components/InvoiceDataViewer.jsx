@@ -137,9 +137,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       return next;
     });
     // update selected chassis if it's the current one
-    setSelectedChassis(prev =>
-      prev && prev.chassis_number === chassisNum ? { ...prev, charges: [...(prev.charges || []), { type: "", amount: 0, isConfirm: false }] } : prev
-    );
+    setSelectedChassis(prev => (prev && prev.chassis_number === chassisNum ? { ...prev, charges: [...(prev.charges || []), { type: "", amount: 0, isConfirm: false }] } : prev));
     setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
   };
 
@@ -190,7 +188,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
     const confirmed = await confirm({
       title: `Save Page ${pageNum}`,
-      message: `You're about to save page ${pageNum}. This will record ${chassisCount} chassis item${chassisCount === 1 ? '' : 's'} for review. Do you want to continue?`,
+      message: `You're about to save page ${pageNum}. This will record ${chassisCount} chassis item${chassisCount === 1 ? "" : "s"} for review. Do you want to continue?`,
       confirmText: "Save",
       cancelText: "Cancel",
       type: "primary",
@@ -222,7 +220,9 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       isCorrect: feedback,
       CompanyID: data?.companyId || null,
       DocumentURL: data?.blobUrl || null,
+      invoiceJobId: data?.id || null,
     };
+    console.log("Saving page data", body);
     try {
       setIsLoading(true);
       const res = await API("PUT", "paymentConfirmation", body);
@@ -230,7 +230,6 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         showToast("Error saving page", "error");
         return;
       }
-      // mark this page as saved and if all pages are saved, close the viewer via onBack
       setSavedPages(prev => {
         const next = { ...prev, [selectedPageKey]: true };
         const allSaved = pageKeys.every(k => next[k] === true);
@@ -264,7 +263,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={onBack} className="p-3 bg-[var(--surface)] rounded-lg border border-[var(--border)] hover:bg-[var(--secondary)] transition-all duration-200 shadow-sm hover:shadow">
-             <ArrowLeft className="w-5 h-5 text-[var(--foreground)]" />
+              <ArrowLeft className="w-5 h-5 text-[var(--foreground)]" />
             </button>
 
             <div>
@@ -276,9 +275,9 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
         <Error message={displayError} />
 
-        <div className="flex gap-6">
+        <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
           {/* Left: PDF viewer */}
-          <div className="flex-1 bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6 min-h-[600px] shadow-sm">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6 min-h-[420px] md:min-h-[600px] shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
@@ -309,12 +308,12 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
             </div>
 
             {/* PDF viewer area: using proven iframe approach from FilePreviewer */}
-            <div className="h-[560px] bg-white border border-[var(--border)] rounded-lg overflow-hidden shadow-inner relative">
+            <div className="h-[420px] md:h-[560px] bg-white border border-[var(--border)] rounded-lg overflow-hidden shadow-inner relative">
               {data?.blobUrl ? (
                 <>
                   {/* Loading overlay */}
                   {pdfLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10">
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/80 backdrop-blur-sm z-10 p-4">
                       <div className="flex flex-col items-center gap-3">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[var(--primary)]"></div>
                         <p className="text-[var(--secondary-foreground)]">Loading PDF...</p>
@@ -324,8 +323,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
                   {/* Error state */}
                   {pdfError && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-red-50 z-10">
-                      <div className="text-center p-8">
+                    <div className="absolute inset-0 flex items-center justify-center bg-red-50 z-10 p-4">
+                      <div className="text-center p-4 md:p-8">
                         <FileUp className="w-16 h-16 mx-auto mb-4 text-red-400" />
                         <h3 className="text-lg font-medium text-red-900 mb-2">PDF Loading Failed</h3>
                         <p className="text-sm text-red-700 mb-4">Unable to load the PDF document. Please try again or use the download option.</p>
@@ -353,7 +352,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                   <iframe
                     key={pdfPage} // Force re-render when page changes
                     src={getPdfUrl(data.blobUrl, pdfPage)}
-                    className="w-full h-full border-0"
+                    className="w-full h-full border-0 min-h-[320px] md:min-h-[540px]"
+                    style={{ display: "block" }}
                     title={`Invoice PDF - Page ${pdfPage}`}
                     onLoad={() => {
                       setPdfLoading(false);
@@ -384,8 +384,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
           </div>
 
           {/* Right: parsed data, tabs and editable table */}
-          <div className="w-220 bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6 flex flex-col shadow-sm max-h-[1000px]">
-            <div className="mb-4">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6 flex flex-col shadow-sm max-h-[calc(100vh-160px)] md:max-h-[1000px] overflow-hidden">
+            <div className="mb-4 sticky top-4 bg-[var(--surface)] z-10">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-3">Parsed Data</h2>
               <div className="flex items-center gap-1 bg-[var(--background)] p-1 rounded-lg">
                 {pageKeys.map(key => {
@@ -424,7 +424,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto px-0 py-3">
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-sm font-medium text-[var(--foreground)]">Chassis Numbers</div>
@@ -436,6 +436,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                       No chassis found on this page
                     </div>
                   )}
+
                   <div>
                     {chassisByPage[selectedPageKey].map(item => {
                       const isSelected = selectedChassis && selectedChassis.chassis_number === item.chassis_number;
@@ -445,49 +446,37 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                           <button
                             key={item.chassis_number}
                             onClick={() => handleSelectChassis(item)}
-                            className={`relative px-4 py-2 border rounded-lg text-xs font-medium transition-all duration-200 min-w-[120px] ${
+                            className={`relative px-4 py-2 m-1 border rounded-lg text-xs font-medium transition-all duration-200 min-w-[120px] ${
                               isSelected
                                 ? "bg-[var(--primary)] text-[var(--primary-foreground)] border-[var(--primary)] shadow-md scale-105"
-                                : isReviewed
-                                ? "bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/30 hover:bg-[var(--success)]/20"
                                 : "bg-[var(--background)] text-[var(--secondary-foreground)] border-[var(--border)] hover:bg-[var(--secondary)] hover:border-[var(--primary)]/30 hover:shadow-sm"
                             }`}
                           >
-                            <div className="flex items-center justify-center gap-2">
-                              <span>{item.chassis_number}</span>
-                              {isReviewed && (
-                                <span
-                                  className={`w-4 h-4 rounded-full text-[10px] flex items-center justify-center ${
-                                    isReviewed === "yes" ? "bg-[var(--success)] text-[var(--on-success)]" : "bg-[var(--warning)] text-[var(--on-warning)]"
-                                  }`}
-                                >
-                                  {isReviewed === "yes" ? "✓" : "!"}
-                                </span>
-                              )}
-                            </div>
+                            <span>{item.chassis_number}</span>
                           </button>
                         </>
                       );
                     })}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={goToPrevChassis} disabled={selectedIndexInPage <= 0} className="px-3 py-2 bg-[var(--surface)] border w-20 border-[var(--border)] rounded-md">
-                      Previous
-                    </button>
-                    <button
-                      onClick={goToNextChassis}
-                      disabled={selectedIndexInPage < 0 || selectedIndexInPage >= selectedPageList.length - 1}
-                      className="px-3 w-20 py-2 bg-[var(--primary)] border border-[var(--border)] rounded-md"
-                    >
-                      Next
-                    </button>
-                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 align-middle mt-2 justify-end w-full">
+                  <button onClick={goToPrevChassis} disabled={selectedIndexInPage <= 0} className="px-3 py-2 bg-[var(--surface)] border w-20 border-[var(--border)] rounded-md">
+                    Previous
+                  </button>
+                  <button
+                    onClick={goToNextChassis}
+                    disabled={selectedIndexInPage < 0 || selectedIndexInPage >= selectedPageList.length - 1}
+                    className="px-3 w-20 py-2 bg-[var(--primary)] border border-[var(--border)] rounded-md"
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
 
               {/* Editable table for selected chassis */}
               {selectedChassis ? (
-                <div className="bg-[var(--background)]  p-6 rounded border">
+                <div className="bg-[var(--background)]  p-4 md:p-6 rounded border flex flex-col">
                   <div className="flex items-center justify-between  ">
                     <div className="font-medium">{selectedChassis.chassis_number}</div>
 
@@ -568,7 +557,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                     </table>
                   </div>
 
-                  <div className="mt-2 p-4 bg-[var(--background)] rounded-lg border border-[var(--border)]">
+                  <div className="mt-2 p-3 md:p-4 bg-[var(--background)] rounded-lg border border-[var(--border)] sticky bottom-0 bg-opacity-90 backdrop-blur-sm">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">

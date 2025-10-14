@@ -15,8 +15,6 @@ export default function VehiclesPage() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
-  const [InvoiceResponse, setInvoiceResponse] = useState(null);
-  const [isInvoiceDataview, setIsInvoiceDataView] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState(null);
   const [invoiceFileModal, setInvoiceFileModal] = useState(false);
 
@@ -191,8 +189,8 @@ export default function VehiclesPage() {
       return;
     }
     showToast(response.message, "success");
-    setInvoiceResponse(response.data);
-    setIsInvoiceDataView(true);
+    // setInvoiceResponse(response.data);
+    // setIsInvoiceDataView(true);
     setInvoiceFileModal(false);
     setInvoiceFile(null);
     setError("");
@@ -246,8 +244,6 @@ export default function VehiclesPage() {
   const handleBackToList = () => {
     setCurrentView("list");
     setEdit(null);
-    setInvoiceResponse(null);
-    setIsInvoiceDataView(false);
     loadData(); // Refresh the list
   };
 
@@ -261,9 +257,7 @@ export default function VehiclesPage() {
   if (currentView === "form") {
     return <EditVehicle vehicleId={edit} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
   }
-  if (isInvoiceDataview) {
-    return <InvoiceDataViewer data={InvoiceResponse} onBack={handleBackToList} />;
-  }
+ 
 
 
   return (

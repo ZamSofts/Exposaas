@@ -12,7 +12,6 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === "GET") {
-      
       const userFilter = session.role === "Sadmin" ? {} : { companyId: session?.companyId };
       if (!userFilter.companyId && session.role !== "Sadmin") {
         return res.status(400).json({ error: "Missing companyId and no company available in session" });
@@ -84,7 +83,7 @@ export default async function handler(req, res) {
 
     if (req.method === "PUT") {
       const body = req.body || {};
-      const { Page, Json, isCorrect, CompanyID, DocumentURL } = body;
+      const { Page, Json, isCorrect, CompanyID, DocumentURL, invoiceJobId } = body;
 
       if (!Json || typeof Json !== "object") return res.status(400).json({ error: "Missing or invalid Json payload for page" });
 
@@ -130,9 +129,12 @@ export default async function handler(req, res) {
           Json: storeJson,
           isCorrect: isCorrect || "",
           companyId,
+          invoiceJobId: invoiceJobId || null,
         },
       });
-
+      if (invoiceJobId) {
+        const invoiceJob = await prisma.invoiceJobs.update({ where: { id: invoiceJobId }, data: { isEvaluated: true } });
+      }
       return res.status(201).json({ ok: true, created: true, data: saved });
     }
     if (req.method === "PATCH") {
@@ -165,7 +167,9 @@ export default async function handler(req, res) {
         if (typeof chargeIndex === "number") {
           foundIdx = chargeIndex;
         } else if (type !== undefined) {
-          foundIdx = charges.findIndex(c => String(c.type) === String(type) && (amount == null ? (c.amount == null) : Number(c.amount) === Number(amount) && (c.isConfirm == null || c.isConfirm === false)));
+          foundIdx = charges.findIndex(
+            c => String(c.type) === String(type) && (amount == null ? c.amount == null : Number(c.amount) === Number(amount) && (c.isConfirm == null || c.isConfirm === false))
+          );
         } else {
           // fallback: pick first not-yet-confirmed charge
           foundIdx = charges.findIndex(c => c.isConfirm == null || c.isConfirm === false);
@@ -203,7 +207,6 @@ export default async function handler(req, res) {
       return res.json({ ok: true, updated: true, data: updated });
     }
   } catch (err) {
-    console.error("/api/paymentConfirmation error", err);
     return res.status(500).json({ error: "Internal server error" });
   }
 }

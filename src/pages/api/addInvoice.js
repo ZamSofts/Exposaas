@@ -1,4 +1,6 @@
-import { putFile } from "@/lib/useful"; // adjust path if needed
+import {getSession, putFile } from "@/lib/useful"; // adjust path if needed
+import { initQueue } from "@extra/queues/pdfInvoice";
+
 import multer from "multer";
 
 export const config = {
@@ -16,6 +18,7 @@ const upload = multer({
 }).single("file");
 
 export default async function handler(req, res) {
+  const session = await getSession(req, res);
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -23,7 +26,7 @@ export default async function handler(req, res) {
   // Wrap upload in a Promise so we can await it and only send response after processing.
   try {
     await new Promise((resolve, reject) => {
-      upload(req, res, (err) => {
+      upload(req, res, err => {
         if (err) return reject(err);
         resolve();
       });
@@ -32,11 +35,13 @@ export default async function handler(req, res) {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
+    const boss = await initQueue();
 
-    // putFile is expected to accept the multer file (buffer) and return a url
     const { url } = await putFile(req.file, "invoices/");
-  
-console.log("File uploaded to URL:", url);
+
+    await boss.send("gemini-extract", { fileUrl: url, companyId: session?.companyId });
+    console.log("Dispatched gemini-extract job to queue");
+
     const data = {
       page_1: [
         {
@@ -63,12 +68,10 @@ console.log("File uploaded to URL:", url);
           ],
         },
       ],
-      blobUrl: url,
     };
 
-    return res.status(200).json({ message: "Invoice uploaded successfully", data });
+    return res.status(200).json({ message: "Invoice uploaded successfully. We’re analyzing it,you’ll be notified when it’s ready.", data });
   } catch (err) {
-    // If multer error it may be a file type error; respond with 400 for bad request
     const status = err && err.message && err.message.includes("Only PDF") ? 400 : 500;
     return res.status(status).json({ error: err.message || String(err) });
   }
