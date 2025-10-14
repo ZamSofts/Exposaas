@@ -25,6 +25,10 @@ export default async function handler(req, res) {
         const item = await prisma.invoiceJobs.findUnique({ where: { id }, ...(selectFields ? { select: selectFields } : {}) });
         return res.status(200).json(item);
       }
+
+      const where = { ...userFilter };
+      if (DocumentURL) where.DocumentURL = String(DocumentURL);
+
       const trimmed = search;
       let searchFilter = {};
       if (trimmed) {
