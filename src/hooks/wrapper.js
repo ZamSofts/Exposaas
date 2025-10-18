@@ -47,7 +47,7 @@ export const isAllowed = (required = [], session) => {
   const permissions = Array.isArray(session.permissions) ? session.permissions : [];
   const roles = Array.isArray(session.roles) ? session.roles : [];
   for (const item of required) {
-    if (permissions.includes(item.toLowerCase()) || roles.includes(item.toLowerCase())) return true;
+    if (permissions.includes(item) || roles.includes(item)) return true;
   }
   return false;
 };
