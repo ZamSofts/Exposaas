@@ -295,8 +295,8 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
             maxWidth: '380px'
           }}
         >
-          <div className="p-3 border-b border-[var(--border)] flex items-center justify-between bg-[var(--accent)]/50">
-            <h3 className="font-semibold text-[var(--foreground)] text-sm">Notifications</h3>
+          <div className="p-3 border-b border-[var(--border)] flex items-center justify-between bg-[var(--primary)]">
+            <h3 className="font-semibold text-[var(--primary-foreground)] text-sm">Notifications</h3>
             <button
               onClick={() => setShowNotifications(false)}
               className="p-1 hover:bg-[var(--accent)] rounded transition-colors"
@@ -315,7 +315,7 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
               notifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`p-3 border-b border-[var(--border)] hover:bg-[var(--accent)]/30 transition-colors ${
+                  className={`p-3 border-b border-[var(--border)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors ${
                     !notification.read ? 'bg-[var(--primary)]/10' : ''
                   }`}
                 >
@@ -357,7 +357,7 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
                                 markAsRead(notification.id);
                                 setShowNotifications(false);
                               }}
-                              className="text-xs bg-[var(--primary)] text-[var(--primary-foreground)] px-2 py-1 rounded hover:bg-[var(--primary)]/80 transition-colors"
+                              className="text-xs bg-[var(--primary)]/10 text-[var(--foreground)] border border-[var(--primary)]/30 px-2 py-1 rounded hover:bg-[var(--primary)]/80 hover:text-[var(--primary-foreground)] transition-colors"
                             >
                               {action.label}
                             </button>
@@ -381,11 +381,11 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
           </div>
           
           {notifications.length > 0 && (
-            <div className="p-2 border-t border-[var(--border)] bg-[var(--accent)]/20">
+            <div className="p-2 border-t border-[var(--border)] bg-[var(--primary)] hover:bg-[var(--primary)]/50 transition-colors disabled:opacity-50">
               <button
                 onClick={markAllAsRead}
                 disabled={loading}
-                className="w-full text-xs text-[var(--primary)] hover:text-[var(--primary)] py-1 px-2 rounded hover:bg-[var(--accent)]/50 transition-colors disabled:opacity-50"
+                className="w-50 text-xs text-[var(--primary-foreground)] hover:text-[var(--primary-foreground)] py-1 px-2 rounded "
               >
                 {loading ? 'Loading...' : 'Mark all as read'}
               </button>

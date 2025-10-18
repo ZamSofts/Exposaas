@@ -304,7 +304,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             <p className="text-xs text-[var(--muted-foreground)] truncate">{session?.company || ""}</p>
           </div>
           {/* Notification Bell */}
-          {session?.role?.toLowerCase?.() !== "sadmin" && (
+          {session?.role?.toLowerCase?.() !== "sadmin" && !isCollapsed && (
             <div className="flex-shrink-0">
               <SidebarNotifications isCollapsed={isCollapsed} />
             </div>
