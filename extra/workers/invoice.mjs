@@ -1,6 +1,7 @@
 import { initQueue } from "../queues/pdfInvoice.mjs";
 import { processInvoiceWithGemini } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
+import NotificationService from "../services/notificationService.mjs";
 
 (async () => {
   try {
@@ -14,15 +15,29 @@ import { prisma } from "../PrismaClient/prismaClient.mjs";
     }
 
     console.log("[worker] registering handler for: gemini-extract");
-    // pg-boss passes the job object (not an array). Handler must return/throw to mark success/failure.
     await boss.work("gemini-extract", async ([job]) => {
       let filePath = job && job.data && (job.data.fileUrl || job.data.filePath || job.data.path);
       let companyId = job && job.data && job.data.companyId;
-      console.log("📄 Processing job:", job && job.id, filePath);
+      let userId = job && job.data && job.data.userId; // Get userId from job data
+      console.log("📄 Processing job:", job && job.id, filePath, "for user:", userId);
 
       if (!filePath) {
         const err = new Error("Missing file path/url on job data");
         console.error("❌", err.message, "job=", job && job.id);
+        
+        if (userId && companyId) {
+          try {
+            await NotificationService.sendInvoiceFailedNotification(
+              userId,
+              companyId,
+              filePath || 'Unknown',
+              err.message
+            );
+          } catch (notifyErr) {
+            console.error("❌ Failed to send failure notification:", notifyErr);
+          }
+        }
+        
         throw err;
       }
 
@@ -41,11 +56,41 @@ import { prisma } from "../PrismaClient/prismaClient.mjs";
 
         const created = await prisma.invoiceJobs.create({ data: payload });
         console.log("✅ Invoice processed and stored", job.id);
+        
+        if (userId) {
+          try {
+            await NotificationService.sendInvoiceProcessedNotification(
+              userId,
+              companyId,
+              created
+            );
+            console.log("🔔 Success notification sent to user", userId);
+          } catch (notifyErr) {
+            console.error("❌ Failed to send success notification:", notifyErr);
+          }
+        } else {
+          console.warn("⚠️ No userId provided, cannot send notification");
+        }
+        
       } catch (err) {
         console.error("❌ Gemini processing failed for job", job && job.id, err && err.message ? err.message : err);
-        // If Prisma error, log more details when available
+        
+        if (userId && companyId) {
+          try {
+            await NotificationService.sendInvoiceFailedNotification(
+              userId,
+              companyId,
+              filePath,
+              err.message || 'Unknown error occurred during processing'
+            );
+            console.log("🔔 Failure notification sent to user", userId);
+          } catch (notifyErr) {
+            console.error("❌ Failed to send failure notification:", notifyErr);
+          }
+        }
+        
         if (err && err.meta) console.error("Prisma meta:", err.meta);
-        // rethrow so pg-boss marks job failed / retries
+        
         throw err;
       }
     });

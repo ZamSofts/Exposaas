@@ -93,7 +93,7 @@ export default function InvoiceJobsPage() {
 
       <Sidebar>
         <div className="p-8 bg-[var(--background)] min-h-screen relative">
-          {isLoading && <Loader />}
+          
 
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">

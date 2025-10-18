@@ -39,7 +39,13 @@ export default async function handler(req, res) {
 
     const { url } = await putFile(req.file, "invoices/");
 
-    await boss.send("gemini-extract", { fileUrl: url, companyId: session?.companyId });
+    // Include user info for notifications
+    await boss.send("gemini-extract", { 
+      fileUrl: url, 
+      companyId: session?.companyId,
+      userId:session?.id,
+      userName: session?.name
+    });
     console.log("Dispatched gemini-extract job to queue");
 
     const data = {

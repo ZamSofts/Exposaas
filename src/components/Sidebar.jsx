@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import SidebarNotifications from "./SidebarNotifications";
+
 import {
   LayoutDashboard,
   Truck,
@@ -26,6 +28,7 @@ import {
   CheckCircle,
   ReceiptText,
 } from "lucide-react";
+import { isAllowed } from "../hooks/wrapper";
 
 // Create context for sidebar state
 const SidebarContext = createContext({
@@ -300,7 +303,15 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             <p className="text-sm font-semibold text-[var(--foreground)] truncate">{session?.name || session?.username || "User"}</p>
             <p className="text-xs text-[var(--muted-foreground)] truncate">{session?.company || ""}</p>
           </div>
+          {/* Notification Bell */}
+          {session?.role?.toLowerCase?.() !== "sadmin" && (
+            <div className="flex-shrink-0">
+              <SidebarNotifications isCollapsed={isCollapsed} />
+            </div>
+          )}
+
         </div>
+        
       </div>
 
       {/* Navigation */}

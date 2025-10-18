@@ -7,7 +7,7 @@ import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
 
 
 export default function VehiclesPage() {
-  const { session, status } = useAuth(["view:vehicle"]);
+  const { session, status } = useAuth(["view:vehicle"],["Sadmin"]);
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [vehicles, setVehicles] = useState([]);
