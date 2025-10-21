@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, API, useConfirm, } from "@/hooks/wrapper";
 import { Bell, X, CheckCircle, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
+import wsClient from "@/lib/wsClient";
 
 const SidebarNotifications = ({ isCollapsed = false }) => {
   const { session } = useAuth([], ["sadmin", "customer"]);
@@ -163,67 +164,34 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
 
   // WebSocket connection for notifications
   useEffect(() => {
+    // Connect the shared wsClient when session available
     if (!session?.id || !session?.companyId) {
+      // disconnect shared client if session removed
+      wsClient.disconnect();
+      setIsConnected(false);
       return;
     }
 
-    const connectWebSocket = () => {
-      const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:5000";
-      const ws = new WebSocket(WS_URL);
-
-      ws.onopen = () => {
+    const handler = data => {
+      if (!data) return;
+      if (data.type === '__open') {
         setIsConnected(true);
-
-        // Send join message for notifications
-        ws.send(
-          JSON.stringify({
-            type: "join",
-            userId: session.id,
-            username: session.username,
-            companyId: session.companyId,
-            timestamp: Date.now(),
-          })
-        );
-      };
-
-      ws.onmessage = event => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (data.type === "notification") {
-            handleNotification(data);
-          }
-        } catch (error) {
-          console.error("❌ Error parsing sidebar notification message:", error);
-        }
-      };
-
-      ws.onclose = () => {
+        return;
+      }
+      if (data.type === '__close') {
         setIsConnected(false);
-
-        // Reconnect after 3 seconds
-        setTimeout(() => {
-          if (session?.id) {
-            connectWebSocket();
-          }
-        }, 3000);
-      };
-
-      ws.onerror = error => {
-        console.error("❌ Sidebar notifications WebSocket error:", error);
-        setIsConnected(false);
-      };
-
-      wsRef.current = ws;
+        return;
+      }
+      if (data.type === 'notification') {
+        handleNotification(data);
+      }
     };
 
-    connectWebSocket();
+    wsClient.subscribe(handler);
+    wsClient.connect({ id: session.id, username: session.username, companyId: session.companyId });
 
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
+      wsClient.unsubscribe(handler);
     };
   }, [session?.id, session?.companyId, session?.username, handleNotification]);
 
@@ -299,7 +267,7 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
           </span>
         )}
         {/* Connection indicator */}
-        <div className={`absolute -bottom-0 -right-0 w-2 h-2 rounded-full ${isConnected ? "bg-[var(--success)]" : "bg-[var(--error)]"}`} />
+        <div className={`absolute -bottom-0 -right-0 rounded-full ${isConnected ? "bg-[var(--success)]" : "bg-[var(--error)]"}`} style={{width:'5px',height:"5px"}} />
       </button>
 
       {/* Notification Dropdown */}

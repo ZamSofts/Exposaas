@@ -3,6 +3,7 @@ import Head from "next/head";
 import { useAuth, CustomButton, Error ,Loader as customLoader} from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import {  MessageCircle, Send, Users, Wifi, WifiOff } from "lucide-react";
+import wsClient from "@/lib/wsClient";
 
 export default function ChatPage() {
   const { session, status } = useAuth([],["Customer"]);
@@ -117,14 +118,14 @@ function ChatContent({ userInfo }) {
 
   // Load more messages when scrolling to top
   const loadMoreMessages = useCallback(() => {
-    if (!wsRef.current || !ready || loadingMore || !hasMoreMessages || !userId || !companyId) {
-      console.log("❌ Cannot load more messages:", { 
-        wsReady: !!wsRef.current, 
-        ready, 
-        loadingMore, 
-        hasMoreMessages, 
-        userId: !!userId, 
-        companyId: !!companyId 
+    if (!wsClient.isConnected() || !ready || loadingMore || !hasMoreMessages || !userId || !companyId) {
+      console.log("❌ Cannot load more messages:", {
+        wsConnected: wsClient.isConnected(),
+        ready,
+        loadingMore,
+        hasMoreMessages,
+        userId: !!userId,
+        companyId: !!companyId,
       });
       return;
     }
@@ -133,19 +134,17 @@ function ChatContent({ userInfo }) {
     const nextPage = page + 1;
 
     try {
-      wsRef.current.send(
-        JSON.stringify({
-          type: "load_more",
-          userId: userId,
-          companyId: companyId,
-          page: nextPage,
-          limit: MESSAGES_PER_PAGE,
-        })
-      );
+      wsClient.send({
+        type: 'load_more',
+        userId: userId,
+        companyId: companyId,
+        page: nextPage,
+        limit: MESSAGES_PER_PAGE,
+      });
     } catch (error) {
-      console.error("❌ Error sending load more request:", error);
+      console.error('❌ Error sending load more request:', error);
       setLoadingMore(false);
-      setError("Failed to load more messages");
+      setError('Failed to load more messages');
     }
   }, [ready, loadingMore, hasMoreMessages, page, userId, companyId]);
 
@@ -195,249 +194,149 @@ function ChatContent({ userInfo }) {
   }, [messages, loadingMore, page]);
 
   const connect = useCallback(() => {
-    // Prevent multiple simultaneous connections
-    if (connectingRef.current || !mountedRef.current || !shouldConnectRef.current) {
-      console.log("⏳ Connection prevented:", { 
-        connecting: connectingRef.current, 
-        mounted: mountedRef.current, 
-        shouldConnect: shouldConnectRef.current 
-      });
-      return;
-    }
-
-    // Clear any existing reconnection timeout
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-
-    // Close existing connection if any
-    if (wsRef.current && wsRef.current.readyState !== WebSocket.CLOSED) {
-      console.log("🔄 Closing existing WebSocket connection");
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
-    connectingRef.current = true;
-    setConnecting(true);
-    console.log("🔌 Starting WebSocket connection...");
-
-    try {
-      const url = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:5000";
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        if (!mountedRef.current) {
-          ws.close();
-          return;
-        }
-        
-        connectingRef.current = false; // Reset connecting flag
-        setConnecting(false);
-        setReady(true);
-        setError("");
-        connectionAttemptsRef.current = 0; // Reset connection attempts
-        setConnectionAttempts(0);
-        console.log("🔌 WebSocket connected");
-
-        if (userId && username && companyId) {
-          ws.send(
-            JSON.stringify({
-              type: "join",
+    if (!mountedRef.current || !shouldConnectRef.current) return;
+    // subscribe to wsClient messages via handler below when auth ready
+    wsClient.connect({ id: userId, username, companyId });
+  }, [userId, username, companyId]);
+  useEffect(() => {
+    const handler = data => {
+      try {
+        if (!data) return;
+        if (data.type === '__open') {
+          connectingRef.current = false;
+          setConnecting(false);
+          setReady(true);
+          setError("");
+          connectionAttemptsRef.current = 0;
+          setConnectionAttempts(0);
+          console.log('🔌 WebSocket connected (shared)');
+          // Send join with pagination request so server returns initial chat history
+          if (userId && username && companyId) {
+            wsClient.send({
+              type: 'join',
               userId: userId,
               username: username,
               companyId: companyId,
               timestamp: Date.now(),
               page: 1,
               limit: MESSAGES_PER_PAGE,
-            })
-          );
-        } else {
-          console.error("❌ Missing user credentials:", { userId, username, companyId });
-          setError("User authentication data missing");
+            });
+          }
+          return;
         }
-      };
 
-      ws.onmessage = event => {
-        try {
-          const data = JSON.parse(event.data);
+        if (data.type === '__close') {
+          connectingRef.current = false;
+          setConnecting(false);
+          setReady(false);
+          console.log('❌ WebSocket closed (shared)');
+          // Reconnect logic is handled by wsClient
+          return;
+        }
 
-          if (data.type === "user_count") {
-            setOnlineUsers(data.count);
-            return;
-          }
+        if (data.type === 'user_count') {
+          setOnlineUsers(data.count);
+          return;
+        }
 
-          if (data.type === "chat_history") {
-            const newMessages = data.messages || [];
-            const total = data.total || 0;
-            const currentPage = data.page || 1;
-            
-            setTotalMessages(total);
-            setMessages(newMessages);
-            setPage(1);
-            setHasMoreMessages(total > newMessages.length);
-            setLoading(false);
-            setLoadingMore(false);
-            
-            setTimeout(() => {
+        if (data.type === 'chat_history') {
+          const newMessages = data.messages || [];
+          const total = data.total || 0;
+          const currentPage = data.page || 1;
 
-              scrollToBottom(true); 
-              setIsNearBottom(true);
-              setIsUserScrolling(false); 
-      
-            }, 100);
-            return;
-          }
+          setTotalMessages(total);
+          setMessages(newMessages);
+          setPage(1);
+          setHasMoreMessages(total > newMessages.length);
+          setLoading(false);
+          setLoadingMore(false);
 
-          if (data.type === "load_more_messages") {
-            const newMessages = data.messages || [];
-            const total = data.total || 0;
-            const currentPage = data.page || 1;
-            
-            setTotalMessages(total);
-            
-            setMessages(prevMessages => [...newMessages.reverse(), ...prevMessages]);
-            setPage(currentPage);
-            setHasMoreMessages(data.hasMore);
-            setLoadingMore(false);
-            return;
-          }
+          setTimeout(() => {
+            scrollToBottom(true);
+            setIsNearBottom(true);
+            setIsUserScrolling(false);
+          }, 100);
+          return;
+        }
 
-          if (data.type === "join_success") {
-            console.log("✅ Successfully joined chat:", data.user);
-            return;
-          }
+        if (data.type === 'load_more_messages') {
+          const newMessages = data.messages || [];
+          const total = data.total || 0;
+          const currentPage = data.page || 1;
 
-          if (data.type === "error") {
-            console.error("❌ Server error:", data.message);
-            setError(data.message);
-            setLoadingMore(false); // Reset loading state on error
-            return;
-          }
+          setTotalMessages(total);
+          setMessages(prevMessages => [...newMessages.reverse(), ...prevMessages]);
+          setPage(currentPage);
+          setHasMoreMessages(data.hasMore);
+          setLoadingMore(false);
+          return;
+        }
 
-          if (data.type === "system") {
-            setMessages(prev => [
+        if (data.type === 'join_success') {
+          console.log('✅ Successfully joined chat:', data.user);
+          return;
+        }
+
+        if (data.type === 'error') {
+          console.error('❌ Server error:', data.message);
+          setError(data.message);
+          setLoadingMore(false);
+          return;
+        }
+
+        if (data.type === 'system') {
+          setMessages(prev => [
+            ...prev,
+            {
+              ...data,
+              id: data.id || Date.now() + Math.random(),
+              timestamp: data.timestamp || Date.now(),
+            },
+          ]);
+          return;
+        }
+
+        if (data.type === 'chat') {
+          setMessages(prev => {
+            const exists = prev.some(msg => msg.id === data.id);
+            if (exists) return prev;
+            return [
               ...prev,
               {
                 ...data,
                 id: data.id || Date.now() + Math.random(),
                 timestamp: data.timestamp || Date.now(),
               },
-            ]);
-            return;
-          }
-
-          // Handle chat messages
-          if (data.type === "chat") {
-            console.log("📨 Received chat message:", data);
-
-            setMessages(prev => {
-          
-              const exists = prev.some(msg => msg.id === data.id);
-              if (exists) {
-                console.log("⚠️ Duplicate message received, ignoring");
-                return prev;
-              }
-
-              return [
-                ...prev,
-                {
-                  ...data,
-                  id: data.id || Date.now() + Math.random(),
-                  timestamp: data.timestamp || Date.now(),
-                },
-              ];
-            });
-          }
-        } catch (parseError) {
-          console.error("❌ Error parsing message:", parseError);
-          setError("Received invalid message from server");
+            ];
+          });
         }
-      };
+      } catch (e) {
+        console.error('chat handler error', e);
+      }
+    };
 
-      ws.onclose = event => {
-        connectingRef.current = false; // Reset connecting flag
-        setConnecting(false);
-        setReady(false);
-        console.log("❌ WebSocket closed, code:", event.code);
-
-        if (mountedRef.current && shouldConnectRef.current && connectionAttemptsRef.current < 5) {
-          connectionAttemptsRef.current += 1;
-          setConnectionAttempts(connectionAttemptsRef.current);
-         
-
-          // Use timeout ref to allow cleanup
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (mountedRef.current && shouldConnectRef.current) {
-              reconnectTimeoutRef.current = null;
-              connect();
-            }
-          }, 2000 * connectionAttemptsRef.current); // Exponential backoff
-        } else if (connectionAttemptsRef.current >= 5) {
-          setError("Failed to connect after multiple attempts. Please refresh the page.");
-        }
-      };
-
-      ws.onerror = err => {
-        connectingRef.current = false; // Reset connecting flag
-        setConnecting(false);
-        console.error("❌ WebSocket error:", err);
-        setError("Failed to connect to chat server");
-        
-        if (ws.readyState !== WebSocket.CLOSED) {
-          ws.close();
-        }
-      };
-    } catch (err) {
-      connectingRef.current = false; // Reset connecting flag
-      setConnecting(false);
-      setError("Failed to establish WebSocket connection");
-      console.error("Connection error:", err);
-      setLoading(false);
-    }
-  }, [userId, username, companyId]); 
-  useEffect(() => {
+    // subscribe and connect when user is available
     const timer = setTimeout(() => {
-      if (userId && username && companyId && shouldConnectRef.current && mountedRef.current) {
-        console.log("🔐 User authenticated, connecting WebSocket:", { userId, username, companyId });
-        connect();
-        shouldConnectRef.current = false; // Prevent multiple connections
-      } else {
-        console.log("⏳ Waiting for authentication or already connected:", { 
-          userId, 
-          username, 
-          companyId, 
-          shouldConnect: shouldConnectRef.current,
-          mounted: mountedRef.current 
-        });
+      if (userId && username && companyId && mountedRef.current) {
+        console.log('🔐 User authenticated, connecting shared WebSocket:', { userId, username, companyId });
+        wsClient.subscribe(handler);
+        wsClient.connect({ id: userId, username, companyId });
+        shouldConnectRef.current = false;
       }
     }, 100);
-    
+
     return () => {
       clearTimeout(timer);
-      console.log("🧹 Chat component cleanup");
-      shouldConnectRef.current = false; // Prevent reconnections during cleanup
-      
-      // Clear reconnection timeout
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      
-      // Close WebSocket connection safely
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        console.log("🔌 Closing WebSocket on cleanup");
-        wsRef.current.close(1000, "Component unmounting");
-      }
-      wsRef.current = null;
-      
-      // Reset states
+      console.log('🧹 Chat component cleanup');
+      shouldConnectRef.current = false;
+      wsClient.unsubscribe(handler);
+
+      // reset chat UI state
       setReady(false);
       setMessages([]);
       setOnlineUsers(1);
     };
-  }, [userId, username, companyId]); // Removed connect dependency
+  }, [userId, username, companyId]);
 
   const sendMessage = useCallback(() => {
     const text = message.trim();
@@ -453,7 +352,7 @@ function ChatContent({ userInfo }) {
       return;
     }
     
-    if (wsRef.current?.readyState !== WebSocket.OPEN) {
+    if (!wsClient.isConnected()) {
       setError("Cannot send message: not connected to server");
       return;
     }
@@ -473,15 +372,25 @@ function ChatContent({ userInfo }) {
     };
 
     try {
-      wsRef.current.send(JSON.stringify(payload));
+      wsClient.send(payload);
       setTotalMessages(prev => prev + 1);
       setMessage("");
       setError("");
+      // After sending, force scroll to bottom so sender sees their message
+      setTimeout(() => {
+        try {
+          scrollToBottom(true);
+          setIsNearBottom(true);
+          setIsUserScrolling(false);
+        } catch (e) {
+          /* ignore */
+        }
+      }, 80);
     } catch (err) {
       setError("Failed to send message");
       console.error("Send error:", err);
     }
-  }, [message, userId, username, companyId]);
+  }, [message, userId, username, companyId, scrollToBottom]);
 
   const handleKeyPress = useCallback(
     e => {

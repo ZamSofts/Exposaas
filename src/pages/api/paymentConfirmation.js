@@ -34,17 +34,12 @@ export default async function handler(req, res) {
 
       const finalWhere = searchFilter.OR ? { AND: [where, searchFilter] } : where;
 
-      const flatten = req.query.flatten === "1" || req.query.flatten === "true";
 
-      if (!flatten) {
-        const [items, total] = await Promise.all([
-          prisma.paymentConfirmation.findMany({ where: finalWhere, ...(selectFields ? { select: selectFields } : {}), orderBy: { [sortBy]: sortOrder }, skip, take }),
-          prisma.paymentConfirmation.count({ where: finalWhere }),
-        ]);
-
-        return res.json({ data: items, total });
-      }
-      const rows = await prisma.paymentConfirmation.findMany({ where: finalWhere, ...(selectFields ? { select: selectFields } : {}), orderBy: { [sortBy]: sortOrder } });
+      const rows = await prisma.paymentConfirmation.findMany({ 
+        where,
+        ...(selectFields ? { select: selectFields } : {}), 
+        orderBy: { [sortBy]: sortOrder } 
+      });
 
       const charges = [];
       for (const row of rows) {
@@ -75,8 +70,20 @@ export default async function handler(req, res) {
         }
       }
 
-      const totalCharges = charges.length;
-      const paged = charges.slice(skip, skip + take);
+      let filteredCharges = charges;
+      if (trimmed) {
+        filteredCharges = charges.filter(charge => {
+          return (
+            String(charge.chassis_number).toLowerCase().includes(trimmed.toLowerCase()) ||
+            String(charge.type).toLowerCase().includes(trimmed.toLowerCase()) ||
+            String(charge.DocumentURL).toLowerCase().includes(trimmed.toLowerCase()) ||
+            String(charge.createdAt).toLowerCase().includes(trimmed.toLowerCase()) ||
+            String(charge.confirmationId).includes(trimmed)
+          );
+        });
+      }
+      const totalCharges = filteredCharges.length;
+      const paged = filteredCharges.slice(skip, skip + take);
 
       return res.json({ data: paged, total: totalCharges });
     }

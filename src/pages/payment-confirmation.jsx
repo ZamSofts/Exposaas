@@ -25,15 +25,13 @@ export default function PaymentConfirmation() {
 
   // Load confirmations and extract unconfirmed charges
   const [unconfirmedCharges, setUnconfirmedCharges] = useState([]);
-  const originalChargesRef = useRef([]);
 
   const [loadingIds, setLoadingIds] = useState([]);
   const [confirmedIds, setConfirmedIds] = useState([]);
 
   useEffect(() => {
     loadConfirmations();
-  }, [currentPage, perPage, sortBy, sortOrder]);
- 
+  }, [currentPage, perPage, sortBy, sortOrder, search]);
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
@@ -46,8 +44,8 @@ export default function PaymentConfirmation() {
         page: currentPage.toString(),
         limit: perPage.toString(),
         sortBy: sortBy.toString(),
+        search: search.toString(),
         sortOrder: sortOrder.toString(),
-        flatten: "1",
       });
       const res = await API("GET", `paymentConfirmation?${params}`);
       if (res.error) {
@@ -55,47 +53,9 @@ export default function PaymentConfirmation() {
         setIsLoading(false);
         return;
       }
-
-      const rows = res.data || [];
-      // If backend returned already-flattened charges (flatten mode), use them directly
-      if (rows.length > 0 && (rows[0].chassis_number !== undefined || rows[0].confirmationId !== undefined)) {
-        setUnconfirmedCharges(rows);
-        originalChargesRef.current = rows;
-        setTotal(res.total || rows.length);
-      } else {
-        // Collect unconfirmed charges across all returned confirmation rows
-        const charges = [];
-        for (const row of rows) {
-          const storeJson = row.Json || {};
-          for (const pageKey of Object.keys(storeJson)) {
-            const pageArr = Array.isArray(storeJson[pageKey]) ? storeJson[pageKey] : [];
-            for (const chassisItem of pageArr) {
-              const chassis_number = chassisItem.chassis_number;
-              const chassisCharges = Array.isArray(chassisItem.charges) ? chassisItem.charges : [];
-              chassisCharges.forEach((c, idx) => {
-                const isConf = c.isConfirm == null ? false : Boolean(c.isConfirm);
-                if (isConf === false) {
-                  charges.push({
-                    id: `${row.id}_${pageKey}_${chassis_number}_${idx}`,
-                    confirmationId: row.id,
-                    DocumentURL: row.DocumentURL,
-                    Page: row.Page || (pageKey === "page_1" ? 1 : parseInt(pageKey.split("_")[1], 10) || 1),
-                    pageKey,
-                    chassis_number,
-                    type: c.type,
-                    amount: c.amount,
-                    isConfirm: isConf,
-                    createdAt: row.createdAt,
-                  });
-                }
-              });
-            }
-          }
-        }
-        setUnconfirmedCharges(charges);
-        originalChargesRef.current = charges;
-        setTotal(res.total || charges.length);
-      }
+      const rows = res.data;
+      setUnconfirmedCharges(rows);
+      setTotal(res.total || rows.length);
     } catch (err) {
       console.error("Error loading confirmations", err);
       setError("Failed to load confirmations");
@@ -110,20 +70,7 @@ export default function PaymentConfirmation() {
   };
 
   const handleSearch = value => {
-    // setSearch(value);
-    if (value.trim() === "") {
-      setUnconfirmedCharges(originalChargesRef.current);
-      setTotal(originalChargesRef.current.length);
-    } else {
-      const filtered = originalChargesRef.current.filter(item =>
-        item.chassis_number?.toLowerCase().includes(value.toLowerCase()) ||
-        item.type?.toLowerCase().includes(value.toLowerCase()) ||
-        item.amount?.toString().includes(value) ||
-        item.DocumentURL?.toLowerCase().includes(value.toLowerCase())
-      );
-      setUnconfirmedCharges(filtered);
-      setTotal(filtered.length);
-    }
+    setSearch(value);
     setCurrentPage(1);
   };
 
@@ -262,8 +209,6 @@ export default function PaymentConfirmation() {
       </Sidebar>
 
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
-
-      
     </>
   );
 }
