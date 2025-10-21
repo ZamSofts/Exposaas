@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
+import { fileURLToPath } from 'url';
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 
 const WS_PORT = process.env.WS_PORT || 5000;
@@ -258,9 +259,6 @@ class WebSocketManager {
         break;
       case "vehicle_update":
         this.handleVehicleUpdate(senderWs, payload);
-        break;
-      case "system":
-        this.handleSystemMessage(senderWs, payload);
         break;
       case "notification":
         this.handleNotification(senderWs, payload);
@@ -655,7 +653,6 @@ class WebSocketManager {
         },
       });
 
-      // Format message for broadcast
       const broadcastMessage = {
         id: savedMessage.id,
         text: savedMessage.message,
@@ -675,19 +672,6 @@ class WebSocketManager {
       this.sendError(senderWs, "Failed to save message");
     }
   }
-
-  /* handleVehicleUpdate(senderWs, payload) {
-    // Broadcast vehicle updates to all clients
-    this.broadcast({
-      ...payload,
-      type: "vehicle_update",
-      timestamp: Date.now()
-    });
-  } */
-
-  /*   handleSystemMessage(senderWs, payload) {
-    console.log(`🔧 System message from ${senderWs.id}:`, payload.message);
-  } */
 
   handleNotification(senderWs, payload) {
     try {
@@ -836,6 +820,51 @@ class WebSocketManager {
       timestamp: Date.now(),
     });
   }
+  sendNotificationToUser(userId, notification = {}) {
+    try {
+      const targetId = parseInt(userId);
+      for (const [clientId, info] of this.clients.entries()) {
+        if (info.userId === targetId && info.ws.readyState === WebSocket.OPEN) {
+          const payload = {
+            type: 'notification',
+            ...notification,
+            timestamp: notification.timestamp || new Date().toISOString(),
+          };
+          this.sendToClient(info.ws, payload);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ sendNotificationToUser error:', error && error.message ? error.message : error);
+      return false;
+    }
+  }
+
+  // Sends a notification payload to all connected users in a company
+  sendNotificationToCompany(companyId, notification = {}) {
+    try {
+      const targetCompany = parseInt(companyId);
+      let sent = 0;
+      const payload = {
+        type: 'notification',
+        ...notification,
+        timestamp: notification.timestamp || new Date().toISOString(),
+      };
+
+      for (const [clientId, info] of this.clients.entries()) {
+        if (info.companyId === targetCompany && info.ws.readyState === WebSocket.OPEN) {
+          this.sendToClient(info.ws, payload);
+          sent++;
+        }
+      }
+
+      return sent;
+    } catch (error) {
+      console.error('❌ sendNotificationToCompany error:', error && error.message ? error.message : error);
+      return 0;
+    }
+  }
 
   generateClientId() {
     return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -908,16 +937,21 @@ class WebSocketManager {
   }
 }
 
-// Initialize WebSocket manager
 const wsManager = new WebSocketManager();
-wsManager.initialize().catch(error => {
-  console.error("❌ Failed to initialize WebSocket manager:", error);
-  process.exit(1);
-});
 
-// Graceful shutdown
-process.on("SIGINT", () => wsManager.shutdown());
-process.on("SIGTERM", () => wsManager.shutdown());
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // When run directly (node extra/webSocket/ws.mjs) — start the server
+  wsManager.initialize().catch(error => {
+    console.error("❌ Failed to initialize WebSocket manager:", error);
+    process.exit(1);
+  });
 
-// Export the manager instance for direct use
+  // Graceful shutdown only for the process that started the server
+  process.on("SIGINT", () => wsManager.shutdown());
+  process.on("SIGTERM", () => wsManager.shutdown());
+} else {
+
+  console.log('[DEBUG] ws.mjs imported — not starting server (deferred start)');
+}
+
 export { wsManager };

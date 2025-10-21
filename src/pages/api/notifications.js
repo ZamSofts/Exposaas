@@ -125,18 +125,12 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      const { notificationId } = req.body;
-      const userId = parseInt(session.id);
-
-      if (!notificationId) {
+      if( !id ) {
         return res.status(400).json({ error: "Missing notificationId" });
       }
-
-      // Delete specific notification
       await prisma.notification.delete({
         where: {
-          id: parseInt(notificationId),
-          userId: userId, // Ensure user can only delete their own notifications
+          id: parseInt(id),
         },
       });
 

@@ -1,5 +1,5 @@
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import notificationWS from "../webSocket/notifications.mjs";
+import { wsManager } from "../webSocket/ws.mjs";
 
 class NotificationService {
   static async createAndSend({ userId, companyId, title, message, category = "info", actions = null, metadata = null }) {
@@ -28,7 +28,7 @@ class NotificationService {
         read: false,
       };
 
-      const sent = notificationWS.sendToUser(userId, wsNotification);
+  const sent = wsManager.sendNotificationToUser(userId, wsNotification);
 
       console.log(`🔔 Notification created and ${sent ? "sent" : "queued"} for user ${userId}: ${title}`);
 
