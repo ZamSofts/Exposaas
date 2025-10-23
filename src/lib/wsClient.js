@@ -11,6 +11,7 @@ class WSClient {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
     this.reconnectTimer = null;
+    this.explicitDisconnect = false;
   }
 
   isConnected() {
@@ -63,6 +64,7 @@ class WSClient {
           companyId: this.session.companyId,
           timestamp: Date.now(),
         }));
+        
       } catch (e) {
         console.warn('wsClient: failed to send join', e);
       }
@@ -93,8 +95,10 @@ class WSClient {
     this.ws.onclose = () => {
       this.isConnecting = false;
       this._notify({ type: '__close' });
-      // clear connectedSessionId only if it matches current session
-      this.connectedSessionId = null;
+      // Only clear connectedSessionId if this was an explicit disconnect call
+      if (this.explicitDisconnect) {
+        this.connectedSessionId = null;
+      }
       this._scheduleReconnect();
     };
 
@@ -146,6 +150,7 @@ class WSClient {
     this.session = null;
     this.connectedSessionId = null;
     this.queue = [];
+    this.explicitDisconnect = true;
     if (this.ws) {
       try {
         this.ws.close(1000, 'Client disconnect');
@@ -196,5 +201,9 @@ class WSClient {
   }
 }
 
-const instance = new WSClient();
+// Keep a single WSClient instance across HMR/dev reloads so the socket isn't torn down
+const globalKey = "__EXPOSAAS_WS_CLIENT__";
+const instance = globalThis[globalKey] || new WSClient();
+if (!globalThis[globalKey]) globalThis[globalKey] = instance;
+
 export default instance;
