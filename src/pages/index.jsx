@@ -52,7 +52,7 @@ export default function LoginPage() {
       } else if (result?.ok) {
         getSession().then(session => {
           if (session) {
-            session.user.role.toLowerCase() === "customer" ? router.push("/vehicle") : router.push("/dashboard");
+            session?.user?.role?.toLowerCase() === "customer"  ? router.push("/vehicle") : router.push("/dashboard");
           }
         });
       }

@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import SidebarNotifications from "./SidebarNotifications";
+
 import {
   LayoutDashboard,
   Truck,
@@ -24,7 +26,9 @@ import {
   ChevronRight,
   Settings,
   CheckCircle,
+  ReceiptText,
 } from "lucide-react";
+import { isAllowed } from "../hooks/wrapper";
 
 // Create context for sidebar state
 const SidebarContext = createContext({
@@ -151,18 +155,33 @@ const getAllSidebarSections = () => [
         excludeRoles: ["Sadmin"],
       },
       {
+        id: "invoice-jobs",
+        label: "Invoice Jobs",
+        icon: <ReceiptText size={20} />,
+        href: "/InvoiceJobs",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
+        id: "payment-confirmation",
+        label: "Payment Confirmation",
+        icon: <CheckCircle size={20} />,
+        href: "/payment-confirmation",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
         id: "extras",
         label: "Extras",
         icon: <Settings size={20} />,
         isDropdown: true,
-        roles: ["Sadmin"],
+        roles: ["Sadmin", "admin"],
         subItems: [
           {
             id: "manage-status",
             label: "Manage Status",
             href: "/status",
             icon: <CheckCircle size={16} />,
-            roles: ["Admin", "Sadmin"],
           },
         ],
       },
@@ -284,7 +303,15 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             <p className="text-sm font-semibold text-[var(--foreground)] truncate">{session?.name || session?.username || "User"}</p>
             <p className="text-xs text-[var(--muted-foreground)] truncate">{session?.company || ""}</p>
           </div>
+          {/* Notification Bell */}
+          {session?.role?.toLowerCase?.() !== "sadmin" && !isCollapsed && (
+            <div className="flex-shrink-0">
+              <SidebarNotifications isCollapsed={isCollapsed} />
+            </div>
+          )}
+
         </div>
+        
       </div>
 
       {/* Navigation */}

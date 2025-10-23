@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle,InvoiceDataViewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
 
+
 export default function VehiclesPage() {
-  const { session, status } = useAuth(["view:vehicle"]);
+  const { session, status } = useAuth(["view:vehicle"],["Sadmin"]);
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [vehicles, setVehicles] = useState([]);
@@ -14,6 +15,8 @@ export default function VehiclesPage() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [invoiceFileModal, setInvoiceFileModal] = useState(false);
 
   const [csvFile, setCsvFile] = useState(null);
   const [csvFileModal, setCsvFileModal] = useState(false);
@@ -106,6 +109,19 @@ export default function VehiclesPage() {
     setError("");
   };
 
+    const handleInvoiceFileChange = e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+    if (fileExtension !== "pdf" || !["application/pdf"].includes(file.type)) {
+      setError("Only valid invoice files are allowed!");
+      setInvoiceFile(null);
+      return;
+    }
+    setInvoiceFile(file);
+    setError("");
+  };
+
   // Fake progress bar for CSV upload
   const uploadCsv = async () => {
     if (!csvFile) {
@@ -142,6 +158,45 @@ export default function VehiclesPage() {
     loadData();
   };
 
+
+  // Fake progress bar for Invoice upload
+  const uploadInvoice = async () => {
+    if (!invoiceFile) {
+      setError("Please select a valid Invoice file first.");
+      showToast("Please select a valid Invoice file first.", "error");
+      return;
+    }
+    setUploadProgress(1);
+    let fakeProgress = 1;
+    const interval = setInterval(() => {
+      fakeProgress += Math.random() * 10;
+      if (fakeProgress < 90) {
+        setUploadProgress(Math.floor(fakeProgress));
+      }
+    }, 200);
+    const formData = new FormData();
+    formData.append("file", invoiceFile);
+    const response = await API("POST", "addInvoice", formData, true);
+
+    clearInterval(interval);
+    setUploadProgress(100);
+
+    setTimeout(() => setUploadProgress(0), 1000);
+
+    if (response.error) {
+      setError(response.error);
+      showToast(response.error, "error");
+      return;
+    }
+    showToast(response.message, "success");
+    // setInvoiceResponse(response.data);
+    // setIsInvoiceDataView(true);
+    setInvoiceFileModal(false);
+    setInvoiceFile(null);
+    setError("");
+    loadData();
+  };
+
   const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete Vehicle",
@@ -172,6 +227,7 @@ export default function VehiclesPage() {
     setCsvFile(null);
     setCsvFileModal(false);
     setCustomLoader(false);
+    setInvoiceFileModal(false);
   };
 
   // View management functions
@@ -195,10 +251,14 @@ export default function VehiclesPage() {
     handleBackToList();
   };
 
+  
+
   // If we're in form view, render the VehicleForm component
   if (currentView === "form") {
     return <EditVehicle vehicleId={edit} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
   }
+ 
+
 
   return (
     <>
@@ -253,6 +313,40 @@ export default function VehiclesPage() {
             </div>
           )}
 
+          {invoiceFileModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+              <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
+                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="input-label">Upload Invoice File</label>
+                    <input type="file" accept=".pdf" onChange={handleInvoiceFileChange} className="input-style" />
+                    {invoiceFile && (
+                      <p className="text-sm text-[var(--secondary-foreground)] mt-2">
+                        Selected file: <strong>{invoiceFile.name}</strong>
+                      </p>
+                    )}
+                  </div>
+                  <Error message={error} />
+                  {uploadProgress > 0 && (
+                    <div className="w-full bg-[var(--border)] rounded h-3 mb-2">
+                      <div className="bg-[var(--primary)] h-3 rounded transition-all duration-200" style={{ width: `${uploadProgress}%` }}></div>
+                      <div className="text-xs text-right mt-1 text-[var(--foreground)]">{uploadProgress}%</div>
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <CustomButton title="Upload & Sync" onClick={uploadInvoice} className="btn-primary" />
+                    <CustomButton
+                      title="Cancel"
+                      onClick={resetForm}
+                      className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6">
@@ -272,13 +366,19 @@ export default function VehiclesPage() {
           {customLoader && <Loader />}
 
           <div className="relative">
-            {isAllowed(["add:csv"],session) ? (
+            {isAllowed(["add:csv"], session) ? (
               <>
                 <div className="absolute right-0 top-0 hidden md:block">
                   <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
                 </div>
+                <div className="absolute right-60 top-0 hidden md:block">
+                  <CustomButton title="Upload Invoice" onClick={() => setInvoiceFileModal(!invoiceFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
+                </div>
                 <div className="block md:hidden mb-3">
                   <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
+                </div>
+                <div className="block md:hidden mb-3">
+                  <CustomButton title="Upload Invoice" onClick={() => setInvoiceFileModal(!invoiceFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
                 </div>
               </>
             ) : null}
@@ -346,7 +446,7 @@ export default function VehiclesPage() {
 
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(v.createdAt).toLocaleString()}</td>
 
-                   {isAllowed(["edit:vehicle"], session) && (
+                    {isAllowed(["edit:vehicle"], session) && (
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         <div className="flex items-center justify-end gap-2">
                           <button

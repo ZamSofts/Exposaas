@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
+import { fileURLToPath } from 'url';
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 
 const WS_PORT = process.env.WS_PORT || 5000;
@@ -259,8 +260,8 @@ class WebSocketManager {
       case "vehicle_update":
         this.handleVehicleUpdate(senderWs, payload);
         break;
-      case "system":
-        this.handleSystemMessage(senderWs, payload);
+      case "notification":
+        this.handleNotification(senderWs, payload);
         break;
       default:
         this.broadcast(payload, senderWs);
@@ -285,14 +286,13 @@ class WebSocketManager {
       });
 
       if (!user) {
-        this.sendError(senderWs, "User not found");
-        return;
-      }
-
-      // Verify user belongs to the specified company
-      if (user.companyId !== parseInt(companyId)) {
-        this.sendError(senderWs, "User does not belong to the specified company");
-        return;
+        console.warn(`⚠️ User lookup failed for userId=${userId}. Falling back to provided companyId=${companyId} and username=${username}`);
+      } else {
+        // Verify user belongs to the specified company
+        if (user.companyId !== parseInt(companyId)) {
+          this.sendError(senderWs, "User does not belong to the specified company");
+          return;
+        }
       }
 
       // Check for existing connections for this user and close them
@@ -304,16 +304,20 @@ class WebSocketManager {
         }
       });
 
-      // Update client info
+      // Update client info (use user info when available, otherwise use provided payload values)
       const client = this.clients.get(senderWs.id);
       if (client) {
-        client.userId = parseInt(userId);
+        client.userId = user ? parseInt(userId) : null;
         client.username = username;
         client.companyId = parseInt(companyId);
-        client.user = user;
+        client.user = user || null;
       }
 
-      console.log(`👤 User ${username} (${userId}) from company ${user.company.name} joined the chat`);
+      if (user) {
+        console.log(`👤 User ${username} (${userId}) from company ${user.company.name} joined the chat`);
+      } else {
+        console.log(`👤 Anonymous client joined as username='${username}' companyId=${companyId}`);
+      }
 
       // Send join confirmation
       this.sendToClient(senderWs, {
@@ -649,7 +653,6 @@ class WebSocketManager {
         },
       });
 
-      // Format message for broadcast
       const broadcastMessage = {
         id: savedMessage.id,
         text: savedMessage.message,
@@ -670,18 +673,28 @@ class WebSocketManager {
     }
   }
 
-  /* handleVehicleUpdate(senderWs, payload) {
-    // Broadcast vehicle updates to all clients
-    this.broadcast({
-      ...payload,
-      type: "vehicle_update",
-      timestamp: Date.now()
-    });
-  } */
+  handleNotification(senderWs, payload) {
+    try {
+      const { companyId, ...notification } = payload;
+      
+      if (!companyId) {
+        console.error("❌ Notification missing companyId");
+        return;
+      }
 
-  /*   handleSystemMessage(senderWs, payload) {
-    console.log(`🔧 System message from ${senderWs.id}:`, payload.message);
-  } */
+      console.log(`🔔 Broadcasting notification to company ${companyId}:`, notification.title || notification.message);
+      
+      // Broadcast notification to all clients in the same company
+      this.broadcast({
+        type: "notification",
+        ...notification,
+        timestamp: notification.timestamp || new Date().toISOString()
+      }, null, companyId);
+      
+    } catch (error) {
+      console.error("❌ Error handling notification:", error.message);
+    }
+  }
 
   handleDisconnection(ws) {
     const client = this.clients.get(ws.id);
@@ -727,17 +740,57 @@ class WebSocketManager {
     const message = typeof payload === "string" ? payload : JSON.stringify(payload);
     let sentCount = 0;
 
+    // Debug: show current known clients and their companyIds
+    try {
+      const debugClients = [];
+      this.clients.forEach((info, id) => {
+        debugClients.push({ id, companyId: info.companyId, username: info.username });
+      });
+      console.log("[DEBUG] current tracked clients:", JSON.stringify(debugClients));
+    } catch (err) {
+      console.error("[DEBUG] failed to enumerate clients:", err && err.message ? err.message : err);
+    }
+
     this.wss.clients.forEach(client => {
       if (client.readyState === WebSocket.OPEN && client !== excludeWs) {
         try {
           // Get client info
           const clientInfo = this.clients.get(client.id);
-          
+
+          // Debug: log each candidate client and why it might be skipped
+          if (!clientInfo) {
+            console.log(`[DEBUG] skipping client ${client.id} - no clientInfo found`);
+            return;
+          }
+
+          // Allow targeted user notifications when payload includes targetUserId
+          let targetUserId = null;
+          try {
+            if (typeof payload === 'object' && payload.targetUserId) {
+              targetUserId = parseInt(payload.targetUserId);
+            }
+          } catch (e) {
+            targetUserId = null;
+          }
+
+          if (targetUserId) {
+            if (clientInfo.userId !== targetUserId) {
+              console.log(`[DEBUG] skipping client ${client.id} - target user mismatch (${clientInfo.userId} != ${targetUserId})`);
+              return;
+            }
+            // matched target user — send
+            client.send(message);
+            sentCount++;
+            return;
+          }
+
           // If companyId is specified, only send to clients from the same company
           if (companyId && clientInfo && clientInfo.companyId !== companyId) {
+            console.log(`[DEBUG] skipping client ${client.id} - company mismatch (${clientInfo.companyId} != ${companyId})`);
             return; // Skip this client
           }
-          
+
+          // Send message
           client.send(message);
           sentCount++;
         } catch (error) {
@@ -766,6 +819,51 @@ class WebSocketManager {
       message: errorMessage,
       timestamp: Date.now(),
     });
+  }
+  sendNotificationToUser(userId, notification = {}) {
+    try {
+      const targetId = parseInt(userId);
+      for (const [clientId, info] of this.clients.entries()) {
+        if (info.userId === targetId && info.ws.readyState === WebSocket.OPEN) {
+          const payload = {
+            type: 'notification',
+            ...notification,
+            timestamp: notification.timestamp || new Date().toISOString(),
+          };
+          this.sendToClient(info.ws, payload);
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('❌ sendNotificationToUser error:', error && error.message ? error.message : error);
+      return false;
+    }
+  }
+
+  // Sends a notification payload to all connected users in a company
+  sendNotificationToCompany(companyId, notification = {}) {
+    try {
+      const targetCompany = parseInt(companyId);
+      let sent = 0;
+      const payload = {
+        type: 'notification',
+        ...notification,
+        timestamp: notification.timestamp || new Date().toISOString(),
+      };
+
+      for (const [clientId, info] of this.clients.entries()) {
+        if (info.companyId === targetCompany && info.ws.readyState === WebSocket.OPEN) {
+          this.sendToClient(info.ws, payload);
+          sent++;
+        }
+      }
+
+      return sent;
+    } catch (error) {
+      console.error('❌ sendNotificationToCompany error:', error && error.message ? error.message : error);
+      return 0;
+    }
   }
 
   generateClientId() {
@@ -839,13 +937,21 @@ class WebSocketManager {
   }
 }
 
-// Initialize WebSocket manager
 const wsManager = new WebSocketManager();
-wsManager.initialize().catch(error => {
-  console.error("❌ Failed to initialize WebSocket manager:", error);
-  process.exit(1);
-});
 
-// Graceful shutdown
-process.on("SIGINT", () => wsManager.shutdown());
-process.on("SIGTERM", () => wsManager.shutdown());
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // When run directly (node extra/webSocket/ws.mjs) — start the server
+  wsManager.initialize().catch(error => {
+    console.error("❌ Failed to initialize WebSocket manager:", error);
+    process.exit(1);
+  });
+
+  // Graceful shutdown only for the process that started the server
+  process.on("SIGINT", () => wsManager.shutdown());
+  process.on("SIGTERM", () => wsManager.shutdown());
+} else {
+
+  console.log('[DEBUG] ws.mjs imported — not starting server (deferred start)');
+}
+
+export { wsManager };

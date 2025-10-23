@@ -16,6 +16,9 @@ model Company {
   users     User[]
   vehicles  Vehicle[]
   roles     Role[]
+  paymentConfirmations PaymentConfirmation[]
+  InvoiceJobs   InvoiceJobs[]
+  notifications Notification[]
 }
 
 model Customer {
@@ -40,6 +43,7 @@ model User {
   company      Company       @relation(fields: [companyId], references: [id])
   roles        UserRole[]
   customer     Customer?
+  notifications Notification[]
 }
 
 model Role {
@@ -83,7 +87,7 @@ model UserRole {
 model Vehicle {
   id            Int           @id @default(autoincrement())
   name          String?
-  chassisNumber String        @unique
+  chassisNumber String        
   remarks       String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -99,6 +103,8 @@ model Vehicle {
   customer      Customer?     @relation(fields: [customerId], references: [id])
   documents     VehicleDocument[]
   payments      VehiclePayments[]
+
+  @@unique([companyId, chassisNumber])
 
 }
 
@@ -142,6 +148,61 @@ model ChatMessage {
   userId    Int
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
+}
+
+
+model PaymentConfirmation {
+  id          Int      @id @default(autoincrement())
+  DocumentURL String?  
+  Page        Int      
+  Json        Json     
+  isCorrect   String   
+  invoiceJobId Int?
+  companyId   Int
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model InvoiceJobs {
+  id          Int      @id @default(autoincrement())
+  DocumentURL String?       
+  Json        Json     
+  companyId   Int
+  isEvaluated Boolean   @default(false)
+  company     Company  @relation(fields: [companyId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  title       String
+  message     String
+  category    NotificationCategory @default(info)
+  userId      Int
+  companyId   Int
+  isRead      Boolean  @default(false)
+  actions     Json?    
+  metadata    Json?   
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([createdAt])
+}
+
+enum NotificationCategory {
+  info
+  success
+  warning
+  error
 }
 
 enum CompanyStatus {

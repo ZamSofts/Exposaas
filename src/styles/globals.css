@@ -194,6 +194,16 @@ body {
                          text-white rounded-lg font-medium transition-all duration-200 hover:scale-105
                          shadow-lg hover:shadow-xl;
 }
+.apply-button {
+  @apply px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] rounded-full text-xs font-medium border border-[var(--primary)]/20
+  hover:bg-[var(--primary)]/50 transition;
+}
+.applied {
+  @apply px-3 py-1  bg-[var(--success)]/10 text-[var(--success)] rounded-full text-xs font-medium border border-[var(--success)]/20;
+}
+.apply-button,.applied {
+  @apply w-29 text-center; 
+}
 .input-style {
   @apply w-full px-4 py-3 pr-12 bg-[var(--input)] border border-[var(--border)] rounded-lg
                text-[var(--foreground)] placeholder-[var(--secondary-foreground)]
