@@ -1,12 +1,14 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { fileURLToPath } from 'url';
 import { prisma } from "../PrismaClient/prismaClient.mjs";
+import { initQueue } from "../queues/notification.mjs";
 
 const WS_PORT = process.env.WS_PORT || 5000;
 const MAX_CONNECTIONS = parseInt(process.env.MAX_WS_CONNECTIONS) || 1000;
 const MAX_MESSAGE_LENGTH = parseInt(process.env.MAX_MESSAGE_LENGTH) || 5000;
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 const RATE_LIMIT_MAX_MESSAGES = 60; // 60 messages per minute
+const NOTIFICATION_QUEUE = 'send-notification';
 
 class WebSocketManager {
   constructor() {
@@ -15,12 +17,18 @@ class WebSocketManager {
     this.clients = new Map();
     this.rateLimitMap = new Map(); // Track message rates per user
     this.cleanupInterval = null;
+    this.boss = null; // pg-boss instance
   }
 
   async initialize() {
     try {
       // Test database connection
       await prisma.$connect();
+      
+      // Initialize pg-boss for notification processing
+      this.boss = await initQueue();
+      await this.setupNotificationProcessor();
+      
       this.wss = new WebSocketServer({
         port: WS_PORT,
         perMessageDeflate: false,
@@ -33,6 +41,7 @@ class WebSocketManager {
 
       console.log(`🚀 WebSocket server running on ws://localhost:${WS_PORT}`);
       console.log(`📊 Max connections: ${MAX_CONNECTIONS}, Max message length: ${MAX_MESSAGE_LENGTH}`);
+      console.log(`🔔 Notification queue processor started for: ${NOTIFICATION_QUEUE}`);
     } catch (error) {
       console.error("❌ Failed to start WebSocket server:", error.message);
       process.exit(1);
@@ -85,6 +94,61 @@ class WebSocketManager {
     this.wss.on("connection", (ws, req) => {
       this.handleConnection(ws, req);
     });
+  }
+
+  async setupNotificationProcessor() {
+    try {
+      await this.boss.work(NOTIFICATION_QUEUE, async ([job]) => {
+        await this.processNotificationJob(job);
+      });
+    } catch (error) {
+      console.error("❌ Failed to setup notification processor:", error.message);
+      throw error;
+    }
+  }
+
+  async processNotificationJob(job) {
+    try {
+      // Handle different job structure possibilities
+      const {userId,companyId, notification} = job.data;
+      
+      if (!userId || !notification) {
+        console.error('❌ Invalid job data: missing userId or notification', { userId });
+        return;
+      }
+      
+      // Debug current connected clients
+      const connectedClients = [];
+      this.clients.forEach((client, id) => {
+        connectedClients.push({
+          id,
+          userId: client.userId,
+          username: client.username,
+          companyId: client.companyId,
+          connected: client.ws.readyState === 1
+        });
+      });
+      console.log(`🔍 Current connected clients:`, connectedClients);
+      
+      let sent = false;
+      
+      // Try to send to specific user first
+      if (userId) {
+        sent = this.sendNotificationToUser(userId, notification);
+      }
+      
+      // If user not connected, try sending to all users in company
+      if (!sent && companyId) {
+        const companySent = this.sendNotificationToCompany(companyId, notification);
+        sent = companySent > 0;
+      }
+      
+      console.log(`📤 Notification job processed: ${sent ? 'SUCCESS - NOTIFICATION SENT!' : 'NO CLIENTS CONNECTED'} for user ${userId}`);
+      
+    } catch (error) {
+      console.error("❌ Error processing notification job:", error);
+      throw error;
+    }
   }
 
   handleConnection(ws, req) {
@@ -820,9 +884,12 @@ class WebSocketManager {
       timestamp: Date.now(),
     });
   }
-  sendNotificationToUser(userId, notification = {}) {
+  async sendNotificationToUser(userId, notification = {}) {
     try {
       const targetId = parseInt(userId);
+      let sent = false;
+      
+      // First, try to find authenticated clients (who have joined chat)
       for (const [clientId, info] of this.clients.entries()) {
         if (info.userId === targetId && info.ws.readyState === WebSocket.OPEN) {
           const payload = {
@@ -831,10 +898,48 @@ class WebSocketManager {
             timestamp: notification.timestamp || new Date().toISOString(),
           };
           this.sendToClient(info.ws, payload);
-          return true;
+          console.log(`📤 Notification sent to authenticated client: ${clientId}`);
+          sent = true;
         }
       }
-      return false;
+      
+      // If no authenticated clients found, try to find the user by company
+      if (!sent) {
+        console.log(`🔍 No authenticated clients found for user ${targetId}, trying to find by company...`);
+        
+        // Get user's company from database
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: targetId },
+            include: { company: true }
+          });
+          
+          if (user) {
+            console.log(`👤 Found user ${user.username} in company ${user.company.name} (${user.companyId})`);
+            
+            // Send to all clients from the same company (even if not authenticated in chat)
+            for (const [clientId, info] of this.clients.entries()) {
+              if (info.ws.readyState === WebSocket.OPEN) {
+                // Send notification to all connected clients from same company
+                // We'll add user identification later - for now send to all clients
+                const payload = {
+                  type: 'notification',
+                  targetUserId: targetId, // Add target user ID for frontend filtering
+                  ...notification,
+                  timestamp: notification.timestamp || new Date().toISOString(),
+                };
+                this.sendToClient(info.ws, payload);
+                console.log(`📤 Notification sent to company client: ${clientId}`);
+                sent = true;
+              }
+            }
+          }
+        } catch (dbError) {
+          console.error('❌ Database error when looking up user:', dbError.message);
+        }
+      }
+      
+      return sent;
     } catch (error) {
       console.error('❌ sendNotificationToUser error:', error && error.message ? error.message : error);
       return false;
@@ -892,6 +997,16 @@ class WebSocketManager {
       this.cleanupInterval = null;
     }
 
+    // Stop pg-boss
+    if (this.boss) {
+      try {
+        await this.boss.stop();
+        console.log("✅ pg-boss stopped");
+      } catch (error) {
+        console.error("❌ Error stopping pg-boss:", error.message);
+      }
+    }
+
     // Close all client connections gracefully
     const closePromises = [];
     this.wss.clients.forEach(ws => {
@@ -945,7 +1060,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.error("❌ Failed to initialize WebSocket manager:", error);
     process.exit(1);
   });
-
   // Graceful shutdown only for the process that started the server
   process.on("SIGINT", () => wsManager.shutdown());
   process.on("SIGTERM", () => wsManager.shutdown());

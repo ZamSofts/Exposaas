@@ -1,5 +1,7 @@
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import { wsManager } from "../webSocket/ws.mjs";
+import { initQueue } from "../queues/notification.mjs";
+
+const NOTIFICATION_QUEUE = 'send-notification';
 
 class NotificationService {
   static async createAndSend({ userId, companyId, title, message, category = "info", actions = null, metadata = null }) {
@@ -28,9 +30,18 @@ class NotificationService {
         read: false,
       };
 
-  const sent = wsManager.sendNotificationToUser(userId, wsNotification);
+      try {
+        const boss = await initQueue();
+        const jobId = await boss.send(NOTIFICATION_QUEUE, {
+          userId: Number(userId),
+          companyId: Number(companyId),
+          notification: wsNotification
+        });
 
-      console.log(`🔔 Notification created and ${sent ? "sent" : "queued"} for user ${userId}: ${title}`);
+        console.log(`🔔 Notification created and enqueued for user ${userId}`);
+      } catch (queueError) {
+        console.error("❌ Failed to enqueue notification:", queueError);
+      }
 
       return notification;
     } catch (error) {
