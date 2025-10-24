@@ -7,11 +7,7 @@
     "worker": "node -r dotenv/config extra/workers/vehicle.mjs",
     "ws": "node -r dotenv/config extra/webSocket/ws.mjs",
     "build": "next build",
-<<<<<<< HEAD
     "start": "concurrently -n \"NEXT,WORKER,WS,INVOICE\" -c \"blue,green,yellow,magenta\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\"",
-=======
-    "start": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\"",
->>>>>>> Rehman
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
