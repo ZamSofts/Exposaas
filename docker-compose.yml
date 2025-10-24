@@ -8,13 +8,9 @@ services:
     ports:
       - "3001:3001"
       - "5000:5000"
+    env_file:
+      - .env.docker     
     environment:
-      NEXTAUTH_SECRET: "!2"
-      DATABASE_URL: "postgresql://postgres:master@host.docker.internal:5432/exposaas?schema=public"
-      AZURE_STORAGE_ACCOUNT_NAME: ""
-      AZURE_STORAGE_ACCOUNT_KEY: ""
-      AZURE_STORAGE_CONTAINER_NAME: ""
-      NEXT_PUBLIC_WS_URL: "wss://exposaas.dndsol.co/ws/"
-      GEMINI_API_KEY: ""
+      NODE_ENV: production
     extra_hosts:
       - "host.docker.internal:host-gateway"
