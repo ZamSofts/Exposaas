@@ -3,26 +3,18 @@ version: '3.9'
 services:
   web:
     build: .
-    container_name: exposaas_app
+    container_name: exposaas
     restart: always
     ports:
-      - "3000:3000"
-    env_file: .env
-    depends_on:
-      - postgres
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: exposaas_db
-    restart: always
+      - "3001:3001"
+      - "5000:5000"
     environment:
-      POSTGRES_USER: *****
-      POSTGRES_PASSWORD: *****
-      POSTGRES_DB: exposaas
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-
-volumes:
-  pgdata:
+      NEXTAUTH_SECRET: "!2"
+      DATABASE_URL: "postgresql://postgres:master@host.docker.internal:5432/exposaas?schema=public"
+      AZURE_STORAGE_ACCOUNT_NAME: ""
+      AZURE_STORAGE_ACCOUNT_KEY: ""
+      AZURE_STORAGE_CONTAINER_NAME: ""
+      NEXT_PUBLIC_WS_URL: "wss://exposaas.dndsol.co/ws/"
+      GEMINI_API_KEY: ""
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
