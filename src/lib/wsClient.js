@@ -63,6 +63,7 @@ class WSClient {
           companyId: this.session.companyId,
           timestamp: Date.now(),
         }));
+        
       } catch (e) {
         console.warn('wsClient: failed to send join', e);
       }
