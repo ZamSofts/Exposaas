@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from "ws";
-import { fileURLToPath } from 'url';
+import { fileURLToPath } from "url";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { initQueue } from "../queues/notification.mjs";
 
@@ -8,7 +8,7 @@ const MAX_CONNECTIONS = parseInt(process.env.MAX_WS_CONNECTIONS) || 1000;
 const MAX_MESSAGE_LENGTH = parseInt(process.env.MAX_MESSAGE_LENGTH) || 5000;
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 const RATE_LIMIT_MAX_MESSAGES = 60; // 60 messages per minute
-const NOTIFICATION_QUEUE = 'send-notification';
+const NOTIFICATION_QUEUE = "send-notification";
 
 class WebSocketManager {
   constructor() {
@@ -24,11 +24,11 @@ class WebSocketManager {
     try {
       // Test database connection
       await prisma.$connect();
-      
+
       // Initialize pg-boss for notification processing
       this.boss = await initQueue();
       await this.setupNotificationProcessor();
-      
+
       this.wss = new WebSocketServer({
         port: WS_PORT,
         perMessageDeflate: false,
@@ -80,9 +80,7 @@ class WebSocketManager {
       const now = Date.now();
       this.rateLimitMap.forEach((data, userId) => {
         // Remove entries older than rate limit window
-        data.messages = data.messages.filter(timestamp => 
-          now - timestamp < RATE_LIMIT_WINDOW
-        );
+        data.messages = data.messages.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
         if (data.messages.length === 0) {
           this.rateLimitMap.delete(userId);
         }
@@ -109,42 +107,22 @@ class WebSocketManager {
 
   async processNotificationJob(job) {
     try {
-      // Handle different job structure possibilities
-      const {userId,companyId, notification} = job.data;
-      
+    
+      const { userId, companyId, notification } = job.data;
       if (!userId || !notification) {
-        console.error('❌ Invalid job data: missing userId or notification', { userId });
+        console.error("❌ Invalid job data: missing userId or notification", { userId });
         return;
       }
-      
-      // Debug current connected clients
-      const connectedClients = [];
-      this.clients.forEach((client, id) => {
-        connectedClients.push({
-          id,
-          userId: client.userId,
-          username: client.username,
-          companyId: client.companyId,
-          connected: client.ws.readyState === 1
-        });
-      });
-      console.log(`🔍 Current connected clients:`, connectedClients);
-      
+
       let sent = false;
-      
-      // Try to send to specific user first
       if (userId) {
         sent = this.sendNotificationToUser(userId, notification);
       }
-      
-      // If user not connected, try sending to all users in company
-      if (!sent && companyId) {
-        const companySent = this.sendNotificationToCompany(companyId, notification);
-        sent = companySent > 0;
-      }
-      
-      console.log(`📤 Notification job processed: ${sent ? 'SUCCESS - NOTIFICATION SENT!' : 'NO CLIENTS CONNECTED'} for user ${userId}`);
-      
+      // if (!sent && companyId) {
+      //   const companySent = this.sendNotificationToCompany(companyId, notification);
+      //   sent = companySent > 0;
+      // }
+
     } catch (error) {
       console.error("❌ Error processing notification job:", error);
       throw error;
@@ -254,17 +232,17 @@ class WebSocketManager {
   }
 
   validatePayload(payload) {
-    if (!payload || typeof payload !== 'object') return false;
-    if (!payload.type || typeof payload.type !== 'string') return false;
-    
+    if (!payload || typeof payload !== "object") return false;
+    if (!payload.type || typeof payload.type !== "string") return false;
+
     // Additional validation based on message type
     switch (payload.type) {
-      case 'chat':
-        return payload.text && typeof payload.text === 'string' && payload.text.trim().length > 0;
-      case 'join':
+      case "chat":
+        return payload.text && typeof payload.text === "string" && payload.text.trim().length > 0;
+      case "join":
         return payload.userId && payload.username && payload.companyId;
-      case 'load_more':
-      case 'load_history':
+      case "load_more":
+      case "load_history":
         return true; // Basic validation already done
       default:
         return true;
@@ -272,42 +250,40 @@ class WebSocketManager {
   }
 
   sanitizeInput(input) {
-    if (typeof input !== 'string') return '';
-    
+    if (typeof input !== "string") return "";
+
     // Remove potential XSS characters and limit length
     return input
-      .replace(/[<>]/g, '') // Remove angle brackets
-      .replace(/javascript:/gi, '') // Remove javascript: protocol
-      .replace(/on\w+=/gi, '') // Remove event handlers
+      .replace(/[<>]/g, "") // Remove angle brackets
+      .replace(/javascript:/gi, "") // Remove javascript: protocol
+      .replace(/on\w+=/gi, "") // Remove event handlers
       .trim()
       .substring(0, MAX_MESSAGE_LENGTH);
   }
 
   checkRateLimit(userId) {
     const now = Date.now();
-    
+
     if (!this.rateLimitMap.has(userId)) {
       this.rateLimitMap.set(userId, { messages: [] });
     }
-    
+
     const userData = this.rateLimitMap.get(userId);
-    
+
     // Clean old messages outside the window
-    userData.messages = userData.messages.filter(timestamp => 
-      now - timestamp < RATE_LIMIT_WINDOW
-    );
-    
+    userData.messages = userData.messages.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+
     // Check if user exceeds rate limit
     if (userData.messages.length >= RATE_LIMIT_MAX_MESSAGES) {
       return false;
     }
-    
+
     // Add current message timestamp
     userData.messages.push(now);
     return true;
   }
 
-  routeMessage(senderWs, payload) {
+  async routeMessage(senderWs, payload) {
     switch (payload.type) {
       case "chat":
         this.handleChatMessage(senderWs, payload);
@@ -321,17 +297,10 @@ class WebSocketManager {
       case "load_more":
         this.handleLoadMore(senderWs, payload);
         break;
-      case "vehicle_update":
-        this.handleVehicleUpdate(senderWs, payload);
-        break;
-      case "notification":
-        this.handleNotification(senderWs, payload);
-        break;
       default:
         this.broadcast(payload, senderWs);
     }
   }
-
   async handleUserJoin(senderWs, payload) {
     try {
       const { userId, username, companyId } = payload;
@@ -415,7 +384,7 @@ class WebSocketManager {
       const { page = 1, limit = 50 } = payload;
       const client = this.clients.get(senderWs.id);
       const companyId = client?.companyId;
-      
+
       await this.sendChatHistory(senderWs, { page, limit, companyId });
     } catch (error) {
       console.error("❌ Error loading history:", error.message);
@@ -428,17 +397,17 @@ class WebSocketManager {
       // Validate pagination parameters
       const page = Math.max(1, parseInt(payload.page) || 1);
       const limit = Math.min(50, Math.max(1, parseInt(payload.limit) || 20)); // Limit between 1-50
-      
+
       const client = this.clients.get(senderWs.id);
       const companyId = client?.companyId;
-      
+
       if (!companyId || !Number.isInteger(companyId)) {
         this.sendError(senderWs, "");
         return;
       }
 
       console.log(`📖 Loading more messages - Page: ${page}, Limit: ${limit}, Company: ${companyId}`);
-      
+
       await this.sendMoreMessages(senderWs, { page, limit, companyId });
     } catch (error) {
       console.error("❌ Error loading more messages:", error.message);
@@ -460,17 +429,17 @@ class WebSocketManager {
       const totalCount = await prisma.chatMessage.count({
         where: {
           user: {
-            companyId: filterCompanyId
-          }
-        }
+            companyId: filterCompanyId,
+          },
+        },
       });
 
       // Get latest messages (most recent first)
       const messages = await prisma.chatMessage.findMany({
         where: {
           user: {
-            companyId: filterCompanyId
-          }
+            companyId: filterCompanyId,
+          },
         },
         include: {
           user: {
@@ -536,17 +505,17 @@ class WebSocketManager {
       const totalCount = await prisma.chatMessage.count({
         where: {
           user: {
-            companyId: filterCompanyId
-          }
-        }
+            companyId: filterCompanyId,
+          },
+        },
       });
 
       // Get older messages for pagination (exclude already loaded messages)
       const messages = await prisma.chatMessage.findMany({
         where: {
           user: {
-            companyId: filterCompanyId
-          }
+            companyId: filterCompanyId,
+          },
         },
         include: {
           user: {
@@ -586,7 +555,7 @@ class WebSocketManager {
         messages: formattedMessages,
         total: totalCount,
         page,
-        hasMore: (page * limit) < totalCount,
+        hasMore: page * limit < totalCount,
         timestamp: Date.now(),
       });
 
@@ -613,8 +582,8 @@ class WebSocketManager {
       const messages = await prisma.chatMessage.findMany({
         where: {
           user: {
-            companyId: filterCompanyId
-          }
+            companyId: filterCompanyId,
+          },
         },
         include: {
           user: {
@@ -666,19 +635,19 @@ class WebSocketManager {
     try {
       const { text, userId } = payload;
       const client = this.clients.get(senderWs.id);
-      
+
       // Validation
-      if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      if (!text || typeof text !== "string" || text.trim().length === 0) {
         this.sendError(senderWs, "Message cannot be empty");
         return;
       }
 
-      if (!userId || !Number.isInteger(parseInt(userId))) {
+      if (!userId || !Number(userId)) {
         this.sendError(senderWs, "User not authenticated");
         return;
       }
 
-      if (!client?.userId || client.userId !== parseInt(userId)) {
+      if (!client?.userId || client.userId !== Number(userId)) {
         this.sendError(senderWs, "User authentication mismatch");
         return;
       }
@@ -690,7 +659,8 @@ class WebSocketManager {
         return;
       }
 
-      if (sanitizedText.length > 2000) { // Reasonable limit for chat messages
+      if (sanitizedText.length > 2000) {
+        // Reasonable limit for chat messages
         this.sendError(senderWs, "Message too long. Maximum 2000 characters.");
         return;
       }
@@ -737,29 +707,6 @@ class WebSocketManager {
     }
   }
 
-  handleNotification(senderWs, payload) {
-    try {
-      const { companyId, ...notification } = payload;
-      
-      if (!companyId) {
-        console.error("❌ Notification missing companyId");
-        return;
-      }
-
-      console.log(`🔔 Broadcasting notification to company ${companyId}:`, notification.title || notification.message);
-      
-      // Broadcast notification to all clients in the same company
-      this.broadcast({
-        type: "notification",
-        ...notification,
-        timestamp: notification.timestamp || new Date().toISOString()
-      }, null, companyId);
-      
-    } catch (error) {
-      console.error("❌ Error handling notification:", error.message);
-    }
-  }
-
   handleDisconnection(ws) {
     const client = this.clients.get(ws.id);
     if (client && client.username) {
@@ -776,7 +723,7 @@ class WebSocketManager {
   broadcastUserCount() {
     // Get unique companies and their user counts
     const companyCounts = new Map();
-    
+
     this.clients.forEach(client => {
       if (client.companyId && client.ws.readyState === WebSocket.OPEN) {
         const count = companyCounts.get(client.companyId) || 0;
@@ -830,7 +777,7 @@ class WebSocketManager {
           // Allow targeted user notifications when payload includes targetUserId
           let targetUserId = null;
           try {
-            if (typeof payload === 'object' && payload.targetUserId) {
+            if (typeof payload === "object" && payload.targetUserId) {
               targetUserId = parseInt(payload.targetUserId);
             }
           } catch (e) {
@@ -888,12 +835,11 @@ class WebSocketManager {
     try {
       const targetId = parseInt(userId);
       let sent = false;
-      
-      // First, try to find authenticated clients (who have joined chat)
+
       for (const [clientId, info] of this.clients.entries()) {
         if (info.userId === targetId && info.ws.readyState === WebSocket.OPEN) {
           const payload = {
-            type: 'notification',
+            type: "notification",
             ...notification,
             timestamp: notification.timestamp || new Date().toISOString(),
           };
@@ -902,29 +848,25 @@ class WebSocketManager {
           sent = true;
         }
       }
-      
-      // If no authenticated clients found, try to find the user by company
+
       if (!sent) {
         console.log(`🔍 No authenticated clients found for user ${targetId}, trying to find by company...`);
-        
-        // Get user's company from database
+
         try {
           const user = await prisma.user.findUnique({
             where: { id: targetId },
-            include: { company: true }
+            include: { company: true },
           });
-          
+
           if (user) {
             console.log(`👤 Found user ${user.username} in company ${user.company.name} (${user.companyId})`);
-            
-            // Send to all clients from the same company (even if not authenticated in chat)
+
             for (const [clientId, info] of this.clients.entries()) {
               if (info.ws.readyState === WebSocket.OPEN) {
-                // Send notification to all connected clients from same company
-                // We'll add user identification later - for now send to all clients
+      
                 const payload = {
-                  type: 'notification',
-                  targetUserId: targetId, // Add target user ID for frontend filtering
+                  type: "notification",
+                  targetUserId: targetId, 
                   ...notification,
                   timestamp: notification.timestamp || new Date().toISOString(),
                 };
@@ -935,24 +877,23 @@ class WebSocketManager {
             }
           }
         } catch (dbError) {
-          console.error('❌ Database error when looking up user:', dbError.message);
+          console.error("❌ Database error when looking up user:", dbError.message);
         }
       }
-      
+
       return sent;
     } catch (error) {
-      console.error('❌ sendNotificationToUser error:', error && error.message ? error.message : error);
+      console.error("❌ sendNotificationToUser error:", error && error.message ? error.message : error);
       return false;
     }
   }
 
-  // Sends a notification payload to all connected users in a company
   sendNotificationToCompany(companyId, notification = {}) {
     try {
       const targetCompany = parseInt(companyId);
       let sent = 0;
       const payload = {
-        type: 'notification',
+        type: "notification",
         ...notification,
         timestamp: notification.timestamp || new Date().toISOString(),
       };
@@ -966,7 +907,7 @@ class WebSocketManager {
 
       return sent;
     } catch (error) {
-      console.error('❌ sendNotificationToCompany error:', error && error.message ? error.message : error);
+      console.error("❌ sendNotificationToCompany error:", error && error.message ? error.message : error);
       return 0;
     }
   }
@@ -1011,10 +952,12 @@ class WebSocketManager {
     const closePromises = [];
     this.wss.clients.forEach(ws => {
       if (ws.readyState === WebSocket.OPEN) {
-        closePromises.push(new Promise(resolve => {
-          ws.once('close', resolve);
-          ws.close(1001, "Server shutting down");
-        }));
+        closePromises.push(
+          new Promise(resolve => {
+            ws.once("close", resolve);
+            ws.close(1001, "Server shutting down");
+          })
+        );
       }
     });
 
@@ -1022,7 +965,7 @@ class WebSocketManager {
     try {
       await Promise.race([
         Promise.all(closePromises),
-        new Promise(resolve => setTimeout(resolve, 5000)) // 5 second timeout
+        new Promise(resolve => setTimeout(resolve, 5000)), // 5 second timeout
       ]);
     } catch (error) {
       console.error("❌ Error closing connections:", error.message);
@@ -1064,8 +1007,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   process.on("SIGINT", () => wsManager.shutdown());
   process.on("SIGTERM", () => wsManager.shutdown());
 } else {
-
-  console.log('[DEBUG] ws.mjs imported — not starting server (deferred start)');
+  console.log("[DEBUG] ws.mjs imported — not starting server (deferred start)");
 }
 
 export { wsManager };

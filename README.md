@@ -547,3 +547,163 @@ Exposaas
 └─ test-azure.js
 
 ```
+```
+Exposaas
+├─ .dockerignore
+├─ .prettierrc
+├─ clean-redis.js
+├─ docker-compose.yml
+├─ Dockerfile
+├─ eslint.config.mjs
+├─ extra
+│  ├─ PrismaClient
+│  │  └─ prismaClient.mjs
+│  ├─ queues
+│  │  ├─ notification.mjs
+│  │  ├─ pdfInvoice.mjs
+│  │  ├─ pgBoss.mjs
+│  │  └─ vehicle.mjs
+│  ├─ services
+│  │  └─ notificationService.mjs
+│  ├─ webSocket
+│  │  └─ ws.mjs
+│  └─ workers
+│     ├─ geminiProcess.mjs
+│     ├─ invoice.mjs
+│     └─ vehicle.mjs
+├─ inspect-redis.js
+├─ memory-monitor.js
+├─ next.config.js
+├─ package-lock.json
+├─ package.json
+├─ postcss.config.mjs
+├─ prisma
+│  ├─ migrations
+│  │  ├─ 20250810070258_initial_schema
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810070403_add_company_details
+│  │  │  └─ migration.sql
+│  │  ├─ 20250810093108_dd
+│  │  │  └─ migration.sql
+│  │  ├─ 20250815163921_update_for_detlet
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820124624_add_vehicle_model
+│  │  │  └─ migration.sql
+│  │  ├─ 20250820145741_add_brand_table
+│  │  │  └─ migration.sql
+│  │  ├─ 20250822044739_add_vehicle_status
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
+│  │  │  └─ migration.sql
+│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
+│  │  │  └─ migration.sql
+│  │  ├─ 20250828112721_add_simple_chat_messages
+│  │  │  └─ migration.sql
+│  │  ├─ 20250902104102_add_vehicle_documents
+│  │  │  └─ migration.sql
+│  │  ├─ 20250903153750_rename_docurl_to_url
+│  │  │  └─ migration.sql
+│  │  ├─ 20250907064548_add_companyid_to_role_with_default
+│  │  │  └─ migration.sql
+│  │  ├─ 20250907065329_update_role_companyid_to_nullable
+│  │  │  └─ migration.sql
+│  │  ├─ 20250912124615_add_amount_to_vehicle_payments
+│  │  │  └─ migration.sql
+│  │  ├─ 20250912153749_add_customer_table
+│  │  │  └─ migration.sql
+│  │  ├─ 20250912160300_add_customer_id_to_vehicle
+│  │  │  └─ migration.sql
+│  │  ├─ 20250914051918_add_customer_user_relation
+│  │  │  └─ migration.sql
+│  │  ├─ 20250916033927_add_company_chassis_unique
+│  │  │  └─ migration.sql
+│  │  ├─ 20251007155347_add_payment_confirmation
+│  │  │  └─ migration.sql
+│  │  ├─ 20251014071707_add_table_invoice_job
+│  │  │  └─ migration.sql
+│  │  ├─ 20251014084227_updatepayemnt_confirm
+│  │  │  └─ migration.sql
+│  │  ├─ 20251014090736_updateinvoicejos
+│  │  │  └─ migration.sql
+│  │  ├─ 20251017160324_add_notifications
+│  │  │  └─ migration.sql
+│  │  └─ migration_lock.toml
+│  ├─ schema.prisma
+│  └─ seed.js
+├─ public
+│  ├─ favicon.ico
+│  ├─ file.svg
+│  ├─ globe.svg
+│  ├─ next.svg
+│  ├─ vercel.svg
+│  └─ window.svg
+├─ README.md
+├─ src
+│  ├─ components
+│  │  ├─ EditVehicle.jsx
+│  │  ├─ InvoiceDataViewer.jsx
+│  │  ├─ Payments.jsx
+│  │  ├─ Sidebar.jsx
+│  │  ├─ SidebarNotifications.jsx
+│  │  └─ ui
+│  │     ├─ ConfirmModal.jsx
+│  │     ├─ CustomButton.jsx
+│  │     ├─ CustomToast.jsx
+│  │     ├─ DataTable.jsx
+│  │     ├─ Error.jsx
+│  │     ├─ FilePreviewer.jsx
+│  │     ├─ Loader.jsx
+│  │     ├─ MultiSelect.jsx
+│  │     ├─ PermissionSelector.jsx
+│  │     ├─ reactSelectStyles.js
+│  │     ├─ SingleSelecter.jsx
+│  │     └─ Skeleton.jsx
+│  ├─ generated
+│  ├─ hooks
+│  │  ├─ useAuth.js
+│  │  ├─ useTheme.js
+│  │  └─ wrapper.js
+│  ├─ lib
+│  │  ├─ auth.js
+│  │  ├─ blob.mjs
+│  │  ├─ db.js
+│  │  ├─ useful.js
+│  │  └─ wsClient.js
+│  ├─ middleware.js
+│  ├─ pages
+│  │  ├─ api
+│  │  │  ├─ addInvoice.js
+│  │  │  ├─ addVehicle.js
+│  │  │  ├─ auth
+│  │  │  │  └─ [...nextauth].js
+│  │  │  ├─ brand.js
+│  │  │  ├─ company.js
+│  │  │  ├─ customer.js
+│  │  │  ├─ InvoiceJobs.js
+│  │  │  ├─ notifications.js
+│  │  │  ├─ paymentConfirmation.js
+│  │  │  ├─ permission.js
+│  │  │  ├─ role.js
+│  │  │  ├─ status.js
+│  │  │  ├─ user.js
+│  │  │  ├─ vehicle.js
+│  │  │  ├─ vehiclePayments.js
+│  │  │  └─ vehicleStatus.js
+│  │  ├─ chat.jsx
+│  │  ├─ company.jsx
+│  │  ├─ customer.jsx
+│  │  ├─ dashboard.jsx
+│  │  ├─ index.jsx
+│  │  ├─ InvoiceJobs.jsx
+│  │  ├─ payment-confirmation.jsx
+│  │  ├─ role.jsx
+│  │  ├─ status.jsx
+│  │  ├─ user.jsx
+│  │  ├─ vehicle.jsx
+│  │  ├─ _app.jsx
+│  │  └─ _document.jsx
+│  └─ styles
+│     └─ globals.css
+└─ test-azure.js
+
+```

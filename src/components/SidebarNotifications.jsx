@@ -62,13 +62,6 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
       });
     }
 
-    if (notification.category === "success") {
-      setTimeout(() => {
-        setNotifications(prev => prev.map(n => (n.id === notification.id ? { ...n, read: true } : n)));
-      }, 8000);
-    }
-
-    console.log("🔔 Sidebar notification received:", notification);
   }, []);
 
   // Mark notification as read
@@ -86,15 +79,7 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
   }, []);
 
   const deleteIt = async id => {
-    // const confirmed = await confirm({
-    //   title: "Delete Notification",
-    //   message: "Are you sure you want to delete this notification? This action cannot be undone.",
-    //   confirmText: "Delete",
-    //   type: "danger",
-    // });
-
-    // if (!confirmed) return;
-
+   
     try {
       const data = await API("DELETE", `notifications?id=${id}`);
       if (data.error) {
