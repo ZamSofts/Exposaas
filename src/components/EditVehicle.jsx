@@ -64,17 +64,17 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setCustomLoader(true);
     setError("");
     try {
-      const [brandData, statusData, customerData] = await Promise.all([
-        API("GET", "brand"), 
-        API("GET", "vehicleStatus"),
-        API("GET", "customer?col=id,name,uniqueId")
-      ]);
+      const [brandData, statusData, customerData] = await Promise.all([API("GET", "brand"), API("GET", "vehicleStatus"), API("GET", "customer?col=id,name,uniqueId")]);
       setBrand(!brandData.error ? brandData : []);
       setVehicleStatus(!statusData.error ? statusData : []);
-      setCustomers(!customerData.error ? customerData.map(c => ({
-        id: c.id,
-        name: c.name + "-" + c.uniqueId ,
-      })) : []);
+      setCustomers(
+        !customerData.error
+          ? customerData.map(c => ({
+              id: c.id,
+              name: c.name + "-" + c.uniqueId,
+            }))
+          : []
+      );
     } catch {
       setError("Something went wrong");
     } finally {
@@ -228,11 +228,8 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       );
 
       if (onSuccess) {
-        setTimeout(() => {
-          onSuccess();
-        }, 1000);
+        onSuccess();
       }
-
     } catch (error) {
       setError("An unexpected error occurred");
       showToast("An unexpected error occurred", "error");
@@ -266,7 +263,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
           </div>
 
           <Error message={error} />
-          
+
           {/* Tab Navigation */}
           <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden">
             <div className="border-b border-[var(--border)]">
@@ -274,32 +271,28 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                 <button
                   onClick={() => setActiveTab("basic")}
                   className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
-                    activeTab === "basic"
-                      ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                      : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
+                    activeTab === "basic" ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
                   }`}
                 >
                   <User className="w-4 h-4" />
                   Basic Info
                 </button>
-               
+
                 <button
                   onClick={() => setActiveTab("documents")}
                   className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
-                    activeTab === "documents"
-                      ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                      : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
+                    activeTab === "documents" ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
                   }`}
                 >
                   <Files className="w-4 h-4" />
                   Documents
                 </button>
-                 <button
+                <button
                   onClick={() => vehicleId && setActiveTab("payments")}
                   disabled={!vehicleId}
                   title={!vehicleId ? "Save vehicle first to manage payments" : "Manage vehicle payments"}
                   className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
-                    !vehicleId 
+                    !vehicleId
                       ? "text-[var(--muted-foreground)] cursor-not-allowed opacity-50"
                       : activeTab === "payments"
                       ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
@@ -337,12 +330,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                     </div>
                     <div>
                       <label className="input-label">Customer</label>
-                      <CustomSelect 
-                        data={customers} 
-                        selectedId={customerId} 
-                        setSelectedId={setCustomerId} 
-                        placeholder="Select customer"
-                      />
+                      <CustomSelect data={customers} selectedId={customerId} setSelectedId={setCustomerId} placeholder="Select customer" />
                     </div>
                     <div>
                       <label className="input-label">Lot Number</label>
@@ -360,9 +348,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                 </div>
               )}
 
-              {activeTab === "payments" && vehicleId && (
-                <Payments vehicleId={vehicleId} />
-              )}
+              {activeTab === "payments" && vehicleId && <Payments vehicleId={vehicleId} />}
 
               {activeTab === "payments" && !vehicleId && (
                 <div className="text-center py-8">

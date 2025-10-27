@@ -94,25 +94,24 @@ const validateVehicle = async ({ chassisNumber, brandId, companyId, statusId, ve
     throw new Error("Missing required fields");
   }
 
-  const [brand, status] = await Promise.all([prisma.brand.findUnique({ where: { id: Number(brandId) } }), prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } })]);
-  let existing = null;
-  if (chassisNumber && companyId) {
-    existing = await prisma.vehicle.findUnique({
+  const [brand, status, existing] = await Promise.all([
+    prisma.brand.findUnique({ where: { id: Number(brandId) } }),
+    prisma.vehicleStatus.findUnique({ where: { id: Number(statusId) } }),
+    prisma.vehicle.findUnique({
       where: {
         companyId_chassisNumber: {
           companyId: Number(companyId),
           chassisNumber,
         },
       },
-    });
-    if (existing && existing.id !== vehicleId) {
-      throw new Error("Chassis number already exists");
-    }
-  }
+    }),
+  ]);
 
   if (!brand) throw new Error("Brand not found");
   if (!status) throw new Error("Status not found");
-  if (existing) throw new Error("Chassis number already exists");
+  if (existing && Number(existing.id) !== Number(vehicleId)) {
+    throw new Error("Chassis number already exists");
+  }
 };
 
 const getSearchFilter = search =>
@@ -189,8 +188,8 @@ export default async function handler(req, res) {
           return res.json(vehicles);
         }
 
-        if (chassisNumber) {
-          const vehicle = await prisma.vehicle.findFirst({ where: { chassisNumber, companyId: session.companyId } });
+        if(chassisNumber){
+          const vehicle = await prisma.vehicle.findFirst({ where: { chassisNumber, companyId:session.companyId} });
           if (!vehicle) return res.status(404).json({ error: "chassis number not found.please first register vehicle" });
           return res.json(vehicle);
         }
@@ -261,7 +260,7 @@ export default async function handler(req, res) {
         const vehicleId = Number(id);
         if (!vehicleId) return res.status(400).json({ error: "Valid vehicle ID required" });
 
-        await validateVehicle({ chassisNumber, brandId, companyId, statusId, vehicleId });
+  await validateVehicle({ chassisNumber, brandId, companyId, statusId, vehicleId });
 
         const updateData = {
           chassisNumber,
