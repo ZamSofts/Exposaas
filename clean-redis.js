@@ -3,7 +3,6 @@ require("dotenv").config();
 
 const redis = new IORedis(process.env.REDIS_URL, {
   maxRetriesPerRequest: null,
-  tls: {}, // Upstash requires TLS
 });
 
 async function cleanRedis() {

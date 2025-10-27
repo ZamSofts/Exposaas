@@ -6,9 +6,8 @@
     "dev": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next dev\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" ",
     "worker": "node -r dotenv/config extra/workers/vehicle.mjs",
     "ws": "node -r dotenv/config extra/webSocket/ws.mjs",
-   
     "build": "next build",
-    "start": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next start\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" ",
+    "start": "concurrently -n \"NEXT,WORKER,WS,INVOICE\" -c \"blue,green,yellow,magenta\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\"",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
@@ -18,9 +17,7 @@
     "@cyntler/react-doc-viewer": "^1.17.0",
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.13.0",
-    "bullmq": "^5.58.2",
     "csv-parser": "^3.2.0",
-    "ioredis": "^5.7.0",
     "lucide-react": "^0.539.0",
     "multer": "^2.0.2",
     "next": "15.4.4",
