@@ -107,7 +107,7 @@ async function downloadFile(url) {
   });
 }
 
-export async function processInvoiceWithGemini(filePath) {
+export async function processInvoiceWithGemini(filePath, invoiceType) {
   let localFilePath = null;
   let downloadedBuffer = null;
 
@@ -116,7 +116,6 @@ export async function processInvoiceWithGemini(filePath) {
     
     console.log("📥 Downloading from Azure Blob or reading local file...");
 
-    // If filePath looks like a URL, download into memory. Otherwise read from disk.
     const isUrl = /^https?:\/\//i.test(filePath);
     if (isUrl) {
       downloadedBuffer = await downloadFile(filePath);
@@ -212,20 +211,12 @@ export async function processInvoiceWithGemini(filePath) {
       console.error("❌ Could not parse JSON from Gemini response. Preview:\n", cleanText.slice(0, 1000));
       return {};
     }
-
-    // ✅ Don't flatten — return exactly page-wise structure
-    // console.log(`✅ Extracted pages: ${Object.keys(parsed).join(", ")}`);
-    // const uploadsDir = path.join(process.cwd(), "uploads");
-    // if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-    // const outputFile = path.join(uploadsDir, `${path.basename(filePath)}.json`);
-    // fs.writeFileSync(outputFile, JSON.stringify(parsed, null, 2), { encoding: "utf-8" });
     return parsed;
   } catch (error) {
     console.error("❌ Error in processInvoiceWithGemini:", error?.message || error);
     return {};
   }
   finally {
-    // 🧹 Clean up downloaded temp file
     if (localFilePath && fs.existsSync(localFilePath)) {
       fs.unlinkSync(localFilePath);
       console.log("🗑️ Temporary file removed:", localFilePath);

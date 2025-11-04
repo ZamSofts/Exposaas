@@ -2,95 +2,9 @@ import { prisma, getSession } from "@/lib/useful";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
-
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 5;
-  const search = String(req.query.search || "").trim();
-  const { sortBy = "id", sortOrder = "asc", DocumentURL, Page: qPage } = req.query || {};
-  const col = req.query.col ? String(req.query.col).split(",") : null;
-  const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
-
   try {
-    if (req.method === "GET") {
-      const userFilter = session.role === "Sadmin" ? {} : { companyId: session?.companyId };
-      if (!userFilter.companyId && session.role !== "Sadmin") {
-        return res.status(400).json({ error: "Missing companyId and no company available in session" });
-      }
-      const where = { ...userFilter };
-      if (DocumentURL) where.DocumentURL = String(DocumentURL);
-      if (qPage) where.Page = Number(qPage);
-
-      const trimmed = search;
-      let searchFilter = {};
-      if (trimmed) {
-        const or = [];
-        if (!isNaN(Number(trimmed))) or.push({ id: Number(trimmed) });
-        or.push({ DocumentURL: { contains: trimmed, mode: "insensitive" } });
-        searchFilter = { OR: or };
-      }
-
-      const take = Number(limit);
-      const skip = (Number(page) - 1) * take;
-
-      const finalWhere = searchFilter.OR ? { AND: [where, searchFilter] } : where;
-
-
-      const rows = await prisma.paymentConfirmation.findMany({ 
-        where,
-        ...(selectFields ? { select: selectFields } : {}), 
-        orderBy: { [sortBy]: sortOrder } 
-      });
-
-      const charges = [];
-      for (const row of rows) {
-        const storeJson = row.Json || {};
-        for (const pageKey of Object.keys(storeJson)) {
-          const pageArr = Array.isArray(storeJson[pageKey]) ? storeJson[pageKey] : [];
-          for (const chassisItem of pageArr) {
-            const chassis_number = chassisItem.chassis_number;
-            const chassisCharges = Array.isArray(chassisItem.charges) ? chassisItem.charges : [];
-            chassisCharges.forEach((c, idx) => {
-              const isConf = c.isConfirm == null ? false : Boolean(c.isConfirm);
-              if (isConf === false) {
-                charges.push({
-                  id: `${row.id}_${pageKey}_${chassis_number}_${idx}`,
-                  confirmationId: row.id,
-                  DocumentURL: row.DocumentURL,
-                  Page: row.Page || (pageKey === "page_1" ? 1 : parseInt(pageKey.split("_")[1], 10) || 1),
-                  pageKey,
-                  chassis_number,
-                  type: c.type,
-                  amount: c.amount,
-                  isConfirm: isConf,
-                  createdAt: row.createdAt,
-                });
-              }
-            });
-          }
-        }
-      }
-
-      let filteredCharges = charges;
-      if (trimmed) {
-        filteredCharges = charges.filter(charge => {
-          return (
-            String(charge.chassis_number).toLowerCase().includes(trimmed.toLowerCase()) ||
-            String(charge.type).toLowerCase().includes(trimmed.toLowerCase()) ||
-            String(charge.DocumentURL).toLowerCase().includes(trimmed.toLowerCase()) ||
-            String(charge.createdAt).toLowerCase().includes(trimmed.toLowerCase()) ||
-            String(charge.confirmationId).includes(trimmed)
-          );
-        });
-      }
-      const totalCharges = filteredCharges.length;
-      const paged = filteredCharges.slice(skip, skip + take);
-
-      return res.json({ data: paged, total: totalCharges });
-    }
-
     if (req.method === "PUT") {
-      const body = req.body || {};
-      const { Page, Json, isCorrect, CompanyID, DocumentURL, invoiceJobId } = body;
+      const { Page, Json, isCorrect, CompanyID, DocumentURL, invoiceJobId } = req.body;
 
       if (!Json || typeof Json !== "object") return res.status(400).json({ error: "Missing or invalid Json payload for page" });
 
@@ -128,7 +42,6 @@ export default async function handler(req, res) {
       const findWhere = { companyId, Page: pageNum };
       if (DocumentURL) findWhere.DocumentURL = DocumentURL;
 
-      // Always create a new row for each page save (user requested behavior)
       const saved = await prisma.paymentConfirmation.create({
         data: {
           DocumentURL: DocumentURL || null,
@@ -140,78 +53,93 @@ export default async function handler(req, res) {
         },
       });
       if (invoiceJobId) {
-        const invoiceJob = await prisma.invoiceJobs.update({ where: { id: invoiceJobId }, data: { isEvaluated: true } });
-      }
-      return res.status(201).json({ ok: true, created: true, data: saved });
-    }
-    if (req.method === "PATCH") {
-      const body = req.body || {};
-      const { id, Json } = body;
-
-      if (!id) return res.status(400).json({ error: "Missing id in request body" });
-
-      if (body.markConfirmed) {
-        const { pageKey, chassis_number, type, amount, chargeIndex } = body;
-        if (!pageKey) return res.status(400).json({ error: "Missing pageKey for markConfirmed" });
-        if (!chassis_number) return res.status(400).json({ error: "Missing chassis_number for markConfirmed" });
-
-        const existing = await prisma.paymentConfirmation.findUnique({ where: { id: Number(id) } });
-        if (!existing) return res.status(404).json({ error: "PaymentConfirmation not found" });
-
-        if (session.role !== "Sadmin" && existing.companyId !== session?.companyId) {
-          return res.status(403).json({ error: "Not permitted to modify this record" });
-        }
-
-        const storeJson = existing.Json || {};
-        const pageArr = Array.isArray(storeJson[pageKey]) ? storeJson[pageKey] : null;
-        if (!pageArr) return res.status(404).json({ error: `Page key ${pageKey} not found in Json` });
-
-        const chassisItem = pageArr.find(ci => String(ci.chassis_number) === String(chassis_number));
-        if (!chassisItem) return res.status(404).json({ error: `Chassis ${chassis_number} not found on ${pageKey}` });
-
-        const charges = Array.isArray(chassisItem.charges) ? chassisItem.charges : [];
-        let foundIdx = -1;
-        if (typeof chargeIndex === "number") {
-          foundIdx = chargeIndex;
-        } else if (type !== undefined) {
-          foundIdx = charges.findIndex(
-            c => String(c.type) === String(type) && (amount == null ? c.amount == null : Number(c.amount) === Number(amount) && (c.isConfirm == null || c.isConfirm === false))
-          );
-        } else {
-          // fallback: pick first not-yet-confirmed charge
-          foundIdx = charges.findIndex(c => c.isConfirm == null || c.isConfirm === false);
-        }
-
-        if (foundIdx === -1 || !charges[foundIdx]) {
-          return res.status(404).json({ error: "Matching charge not found to mark confirmed" });
-        }
-
-        // mark confirmed
-        charges[foundIdx].isConfirm = true;
-
-        // persist updated Json
-        const updatedJson = { ...storeJson, [pageKey]: pageArr };
-
-        const updated = await prisma.paymentConfirmation.update({ where: { id: Number(id) }, data: { Json: updatedJson } });
-
-        return res.json({ ok: true, updated: true, data: updated });
+         await prisma.invoiceJobs.update({ where: { id: invoiceJobId }, data: { isEvaluated: true } });
       }
 
-      // If caller provided a full Json object, replace the Json field
-      if (!Json || typeof Json !== "object") return res.status(400).json({ error: "Missing or invalid Json payload" });
-
-      // Ensure record exists and belongs to the same company (unless Sadmin)
-      const existing = await prisma.paymentConfirmation.findUnique({ where: { id: Number(id) } });
-      if (!existing) return res.status(404).json({ error: "PaymentConfirmation not found" });
-
-      if (session.role !== "Sadmin" && existing.companyId !== session?.companyId) {
-        return res.status(403).json({ error: "Not permitted to modify this record" });
+      const charges = [];
+      const savedJson = saved.Json || {};
+      for (const pageKey of Object.keys(savedJson)) {
+        const pageArrLocal = Array.isArray(savedJson[pageKey]) ? savedJson[pageKey] : [];
+        for (const chassisItem of pageArrLocal) {
+          const chassis_number = chassisItem.chassis_number;
+          const chassisCharges = Array.isArray(chassisItem.charges) ? chassisItem.charges : [];
+          chassisCharges.forEach((c, idx) => {
+              charges.push({
+                DocumentURL: saved.DocumentURL,
+                chassis_number,
+                type: c.type,
+                amount: c.amount,
+                // include chassis-level metadata so we can create vehicles with correct details
+                brand: chassisItem.brand || null,
+                lot_number: chassisItem.lot_number || null,
+                auction: chassisItem.auction || null,
+              });
+            });
+        }
       }
 
-      // Update only the Json field (preserve other columns)
-      const updated = await prisma.paymentConfirmation.update({ where: { id: Number(id) }, data: { Json } });
 
-      return res.json({ ok: true, updated: true, data: updated });
+      console.log('payment items for inserting',charges)
+      for (const ch of charges) {
+        try {
+          const chassisNumber = String(ch.chassis_number || "").trim();
+          if (!chassisNumber) continue;
+          let vehicle = await prisma.vehicle.findUnique({
+            where: {
+              companyId_chassisNumber: {
+                companyId: Number(companyId),
+                chassisNumber,
+              },
+            },
+          });
+          if (!vehicle) {
+            // determine brand name from parsed data, fallback to '-'
+            const brandName = ch.brand && String(ch.brand).trim() !== "" ? String(ch.brand).trim() : "-";
+            const brand = await prisma.brand.upsert({
+              where: { name: brandName },
+              update: {},
+              create: { name: brandName },
+            });
+
+            const lotNumber = ch.lot_number && String(ch.lot_number).trim() !== "" ? String(ch.lot_number).trim() : null;
+            const auction = ch.auction && String(ch.auction).trim() !== "" ? String(ch.auction).trim() : null;
+
+            vehicle = await prisma.vehicle.create({
+              data: {
+                chassisNumber,
+                companyId: Number(companyId),
+                brandId: brand.id,
+                statusId: 1,
+                lotNumber: lotNumber,
+                auction: auction,
+                remarks: `Auto-added from payment confirmatio`,
+
+              },
+            });
+          }
+
+          const amount = ch.amount == null || ch.amount === "" ? null : Number(ch.amount);
+          if (amount == null || isNaN(amount)) {
+            continue;
+          }
+
+          await prisma.vehiclePayments.create({
+            data: {
+              vehicleId: vehicle.id,
+              name: ch.type || "Payment",
+              amount: amount,
+              date: new Date(),
+              remarks: `Auto-added from payment confirmation ${saved.id}`,
+              url: ch.DocumentURL || saved.DocumentURL || null,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to process charge for chassis", ch && ch.chassis_number, err && err.message ? err.message : err);
+        }
+      }
+       res.status(201).json({
+        message: "Page saved and payments added to vehicle payments successfully",
+      });
     }
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });

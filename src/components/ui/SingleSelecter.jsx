@@ -1,5 +1,5 @@
 import Select from "react-select";
-import { customStyles } from "./reactSelectStyles.js"; // adjust path
+import { customStyles } from "./reactSelectStyles.jsx"; // adjust path
 
 export function CustomSelect({ data, selectedId, setSelectedId,placeholder = "Select option..." }) {
   const options = data.map((c) => ({

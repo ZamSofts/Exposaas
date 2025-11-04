@@ -2,13 +2,12 @@ import React, { useMemo, useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
 
-import { useAuth, Error, Toast, Loader, useConfirm } from "@/hooks/wrapper";
-import { ArrowLeft, ChevronLeft, ChevronRight, FileUp, Download, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
-import { API } from "../hooks/wrapper";
+import { useAuth, API, Error, Toast, Loader, useConfirm } from "@/hooks/wrapper";
+import { ArrowLeft,  FileUp, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const router = useRouter();
-
+ console.log("received data from invoicejob page",data)
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [pdfPage, setPdfPage] = useState(1);
@@ -57,7 +56,16 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
   useEffect(() => {
     const list = (editable && editable[selectedPageKey]) || [];
     if (list && list.length > 0) {
-      setSelectedChassis(list[0]);
+      // Try to preserve current selection when editable changes.
+      setSelectedChassis(prev => {
+        if (prev) {
+          // If previous selected chassis still exists (match by chassis_number), keep it.
+          const found = list.find(p => p.chassis_number === prev.chassis_number);
+          if (found) return found;
+        }
+        // Otherwise default to first chassis on the page
+        return list[0];
+      });
     } else {
       setSelectedChassis(null);
     }
@@ -121,6 +129,30 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       return next;
     });
     setSelectedChassis(prev => (prev ? { ...prev, charges: (prev.charges || []).map(c => ({ ...c })) } : null));
+    setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
+  };
+
+  const handleFieldChange = (chassisNum, field, value) => {
+    setEditable(prev => {
+      const next = { ...prev, page_1: prev.page_1.map(p => ({ ...p })), page_2: prev.page_2.map(p => ({ ...p })) };
+      for (const key of pageKeys) {
+        next[key] = next[key].map(item => ({ ...item, charges: (item.charges || []).map(c => ({ ...c })) }));
+        const foundIdx = next[key].findIndex(p => p.chassis_number === chassisNum);
+        if (foundIdx !== -1) {
+          // update field
+          next[key][foundIdx] = { ...next[key][foundIdx], [field]: value };
+          // if chassis_number changed, keep selection in sync
+          if (field === "chassis_number") {
+            setSelectedChassis({ ...next[key][foundIdx] });
+          }
+        }
+      }
+      return next;
+    });
+    // if editing other fields, update selectedChassis too
+    if (field !== "chassis_number") {
+      setSelectedChassis(prev => (prev ? { ...prev, [field]: value } : prev));
+    }
     setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
   };
 
@@ -222,18 +254,19 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       DocumentURL: data?.blobUrl || null,
       invoiceJobId: data?.id || null,
     };
-    console.log("Saving page data", body);
     try {
       setIsLoading(true);
       const res = await API("PUT", "paymentConfirmation", body);
-      if (!res || !res.ok) {
-        showToast("Error saving page", "error");
+
+      if (res.error) {
+        setError(res.error);
+        showToast(res.error, "error");
         return;
       }
+
       setSavedPages(prev => {
         const next = { ...prev, [selectedPageKey]: true };
         const allSaved = pageKeys.every(k => next[k] === true);
-        // call onBack shortly after state update so parent can react
         if (allSaved) {
           setTimeout(() => {
             if (typeof onBack === "function") onBack();
@@ -241,7 +274,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         }
         return next;
       });
-      showToast("Page saved", "success");
+      showToast(res.message, "success");
       setFeedback("yes");
     } catch (err) {
       console.error("Page save error", err);
@@ -277,7 +310,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
           {/* Left: PDF viewer */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6 min-h-[420px] md:min-h-[600px] shadow-sm">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)]  p-4 md:p-6 min-h-[420px] md:min-h-[600px] shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
@@ -308,7 +341,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
             </div>
 
             {/* PDF viewer area: using proven iframe approach from FilePreviewer */}
-            <div className="h-[420px] md:h-[560px] bg-white border border-[var(--border)] rounded-lg overflow-hidden shadow-inner relative">
+            <div className="h-[420px]  md:h-[560px] bg-white border border-[var(--border)] rounded-lg overflow-hidden shadow-inner relative">
               {data?.blobUrl ? (
                 <>
                   {/* Loading overlay */}
@@ -481,6 +514,42 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                     <div className="font-medium">{selectedChassis.chassis_number}</div>
 
                     <div className="text-sm text-[var(--secondary-foreground)]">Edit charges</div>
+                  </div>
+
+                  {/* Editable chassis-level fields */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <label className="text-xs text-[var(--secondary-foreground)]">Chassis Number</label>
+                      <input
+                        value={selectedChassis.chassis_number || ""}
+                        onChange={e => handleFieldChange(selectedChassis.chassis_number, "chassis_number", e.target.value)}
+                        className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[var(--secondary-foreground)]">Brand</label>
+                      <input
+                        value={selectedChassis.brand || ""}
+                        onChange={e => handleFieldChange(selectedChassis.chassis_number, "brand", e.target.value)}
+                        className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[var(--secondary-foreground)]">Lot Number</label>
+                      <input
+                        value={selectedChassis.lot_number || ""}
+                        onChange={e => handleFieldChange(selectedChassis.chassis_number, "lot_number", e.target.value)}
+                        className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[var(--secondary-foreground)]">Auction</label>
+                      <input
+                        value={selectedChassis.auction || ""}
+                        onChange={e => handleFieldChange(selectedChassis.chassis_number, "auction", e.target.value)}
+                        className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                      />
+                    </div>
                   </div>
 
                   <div className="overflow-x-auto mt-4">

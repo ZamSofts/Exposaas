@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle,InvoiceDataViewer } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle, ReactSelect,invoiceTypesOptions } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
 
-
 export default function VehiclesPage() {
-  const { session, status } = useAuth(["view:vehicle"],["Sadmin"]);
+  const { session, status } = useAuth(["view:vehicle"], ["Sadmin"]);
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [vehicles, setVehicles] = useState([]);
@@ -16,7 +15,9 @@ export default function VehiclesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState(null);
+  const [invoiceType,setInvoiceType]= useState("");
   const [invoiceFileModal, setInvoiceFileModal] = useState(false);
+
 
   const [csvFile, setCsvFile] = useState(null);
   const [csvFileModal, setCsvFileModal] = useState(false);
@@ -109,7 +110,7 @@ export default function VehiclesPage() {
     setError("");
   };
 
-    const handleInvoiceFileChange = e => {
+  const handleInvoiceFileChange = e => {
     const file = e.target.files?.[0];
     if (!file) return;
     const fileExtension = file.name.split(".").pop()?.toLowerCase();
@@ -158,7 +159,6 @@ export default function VehiclesPage() {
     loadData();
   };
 
-
   // Fake progress bar for Invoice upload
   const uploadInvoice = async () => {
     if (!invoiceFile) {
@@ -176,7 +176,8 @@ export default function VehiclesPage() {
     }, 200);
     const formData = new FormData();
     formData.append("file", invoiceFile);
-    const response = await API("POST", "addInvoice", formData, true);
+    formData.append("invoiceType", invoiceType);
+    const response = await API("PUT", "addInvoice", formData, true);
 
     clearInterval(interval);
     setUploadProgress(100);
@@ -251,14 +252,10 @@ export default function VehiclesPage() {
     handleBackToList();
   };
 
-  
-
   // If we're in form view, render the VehicleForm component
   if (currentView === "form") {
     return <EditVehicle vehicleId={edit} onBack={handleBackToList} onSuccess={handleFormSuccess} />;
   }
- 
-
 
   return (
     <>
@@ -319,6 +316,15 @@ export default function VehiclesPage() {
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
                 <div className="space-y-4">
                   <div>
+                     <label className="input-label">Invoice Type</label>
+                    <ReactSelect
+                        required
+                        value={invoiceType}
+                        onChange={setInvoiceType}
+                        placeholder="Select Invoice Type"
+                        options={invoiceTypesOptions}
+                      />
+
                     <label className="input-label">Upload Invoice File</label>
                     <input type="file" accept=".pdf" onChange={handleInvoiceFileChange} className="input-style" />
                     {invoiceFile && (

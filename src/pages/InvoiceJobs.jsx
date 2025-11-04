@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useAuth, Error, API, Toast, Loader, InvoiceDataViewer } from "@/hooks/wrapper";
+import { useAuth, Error, API, InvoiceDataViewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { ReceiptText } from "lucide-react";
@@ -12,10 +12,9 @@ export default function InvoiceJobsPage() {
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
+  const [perPage, setPerPage] = useState(5);
   const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState("desc");
 
@@ -25,8 +24,6 @@ export default function InvoiceJobsPage() {
   useEffect(() => {
      loadData();
   }, [currentPage, perPage, sortBy, sortOrder]);
-
-  const showToast = (message, type = "success") => setToast({ id: Date.now(), message, type });
 
   const  loadData = async () => {
     setIsLoading(true);
@@ -150,8 +147,6 @@ export default function InvoiceJobsPage() {
           </DataTable>
         </div>
       </Sidebar>
-
-      <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
     </>
   );
 }

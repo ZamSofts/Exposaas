@@ -20,7 +20,11 @@ export const customStyles = {
     backgroundColor: "var(--input)",
     borderRadius: "0.5rem",
     border: `1px solid var(--border)`,
-    zIndex: 50,
+    zIndex: 5000,
+  }),
+  menuPortal: (provided) => ({
+    ...provided,
+    zIndex: 9999,
   }),
   option: (provided, state) => ({
     ...provided,

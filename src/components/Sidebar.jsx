@@ -163,14 +163,6 @@ const getAllSidebarSections = () => [
         excludeRoles: ["Sadmin"],
       },
       {
-        id: "payment-confirmation",
-        label: "Payment Confirmation",
-        icon: <CheckCircle size={20} />,
-        href: "/payment-confirmation",
-        roles: ["view:vehicle"],
-        excludeRoles: ["Sadmin"],
-      },
-      {
         id: "extras",
         label: "Extras",
         icon: <Settings size={20} />,
