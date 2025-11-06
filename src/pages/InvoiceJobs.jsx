@@ -134,7 +134,7 @@ export default function InvoiceJobsPage() {
                   </td>
 
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-[var(--secondary-foreground)]">{new Date(row.createdAt).toLocaleString()}</div>
+                    <div className="text-sm text-[var(--secondary-foreground)]">{window.goodDateTime(row.createdAt)}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap ">
                     <button onClick={() => openViewer(row)} disabled={row.isEvaluated} className={row.isEvaluated ? "applied" : "apply-button"}>

@@ -19,7 +19,7 @@ import NotificationService from "../services/notificationService.mjs";
       let filePath = job && job.data && (job.data.fileUrl || job.data.filePath || job.data.path);
       let companyId = job && job.data && job.data.companyId;
       let userId = job && job.data && job.data.userId;
-      let invoiceType = job && job.data && job.data.invoiceType; 
+      //let invoiceType = job && job.data && job.data.invoiceType; 
       console.log("📄 Processing job:", job && job.id, filePath, "for user:", userId);
 
       if (!filePath) {
@@ -43,7 +43,7 @@ import NotificationService from "../services/notificationService.mjs";
       }
 
       try {
-        const results = await processInvoiceWithGemini(filePath, invoiceType);
+        const results = await processInvoiceWithGemini(filePath);
 
         if (companyId === undefined || companyId === null) {
           throw new Error("Missing companyId for InvoiceJobs");

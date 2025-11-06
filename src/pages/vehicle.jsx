@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle, ReactSelect,invoiceTypesOptions } from "@/hooks/wrapper";
+import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle, } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
@@ -15,7 +15,7 @@ export default function VehiclesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
   const [invoiceFile, setInvoiceFile] = useState(null);
-  const [invoiceType,setInvoiceType]= useState("");
+  //const [invoiceType,setInvoiceType]= useState("");
   const [invoiceFileModal, setInvoiceFileModal] = useState(false);
 
 
@@ -176,7 +176,7 @@ export default function VehiclesPage() {
     }, 200);
     const formData = new FormData();
     formData.append("file", invoiceFile);
-    formData.append("invoiceType", invoiceType);
+    //formData.append("invoiceType", invoiceType);
     const response = await API("PUT", "addInvoice", formData, true);
 
     clearInterval(interval);
@@ -316,14 +316,14 @@ export default function VehiclesPage() {
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
                 <div className="space-y-4">
                   <div>
-                     <label className="input-label">Invoice Type</label>
+                     {/* <label className="input-label">Invoice Type</label>
                     <ReactSelect
                         required
                         value={invoiceType}
                         onChange={setInvoiceType}
                         placeholder="Select Invoice Type"
                         options={invoiceTypesOptions}
-                      />
+                      /> */}
 
                     <label className="input-label">Upload Invoice File</label>
                     <input type="file" accept=".pdf" onChange={handleInvoiceFileChange} className="input-style" />

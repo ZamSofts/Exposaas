@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   }
   try {
     if (req.method == "PUT") {
-      const { invoiceType } = req.body;
+      //const { invoiceType } = req.body;
 
       if (!req.file) {
         if (req.files && req.files.file) {
@@ -60,7 +60,7 @@ export default async function handler(req, res) {
         companyId: session?.companyId,
         userId: session?.id,
         userName: session?.name,
-        invoiceType: invoiceType,
+        //invoiceType: invoiceType,
       });
       console.log("Dispatched gemini-extract job to queue");
 

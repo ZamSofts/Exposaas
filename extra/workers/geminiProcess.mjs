@@ -107,7 +107,7 @@ async function downloadFile(url) {
   });
 }
 
-export async function processInvoiceWithGemini(filePath, invoiceType) {
+export async function processInvoiceWithGemini(filePath) {
   let localFilePath = null;
   let downloadedBuffer = null;
 

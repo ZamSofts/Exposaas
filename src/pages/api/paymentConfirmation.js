@@ -78,8 +78,6 @@ export default async function handler(req, res) {
         }
       }
 
-
-      console.log('payment items for inserting',charges)
       for (const ch of charges) {
         try {
           const chassisNumber = String(ch.chassis_number || "").trim();

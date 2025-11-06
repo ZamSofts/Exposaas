@@ -17,41 +17,76 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
   const [chassisReviewStatus, setChassisReviewStatus] = useState({});
 
-  const [savedPages, setSavedPages] = useState({ page_1: false, page_2: false });
+  const [savedPages, setSavedPages] = useState({});
   const [pageReviewStatus, setPageReviewStatus] = useState({});
   const [feedback, setFeedback] = useState("yes");
-  const [editable, setEditable] = useState({ page_1: [], page_2: [] });
+  const [editable, setEditable] = useState({});
 
-  const [error] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(false);
 
   useEffect(() => {
-    const base = { ...(data || {}) };
-    base.page_1 = Array.isArray(base.page_1)
-      ? base.page_1.map(p => ({
-          ...p,
-          charges: (p.charges || []).map(c => ({ ...c, amount: c.amount != null ? String(c.amount) : "", isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm) })),
-        }))
-      : [];
-    base.page_2 = Array.isArray(base.page_2)
-      ? base.page_2.map(p => ({
-          ...p,
-          charges: (p.charges || []).map(c => ({ ...c, amount: c.amount != null ? String(c.amount) : "", isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm) })),
-        }))
-      : [];
+    // Build editable object from incoming data, normalizing charges
+    const base = {};
+    const keys = [];
+    if (data && typeof data === "object") {
+      Object.keys(data).forEach(k => {
+        if (k && k.startsWith("page_")) keys.push(k);
+      });
+    }
+    // ensure at least two pages exist for UI fallback
+    if (keys.length === 0) {
+      keys.push("page_1", "page_2");
+    }
+
+    keys.forEach(key => {
+      base[key] = Array.isArray(data?.[key])
+        ? data[key].map(p => ({
+            ...p,
+            charges: (p.charges || []).map(c => ({
+              ...c,
+              amount: c.amount != null ? String(c.amount) : "",
+              isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm),
+            })),
+          }))
+        : [];
+    });
+
     setEditable(base);
     // reset saved state and per-page review
-    setSavedPages({ page_1: false, page_2: false });
+    const savedInit = {};
+    keys.forEach(k => (savedInit[k] = false));
+    setSavedPages(savedInit);
     setPageReviewStatus({});
     // Default to first page and select the first chassis if present
-    setSelectedPageKey("page_1");
-    const firstChassis = base.page_1 && base.page_1.length > 0 ? base.page_1[0] : null;
+    setSelectedPageKey(keys[0] || "page_1");
+    const firstChassis = base[keys[0]] && base[keys[0]].length > 0 ? base[keys[0]][0] : null;
     setSelectedChassis(firstChassis);
   }, [data]);
 
-  const pageKeys = ["page_1", "page_2"];
+  const pageKeys = useMemo(() => {
+    const keys = new Set();
+    if (data && typeof data === "object") {
+      Object.keys(data).forEach(k => {
+        if (k && k.startsWith("page_")) keys.add(k);
+      });
+    }
+    // also include keys from editable state (in case data is empty but editable populated)
+    Object.keys(editable || {}).forEach(k => {
+      if (k && k.startsWith("page_")) keys.add(k);
+    });
+    if (keys.size === 0) {
+      keys.add("page_1");
+      keys.add("page_2");
+    }
+    return Array.from(keys).sort((a, b) => {
+      const na = parseInt((a.split("_")[1] || "0"), 10) || 0;
+      const nb = parseInt((b.split("_")[1] || "0"), 10) || 0;
+      return na - nb;
+    });
+  }, [data, editable]);
 
   useEffect(() => {
     const list = (editable && editable[selectedPageKey]) || [];
@@ -104,13 +139,10 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       setPdfPage(1);
       setPdfError(false);
       setPdfLoading(true);
-
-      const hasPage1 = data?.page_1 && data.page_1.length > 0;
-      const hasPage2 = data?.page_2 && data.page_2.length > 0;
-      const estimatedPages = hasPage2 ? 2 : hasPage1 ? 1 : 2; // Default to 2 if unsure
-      setTotalPages(Math.max(1, estimatedPages));
+      // Use number of parsed pages as a hint for total PDF pages when available
+      setTotalPages(Math.max(1, pageKeys.length || 1));
     }
-  }, [data?.blobUrl, data?.page_1, data?.page_2]);
+  }, [data?.blobUrl, pageKeys]);
 
   const handleSelectChassis = item => {
     setSelectedChassis(item);
@@ -118,7 +150,11 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
   const handleChargeChange = (chassisNum, idx, field, value) => {
     setEditable(prev => {
-      const next = { ...prev, page_1: prev.page_1.map(p => ({ ...p })), page_2: prev.page_2.map(p => ({ ...p })) };
+      const next = { ...prev };
+      // ensure each known page key exists and is shallow-copied
+      for (const key of pageKeys) {
+        next[key] = (prev?.[key] || []).map(p => ({ ...p }));
+      }
       for (const key of pageKeys) {
         next[key] = next[key].map(item => ({ ...item, charges: (item.charges || []).map(c => ({ ...c })) }));
         const found = next[key].find(p => p.chassis_number === chassisNum);
@@ -134,7 +170,10 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
   const handleFieldChange = (chassisNum, field, value) => {
     setEditable(prev => {
-      const next = { ...prev, page_1: prev.page_1.map(p => ({ ...p })), page_2: prev.page_2.map(p => ({ ...p })) };
+      const next = { ...prev };
+      for (const key of pageKeys) {
+        next[key] = (prev?.[key] || []).map(p => ({ ...p }));
+      }
       for (const key of pageKeys) {
         next[key] = next[key].map(item => ({ ...item, charges: (item.charges || []).map(c => ({ ...c })) }));
         const foundIdx = next[key].findIndex(p => p.chassis_number === chassisNum);
@@ -158,7 +197,10 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
   const addCharge = chassisNum => {
     setEditable(prev => {
-      const next = { ...prev, page_1: prev.page_1.map(p => ({ ...p })), page_2: prev.page_2.map(p => ({ ...p })) };
+      const next = { ...prev };
+      for (const key of pageKeys) {
+        next[key] = (prev?.[key] || []).map(p => ({ ...p }));
+      }
       for (const key of pageKeys) {
         next[key] = next[key].map(item => ({ ...item, charges: (item.charges || []).map(c => ({ ...c })) }));
         const found = next[key].find(p => p.chassis_number === chassisNum);
@@ -175,7 +217,10 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
   const removeCharge = (chassisNum, idx) => {
     setEditable(prev => {
-      const next = { ...prev, page_1: prev.page_1.map(p => ({ ...p })), page_2: prev.page_2.map(p => ({ ...p })) };
+      const next = { ...prev };
+      for (const key of pageKeys) {
+        next[key] = (prev?.[key] || []).map(p => ({ ...p }));
+      }
       for (const key of pageKeys) {
         next[key] = next[key].map(item => ({ ...item, charges: (item.charges || []).map(c => ({ ...c })) }));
         const found = next[key].find(p => p.chassis_number === chassisNum);
@@ -189,10 +234,13 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
     setSavedPages(prev => (prev[selectedPageKey] === true ? prev : { ...prev, [selectedPageKey]: false }));
   };
 
-  const chassisByPage = {
-    page_1: editable.page_1 || [],
-    page_2: editable.page_2 || [],
-  };
+  const chassisByPage = useMemo(() => {
+    const map = {};
+    for (const key of pageKeys) {
+      map[key] = editable?.[key] || [];
+    }
+    return map;
+  }, [editable, pageKeys]);
 
   const selectedPageList = chassisByPage[selectedPageKey] || [];
   const selectedIndexInPage = selectedChassis ? selectedPageList.findIndex(p => p.chassis_number === selectedChassis.chassis_number) : -1;
@@ -242,9 +290,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         }, {}),
       }));
 
-    const normalizedPage1 = normalizePage(editable.page_1);
-    const normalizedPage2 = normalizePage(editable.page_2);
-    const pageJson = selectedPageKey === "page_1" ? { page_1: normalizedPage1 } : { page_2: normalizedPage2 };
+  const normalizedPage = normalizePage(editable[selectedPageKey]);
+  const pageJson = { [selectedPageKey]: normalizedPage };
 
     const body = {
       Page: pageNum,
@@ -310,7 +357,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
           {/* Left: PDF viewer */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)]  p-4 md:p-6 min-h-[420px] md:min-h-[600px] shadow-sm">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6  min-h-[620px] md:min-h-[700px] shadow-sm self-start sticky top-4 z-10 max-h-[calc(100vh-160px)]">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
@@ -417,10 +464,10 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
           </div>
 
           {/* Right: parsed data, tabs and editable table */}
-          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6 flex flex-col shadow-sm max-h-[calc(100vh-160px)] md:max-h-[1000px] overflow-hidden">
+          <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6 flex flex-col shadow-sm max-h-[calc(100vh-160px)] md:max-h-[1000px] overflow-auto">
             <div className="mb-4 sticky top-4 bg-[var(--surface)] z-10">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-3">Parsed Data</h2>
-              <div className="flex items-center gap-1 bg-[var(--background)] p-1 rounded-lg">
+              <div className="flex  items-center gap-1 bg-[var(--background)] p-1 rounded-lg">
                 {pageKeys.map(key => {
                   const pageData = editable[key] || [];
                   const pageCount = pageData.length;
@@ -436,7 +483,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                         }
                       }}
                       onClick={() => {
-                        // Prevent switching pages if current page has unsaved changes (strict check)
+                        
                         if (savedPages[selectedPageKey] !== true && selectedPageKey !== key) {
                           showToast("Please save the current page before switching pages.", "error");
                           return;
@@ -563,7 +610,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                       </thead>
                       <tbody>
                         {(() => {
-                          const allPages = [...(editable.page_1 || []), ...(editable.page_2 || [])];
+                          const allPages = pageKeys.reduce((acc, k) => acc.concat(editable?.[k] || []), []);
                           const currentChassis = allPages.find(p => p.chassis_number === selectedChassis?.chassis_number) || selectedChassis;
                           return (currentChassis?.charges || []).map((c, i) => (
                             <tr key={i} className="border-b border-[var(--border)]/50 hover:bg-[var(--secondary)]/10 transition-colors">
@@ -596,7 +643,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                         })()}
 
                         {(() => {
-                          const allPages = [...(editable.page_1 || []), ...(editable.page_2 || [])];
+                          const allPages = pageKeys.reduce((acc, k) => acc.concat(editable?.[k] || []), []);
                           const currentChassis = allPages.find(p => p.chassis_number === selectedChassis?.chassis_number) || selectedChassis;
                           if (!currentChassis || !currentChassis.charges || currentChassis.charges.length === 0) {
                             return (
