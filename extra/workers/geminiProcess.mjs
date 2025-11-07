@@ -4,88 +4,113 @@ import https from "https";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const PROMPT = `
-You are an expert at parsing Japanese automotive auction invoices. Analyze this PDF document and extract chassis numbers (VINs) with their associated charges.
+You are an expert at parsing invoices from PDFs, supporting both Japanese and English languages, and adaptable to any invoice type (e.g., automotive auctions, retail, services, utilities). Analyze this PDF document and extract line items (e.g., products, services, vehicles) with their associated charges, plus global metadata focused on the customer perspective (e.g., what the buyer needs to know about purchases, costs, and payments). Automatically detect the primary language of the document (Japanese or English) and adapt your parsing accordingly—use Japanese terms for JP docs (prioritize keywords like '請求書', '落札料', 'リサイクル預託金', '自賠責相当額', '出品料', '成約料') and English equivalents for EN docs, but always map to the standardized English charge types and output in clear English. Focus on unique, non-duplicative key elements from the customer's view—ignore headers, footers, subtotals, or redundant totals unless they tie directly to items, vehicles, costs, or payment status. For automotive auctions (detect via terms like '計算書', '落札', 'オークション'), extract per vehicle (rows/entries) and customer-relevant globals (totals, purchase summary). STRICTLY AVOID extracting or including: company names (e.g., '有限会社 ワールドオートトレーディング'), internal codes (e.g., '0011028'), addresses, phone/fax/tel numbers, bank details (e.g., bank_name, branch_name, account_type, account_number, account_holder), detailed internal balances (e.g., previous_balance, this_transaction_payment_amount, current_balance_payment_amount, settled_amount, taxable_amount_10_percent, consumption_tax_10_percent, total_price_excluding_tax, total_consumption_tax), or any non-customer-facing metadata. Skip all such details entirely—no inclusion in output.
 
 CRITICAL INSTRUCTIONS:
+Language Detection:
+- Scan the document for keywords: If terms like '請求書', '消費税', 'オークション', '落札価格', '自賠責相当額', '出品料', '成約料' dominate, treat as Japanese. If 'Invoice', 'VAT', 'Tax', or 'Total' dominate, treat as English. Handle mixed-language docs by prioritizing context (e.g., fee labels). For other languages, fall back to English patterns but note 'detected_language' as 'Other'.
+- For non-Latin scripts, transliterate or recognize patterns (e.g., ¥ for JPY, $ for USD, € for EUR).
 
-Chassis Number Detection:
+Item Identification:
+- Carefully examine rows/fields labeled 'Item No.', 'Description', 'Product', 'Service', 'Chassis No.', 'VIN', '車台番号', '内容' (model), '出品No' (auction/listing number), or similar in each table/section.
+- Identifiers may be codes like DD51T-127679 (normalize hyphens/spaces), SKUs, serial numbers, or descriptions (e.g., 'HIACE VAN DX' or 'Honda Fit GP5'). For auctions: Extract auction date (開催日), year (年式), customer (客), vehicle price (車両代). Use the most unique identifier available; if none, use a descriptive summary.
+- Scan all tables, text areas, and footers thoroughly; no item should be missed. Ignore non-line-item entries (e.g., headers, subtotals). For auctions: Count purchases (e.g., '落札 2台').
 
-Carefully examine the chassis number row in each table.
-
-Chassis numbers may appear like DD51T 127679; normalize them to DD51T-127679.
-
-Also detect standard 17-character VINs like 1HGBH41JXMN109186.
-
-Scan all tables and text areas thoroughly; no chassis number should be missed.
+Global Metadata Extraction (Customer-Focused; Essential for Auctions):
+- Document Summary: Date/time (e.g., '2025/06/09 – 17:28:45'), page number, invoice type (e.g., 'Proper Invoice (適格請求書)'), registration number (e.g., 'T3010001057135')—only if relevant to billing clarity.
+- Auction Name: Extract auction house name in both Japanese and English (e.g., {"ja": "HAA", "en": "HAA Auction"}) from logos, headers, or text (e.g., 'Tokyo Auto Auction' → {"ja": "東京オートオークション", "en": "Tokyo Auto Auction"}).
+- Financial Globals: Previous balance (前回繰越金額, empty=0), this transaction total (今回御取引金額) with breakdown (claim amount, tax, other charges), total due (今回御取引合計), paid amount (精算済額), remaining balance (残高)—highlight if fully paid (0 JPY). Do not include detailed sub-breakdowns like taxable_amount_10_percent or consumption_tax_10_percent.
+- Customer Perspective: Purchases count, total cost, paid status, simplified summary (e.g., 'Two Honda Fit GP5 vehicles purchased for 358,620 JPY total, paid in full. Includes bids, fees, insurance, and recycling.').
 
 Charge Type Recognition:
-Extract the following Japanese fee types with their amounts:
+Extract fees and map them to these standardized types with amounts. Recognize variations in both languages and invoice types, including automotive auction specifics:
+- Base Price/Subtotal/Bid: '入札金額/落札価格/車両本体価格/商品価格/Vehicle Winning Bid Amount/車両代' or 'Unit Price/Subtotal/Item Price/Service Fee/Hammer Price/Bid Amount' → 'bid_amount' or 'subtotal'
+- Auction/Commission/Transaction Fee: 'オークション手数料/手数料/落札料/成約料' or 'Auction Fee/Commission/Buyer's Premium/Processing Fee/Contract Fee/Transaction Fee' → 'auction_fee' or 'commission_fee'
+- Listing Fee: '出品料' or 'Listing Fee' → 'listing_fee'
+- Tax (incl. VAT/Sales/Consumption): '税金/消費税' or 'Tax/VAT/Sales Tax/Consumption Tax' → 'tax' (usually % of subtotal; if specified, note subtype like 'bid_tax')
+- Shipping/Transport: '輸送費/送料/陸送費' or 'Shipping/Delivery/Freight/Transport' → 'shipping_fee'
+- Storage/Warehouse: '保管料' or 'Storage Fee/Warehouse Charge' → 'storage_fee'
+- Documentation/Admin: '書類代/管理手数料' or 'Documentation Fee/Admin Fee/Paperwork/Handling' → 'admin_fee'
+- Insurance: '自賠責相当額/Mandatory insurance equivalent' or 'Insurance Fee' → 'insurance_fee'
+- Recycling/Deposit: 'リサイクル預託金/Recycling deposit fee' or 'Deposit/Recycling Fee' → 'recycling_fee'
+- Discount/Adjustment: '割引' or 'Discount/Adjustment/Credit' → 'discount' (negative amounts if applicable)
+- Other/Misc: 'その他/雑費' or 'Other/Miscellaneous/Additional/Utility' → 'other_fee'
+- Ignore grand totals, payments, or non-item-specific fees unless tied to a line item. Handle blank fees by skipping them (e.g., listing_fee=0 → omit).
+- Always convert amounts to integers: Remove commas, currency symbols (¥, $, €, etc.), spaces, or decimals (round if needed). Handle stacked/multi-line cells or formats like '250,000 / 25,000': Top/main value (before /) → primary fee; Bottom/sub (after /) → tax or secondary (e.g., 'subtotal_tax'). Detect quantities if present and multiply if needed (e.g., unit price * qty = subtotal).
 
-オークション手数料/オークション料金 → "auction_fee"
-入札金額/落札価格/車両本体価格 → "bid_amount"
-税金/消費税 → "tax" (usually 10% of other amounts)
-輸送費/陸送費 → "transportation_fee"
-保管料 → "storage_fee"
-書類代/手数料 → "documentation_fee"
-その他 → "other_fee"
+# ====== EXTRACTION RULES — DO NOT IGNORE ======
+• Capture every numeric value exactly as it appears. Never drop numbers.
+• Map values to:
+    vehicle_price / bid_amount
+    auction_fee
+    recycling_fee
+    tax
+    shipping_fee
+    insurance_fee
+    other_fee
+• If multiple distinct values appear under a category → store them as an array.
+  Example: "vehicle_price": [124000, 12400]
+• If only one value appears → store as a single integer.
+• Always extract both primary and secondary stacked table values
+  (top + bottom) and classify where possible.
+• Never infer or delete low-value numbers (e.g., 1,380, 12,400).
+  Keep ALL amounts.
+• Preserve invoice totals exactly.
+• You MUST ALWAYS extract the following fee fields, even if they are missing → return null:
+• bid_amount, bid_tax, auction_fee, auction_tax.
 
-Table Structure Analysis:
+• These fee fields are MANDATORY and must appear in the final JSON every time, without exception.
 
-Each row usually represents one vehicle/chassis.
-Columns contain different charge types.
-Stacked amounts in a single cell must be fully parsed:
-Top value → main fee (e.g., "bid_amount" or "auction_fee")
-Bottom value → tax/secondary fee (e.g., "bid_tax" or "auction_fee_tax")
+• JSON must remain complete, structured, and valid. Do not include raw_values or uncategorized arrays—focus only on mapped charges.
+# ====== END EXTENSION ======
 
-If a cell contains multiple numbers (even if written as text or stacked vertically), extract all of them, map the top value to the main fee type and the bottom to its tax or related fee.
-
-Always convert to integers and remove commas, yen symbols (¥), or spaces.
+Table/Structure Analysis:
+- Identify invoice sections: Each row/entry usually represents one item/line. Look for tables with columns like Item#, Description, Qty, Price, Fees, or auction-specific (開催日, 年式, 内容, 出品No, 客, 車両代, リサイクル料, 請求, 落札料).
+- Handle varied formats: Tabular (e.g., USS/TAA JP auctions, Manheim EN), free-form text (e.g., service invoices), or scanned/handwritten. Use OCR for small/unclear text.
+- Parse stacked amounts in cells: Extract all numbers, map top to main fee, bottom to tax/related.
+- Match charges precisely to the item in the same row/section. If ambiguous, infer from proximity/context. No duplicates: Report vehicle price once per item.
 
 Data Matching:
-
-Match each chassis number with charges from the same table row.
-
-Be precise about which charges belong to which chassis.
+- For each item, collect only its associated charges. Flag unmatched charges as 'unassigned' under a dummy item if needed, but prioritize line-item links. For auctions: Group vehicles into an array with shared fields (auction date, year, model, customer).
+STRICT: Output ONLY in the exact required JSON structure and keys. Do not add extra fields, explanations, summaries, text, or formatting. Return ONLY the specified JSON format, nothing else.
 
 REQUIRED OUTPUT FORMAT:
-
-Return ONLY a valid JSON object like page wise for PDF:
-
+Strictly return only Auction_name and Model translated into English from Japanese;
+If any category (e.g., bid_amount) returns two numeric values, assign the first as the base category (bid_amount) and automatically assign the second as its tax category (bid_tax).
+Return ONLY a valid JSON object, page-wise for the PDF:
+Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number, Model, auction_date, year, quantity, charges[]); ignore all unrelated data.
 {
   "page_1": [
-    {
-      "chassis_number": "DA64W-135499",
-      "charges": [
-        {"type": "bid_amount", "amount": 122000},
-        {"type": "auction_fee_tax", "amount": 1500}
+        "auction":"HAA Auction (English translated)",
+        "chassis_number": "GP5 3066124" or "DA63T 248426" or "ZVW41-3012214" or "DD51T     12679" or "A200A   0005848" or "A201A              0017671" or "PC30MR-1" or "10710" or "PC30MR-1       10710" or "T-10A" or"T-10A       240-01",
+        "lot_number": "7122" or "60238",
+        "brand": "Toyota" or "Hiace(English translated)" or "BMW(Any brand)" or "Corolla(or car name)",
+        "charges": [
+        { "type": "bid_amount", "amount": 250000 },
+        { "type": "bid_tax", "amount": 25000 },
+        { "type": "auction_fee", "amount": 15000 },
+        { "type": "auction_tax", "amount": 1500 },
+        { "type": "insurance_fee", "amount": 23000 },
+        { "type": "insurance_tax", "amount": 2300 },
+        { "type": "recycling_fee", "amount": 13220 }
       ]
     }
   ],
+
   "page_2": [
-    {
-      "chassis_number": "DA64W-135501",
-      "charges": [
-        {"type": "bid_amount", "amount": 125000},
-        {"type": "auction_fee_tax", "amount": 1550}
-      ]
-    }
+    ...
   ]
 }
-
-IMPORTANT NOTES:
-
-If no chassis numbers are found, return [].
-Focus on table data where chassis numbers and amounts appear.
-Use OCR to read all text, including small or unclear text.
-Pay special attention to multi-row table headers and stacked cells.
-Do not include the total amount column.
-Look for patterns like USS auction formats.
-Ensure no payment type is missed for any chassis.
-Analyze the entire document systematically and extract all chassis-charge combinations.
-
-Return a COMPLETE, VALID JSON object. Do not cut off or leave trailing commas.
-Ensure the last character is '}' or ']'.
-`;
+Strictly Do NOT include quantity,auction_date,year, IGNORE THESE COMPLETELY
+Strictly Do NOT include any field whose value is null—omit the field entirely from the output.
+If no items found, return {"detected_language": "Unknown", "invoice_type": "N/A", "pages": {}} with empty arrays; empty optional sections if not applicable.
+Focus on line-item data; ignore headers/footers unless they contain per-item info.
+Pay special attention to multi-row headers, merged cells, rotated text, or multi-page items.
+Do not include grand totals or unrelated fees.
+Ensure no item-charge pair is missed.
+Analyze systematically: Extract all combinations.
+Return a COMPLETE, VALID JSON object. No trailing commas; end with '}'.
+`
 
 
 async function downloadFile(url) {
@@ -183,6 +208,7 @@ export async function processInvoiceWithGemini(filePath) {
     }
 
     console.log(`📥 Gemini response received (${text.length} chars)`);
+    console.log("🔍  JSON from response...", text);
 
     let cleanText = text
       .replace(/^```json/i, "")
@@ -211,7 +237,9 @@ export async function processInvoiceWithGemini(filePath) {
       console.error("❌ Could not parse JSON from Gemini response. Preview:\n", cleanText.slice(0, 1000));
       return {};
     }
+    console.log("🚀 Gemini invoice processing completed successfully.",parsed);
     return parsed;
+
   } catch (error) {
     console.error("❌ Error in processInvoiceWithGemini:", error?.message || error);
     return {};
