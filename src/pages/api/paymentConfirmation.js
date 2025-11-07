@@ -53,7 +53,7 @@ export default async function handler(req, res) {
         },
       });
       if (invoiceJobId) {
-         await prisma.invoiceJobs.update({ where: { id: invoiceJobId }, data: { isEvaluated: true } });
+        await prisma.invoiceJobs.update({ where: { id: invoiceJobId }, data: { isEvaluated: true } });
       }
 
       const charges = [];
@@ -64,17 +64,17 @@ export default async function handler(req, res) {
           const chassis_number = chassisItem.chassis_number;
           const chassisCharges = Array.isArray(chassisItem.charges) ? chassisItem.charges : [];
           chassisCharges.forEach((c, idx) => {
-              charges.push({
-                DocumentURL: saved.DocumentURL,
-                chassis_number,
-                type: c.type,
-                amount: c.amount,
-                // include chassis-level metadata so we can create vehicles with correct details
-                brand: chassisItem.brand || null,
-                lot_number: chassisItem.lot_number || null,
-                auction: chassisItem.auction || null,
-              });
+            charges.push({
+              DocumentURL: saved.DocumentURL,
+              chassis_number,
+              type: c.type,
+              amount: c.amount,
+              // include chassis-level metadata so we can create vehicles with correct details
+              brand: chassisItem.brand || null,
+              lot_number: chassisItem.lot_number || null,
+              auction: chassisItem.auction || null,
             });
+          });
         }
       }
 
@@ -111,7 +111,6 @@ export default async function handler(req, res) {
                 lotNumber: lotNumber,
                 auction: auction,
                 remarks: `Auto-added from payment confirmatio`,
-
               },
             });
           }
@@ -125,7 +124,7 @@ export default async function handler(req, res) {
             data: {
               vehicleId: vehicle.id,
               name: ch.type || "Payment",
-              amount: amount,
+              amount: -amount,
               date: new Date(),
               remarks: `Auto-added from payment confirmation ${saved.id}`,
               url: ch.DocumentURL || saved.DocumentURL || null,
@@ -135,7 +134,7 @@ export default async function handler(req, res) {
           console.error("Failed to process charge for chassis", ch && ch.chassis_number, err && err.message ? err.message : err);
         }
       }
-       res.status(201).json({
+      res.status(201).json({
         message: "Page saved and payments added to vehicle payments successfully",
       });
     }
