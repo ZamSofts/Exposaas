@@ -412,7 +412,7 @@ export default function VehiclesPage() {
                   <th id="status">Status</th>
                   <th id="remarks">Remarks</th>
                   <th id="createdAt">Registered At</th>
-                  {isAllowed(["edit:vehicle"], session) ? <th id="actions">Actions</th> : null}
+                  {isAllowed(["edit:vehicle"], session) ? <th>Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
