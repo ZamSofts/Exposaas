@@ -237,7 +237,7 @@ export async function processInvoiceWithGemini(filePath) {
       console.error("❌ Could not parse JSON from Gemini response. Preview:\n", cleanText.slice(0, 1000));
       return {};
     }
-    console.log("🚀 Gemini invoice processing completed successfully.",parsed);
+    // console.log("🚀 Gemini invoice processing completed successfully.",parsed);
     return parsed;
 
   } catch (error) {
