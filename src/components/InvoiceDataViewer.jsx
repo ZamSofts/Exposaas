@@ -7,7 +7,10 @@ import { ArrowLeft,  FileUp, ExternalLink, RefreshCw, Trash2 } from "lucide-reac
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const router = useRouter();
- console.log("received data from invoicejob page",data)
+ // Log incoming data only when it changes (avoid logging every render)
+ useEffect(() => {
+  console.log("received data from invoicejob page", data);
+ }, [data]);
   const { confirm, ConfirmComponent } = useConfirm();
 
   const [pdfPage, setPdfPage] = useState(1);
@@ -134,15 +137,20 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [pdfPage, totalPages, data?.blobUrl, pdfError]);
 
+  // When the blob URL changes we want to reset viewer loading state and page.
+  // Do NOT run this when `pageKeys` changes (editing parsed data should not retrigger PDF load).
   useEffect(() => {
     if (data?.blobUrl) {
       setPdfPage(1);
       setPdfError(false);
       setPdfLoading(true);
-      // Use number of parsed pages as a hint for total PDF pages when available
-      setTotalPages(Math.max(1, pageKeys.length || 1));
     }
-  }, [data?.blobUrl, pageKeys]);
+  }, [data?.blobUrl]);
+
+  // Keep totalPages in sync with parsed page keys, but don't toggle PDF loading.
+  useEffect(() => {
+    setTotalPages(Math.max(1, pageKeys.length || 1));
+  }, [pageKeys]);
 
   const handleSelectChassis = item => {
     setSelectedChassis(item);

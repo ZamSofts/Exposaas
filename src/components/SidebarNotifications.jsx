@@ -196,20 +196,6 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
     }
   }, []);
 
-  // Debug: indicate the component mounted in browser console
-  useEffect(() => {
-    console.log("🔔 SidebarNotifications mounted", {
-      isCollapsed,
-      session: session
-        ? {
-            id: session.id,
-            username: session.username,
-            companyId: session.companyId,
-          }
-        : "No session",
-    });
-  }, [isCollapsed, session]);
-
   // Close notification dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = event => {
