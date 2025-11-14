@@ -76,7 +76,7 @@ class NotificationService {
     return this.createAndSend({
       userId,
       companyId,
-      title: "Invoice Processing Failed",
+      title: "The model is overloaded. Please try again later.",
       message: `Failed to process your invoice: ${error}`,
       category: "error",
       metadata: {

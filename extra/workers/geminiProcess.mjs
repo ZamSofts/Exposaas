@@ -2,7 +2,8 @@ import fs from "fs";
 import path from "path";
 import https from "https";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-
+import { deleteFile } from "../../src/lib/blob.mjs";
+import NotificationService from "../services/notificationService.mjs";
 
 const generation_config = {
     "temperature": 0,
@@ -266,7 +267,7 @@ export async function processInvoiceWithGemini(filePath) {
 
   } catch (error) {
     console.error("❌ Error in processInvoiceWithGemini:", error?.message || error);
-    return {};
+    return {error: "Error processing invoice", details: error?.message || String(error)};
   }
   finally {
     if (localFilePath && fs.existsSync(localFilePath)) {

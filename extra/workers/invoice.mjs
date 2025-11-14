@@ -3,6 +3,8 @@ import { processInvoiceWithGemini } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import NotificationService from "../services/notificationService.mjs";
 
+const isEmpty = obj => obj && typeof obj === "object" && Object.keys(obj).length === 0;
+
 (async () => {
   try {
     console.log("[worker] starting: gemini-extract");
@@ -19,80 +21,76 @@ import NotificationService from "../services/notificationService.mjs";
       let filePath = job && job.data && (job.data.fileUrl || job.data.filePath || job.data.path);
       let companyId = job && job.data && job.data.companyId;
       let userId = job && job.data && job.data.userId;
-      //let invoiceType = job && job.data && job.data.invoiceType; 
+      //let invoiceType = job && job.data && job.data.invoiceType;
       console.log("📄 Processing job:", job && job.id, filePath, "for user:", userId);
 
       if (!filePath) {
         const err = new Error("Missing file path/url on job data");
         console.error("❌", err.message, "job=", job && job.id);
-        
+
         if (userId && companyId) {
           try {
-            await NotificationService.sendInvoiceFailedNotification(
-              userId,
-              companyId,
-              filePath || 'Unknown',
-              err.message
-            );
+            await NotificationService.sendInvoiceFailedNotification(userId, companyId, filePath || "Unknown", err.message);
           } catch (notifyErr) {
             console.error("❌ Failed to send failure notification:", notifyErr);
           }
         }
-        
+
         throw err;
       }
 
       try {
         const results = await processInvoiceWithGemini(filePath);
+        if (results.error) {
+          console.error("❌ Gemini hard error:", results.error);
+          if (userId && companyId) {
+            const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
-        if (companyId === undefined || companyId === null) {
-          throw new Error("Missing companyId for InvoiceJobs");
-        }
+            const existing = await prisma.notification.findFirst({
+              where: {
+                userId: Number(userId),
+                companyId: Number(companyId),
+                title: "The model is overloaded. Please try again later.",
+                createdAt: { gt: oneMinuteAgo },
+              },
+            });
 
-        const payload = {
-          companyId: companyId,
-          DocumentURL: filePath || null,
-          Json: results,
-        };
-
-        const created = await prisma.invoiceJobs.create({ data: payload });
-        console.log("✅ Invoice processed and stored", job.id);
-        
-        if (userId) {
-          try {
-            await NotificationService.sendInvoiceProcessedNotification(
-              userId,
-              companyId,
-              created
-            );
-            console.log("🔔 Success notification sent to user", userId);
-          } catch (notifyErr) {
-            console.error("❌ Failed to send success notification:", notifyErr);
+            if (!existing) {
+              await NotificationService.sendInvoiceFailedNotification(userId, companyId, filePath, "The model is overloaded. Please try again later.");
+              console.log("🔔 Failure notification sent");
+            } else {
+              console.log("🔕 Skipping duplicate failure notification");
+            }
           }
+          await boss.complete(job.id);
+          return;
         } else {
-          console.warn("⚠️ No userId provided, cannot send notification");
+          if (companyId === undefined || companyId === null) {
+            throw new Error("Missing companyId for InvoiceJobs");
+          }
+
+          const payload = {
+            companyId: companyId,
+            DocumentURL: filePath || null,
+            Json: results,
+          };
+
+          const created = await prisma.invoiceJobs.create({ data: payload });
+          console.log("✅ Invoice processed and stored", job.id);
+
+          if (userId) {
+            try {
+              await NotificationService.sendInvoiceProcessedNotification(userId, companyId, created);
+              console.log("🔔 Success notification sent to user", userId);
+            } catch (notifyErr) {
+              console.error("❌ Failed to send success notification:", notifyErr);
+            }
+          } else {
+            console.warn("⚠️ No userId provided, cannot send notification");
+          }
         }
-        
       } catch (err) {
         console.error("❌ Gemini processing failed for job", job && job.id, err && err.message ? err.message : err);
-        
-        if (userId && companyId) {
-          try {
-            await NotificationService.sendInvoiceFailedNotification(
-              userId,
-              companyId,
-              filePath,
-              err.message || 'Unknown error occurred during processing'
-            );
-            console.log("🔔 Failure notification sent to user", userId);
-          } catch (notifyErr) {
-            console.error("❌ Failed to send failure notification:", notifyErr);
-          }
-        }
-        
-        if (err && err.meta) console.error("Prisma meta:", err.meta);
-        
-        throw err;
       }
     });
 
