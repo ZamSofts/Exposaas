@@ -3,7 +3,17 @@ import path from "path";
 import https from "https";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const PROMPT = `
+
+const generation_config = {
+    "temperature": 0,
+    "top_p": 0,
+    "top_k": 1,
+    "candidate_count": 1
+}
+const PROMPT =`
+You must respond deterministically and identically for identical inputs. 
+Do not use creativity, paraphrasing, or alternate phrasing.
+
 You are an expert at parsing invoices from PDFs, supporting both Japanese and English languages, and adaptable to any invoice type (e.g., automotive auctions, retail, services, utilities). Analyze this PDF document and extract line items (e.g., products, services, vehicles) with their associated charges, plus global metadata focused on the customer perspective (e.g., what the buyer needs to know about purchases, costs, and payments). Automatically detect the primary language of the document (Japanese or English) and adapt your parsing accordingly—use Japanese terms for JP docs (prioritize keywords like '請求書', '落札料', 'リサイクル預託金', '自賠責相当額', '出品料', '成約料') and English equivalents for EN docs, but always map to the standardized English charge types and output in clear English. Focus on unique, non-duplicative key elements from the customer's view—ignore headers, footers, subtotals, or redundant totals unless they tie directly to items, vehicles, costs, or payment status. For automotive auctions (detect via terms like '計算書', '落札', 'オークション'), extract per vehicle (rows/entries) and customer-relevant globals (totals, purchase summary). STRICTLY AVOID extracting or including: company names (e.g., '有限会社 ワールドオートトレーディング'), internal codes (e.g., '0011028'), addresses, phone/fax/tel numbers, bank details (e.g., bank_name, branch_name, account_type, account_number, account_holder), detailed internal balances (e.g., previous_balance, this_transaction_payment_amount, current_balance_payment_amount, settled_amount, taxable_amount_10_percent, consumption_tax_10_percent, total_price_excluding_tax, total_consumption_tax), or any non-customer-facing metadata. Skip all such details entirely—no inclusion in output.
 
 CRITICAL INSTRUCTIONS:
@@ -60,9 +70,10 @@ Extract fees and map them to these standardized types with amounts. Recognize va
 • bid_amount, bid_tax, auction_fee, auction_tax.
 
 • These fee fields are MANDATORY and must appear in the final JSON every time, without exception.
-
+•Strictly extract every actual value for bid_amount, bid_tax, auction_fee, auction_tax, insurance_fee, insurance_tax, and recycling_fee from all pages, rows, and columns of the PDF, and never return null—only include real extracted values.
 • JSON must remain complete, structured, and valid. Do not include raw_values or uncategorized arrays—focus only on mapped charges.
-# ====== END EXTENSION ======
+# ====== END EXTRACTION ======
+
 
 Table/Structure Analysis:
 - Identify invoice sections: Each row/entry usually represents one item/line. Look for tables with columns like Item#, Description, Qty, Price, Fees, or auction-specific (開催日, 年式, 内容, 出品No, 客, 車両代, リサイクル料, 請求, 落札料).
@@ -71,14 +82,16 @@ Table/Structure Analysis:
 - Match charges precisely to the item in the same row/section. If ambiguous, infer from proximity/context. No duplicates: Report vehicle price once per item.
 
 Data Matching:
+When providing the result matching the JSON object name, dynamically look for suitable alternative wording.
 - For each item, collect only its associated charges. Flag unmatched charges as 'unassigned' under a dummy item if needed, but prioritize line-item links. For auctions: Group vehicles into an array with shared fields (auction date, year, model, customer).
-STRICT: Output ONLY in the exact required JSON structure and keys. Do not add extra fields, explanations, summaries, text, or formatting. Return ONLY the specified JSON format, nothing else.
+-STRICT: Output ONLY in the exact required JSON structure and keys. Do not add extra fields, explanations, summaries, text, or formatting. Return ONLY the specified JSON format, nothing else.
 
 REQUIRED OUTPUT FORMAT:
-Strictly return only Auction_name and Model translated into English from Japanese;
-If any category (e.g., bid_amount) returns two numeric values, assign the first as the base category (bid_amount) and automatically assign the second as its tax category (bid_tax).
-Return ONLY a valid JSON object, page-wise for the PDF:
-Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number, Model, auction_date, year, quantity, charges[]); ignore all unrelated data.
+
+-Strictly return only Auction_name and Model translated into English from Japanese;
+-If any category (e.g., bid_amount) returns two numeric values, assign the first as the base category (bid_amount) and automatically assign the second as its tax category (bid_tax).
+-Return ONLY a valid JSON object, page-wise for the PDF:
+-Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number, Model, auction_date, year, quantity, charges[]); ignore all unrelated data.
 {
   "page_1": [
         "auction":"HAA Auction (English translated)",
@@ -101,15 +114,25 @@ Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number
     ...
   ]
 }
-Strictly Do NOT include quantity,auction_date,year, IGNORE THESE COMPLETELY
-Strictly Do NOT include any field whose value is null—omit the field entirely from the output.
-If no items found, return {"detected_language": "Unknown", "invoice_type": "N/A", "pages": {}} with empty arrays; empty optional sections if not applicable.
-Focus on line-item data; ignore headers/footers unless they contain per-item info.
-Pay special attention to multi-row headers, merged cells, rotated text, or multi-page items.
-Do not include grand totals or unrelated fees.
-Ensure no item-charge pair is missed.
-Analyze systematically: Extract all combinations.
-Return a COMPLETE, VALID JSON object. No trailing commas; end with '}'.
+DO NOT IGNORE ANY OF THESE CONSIDER EVERY SINGLE LINE:
+CRITICAL PRIORITY: Search the entire PDF, across all pages, all sections, and all text (not only tables or rows), and extract the exact Lot Number / Block–Lot Number exactly as printed using OCR. This field must always be found.
+-strictly for brand always give the whole name of the brand(eg., Toyota corolla ,BMW M5,Nissan patrol etc)
+-strictly ignore all Management Number / Reference ID (eg.,25102369 or 35506349)
+-Always ignore any numbers realted to (auction/event/session) (eg.,284 or 995 or 201) 
+-Strictly look for dates and any format any do not read any type of date or extra numbers(eg., 10/25 or 9/23 or 1/10/2023)
+-Strictly include every charges object, always include all mandatory charge types: bid_amount, bid_tax, auction_fee, auction_tax, insurance_fee, insurance_tax, and recycling_fee in the JSON output.(Must find realted ammounts eg.,"bid_tax": "ammount":1500)
+-Ignore any grid lines, table borders, or visual artifacts—extract only actual text and numeric values from the document.
+-Always extract and include every value required in the JSON output schema without omission.
+-Always output all numeric values as positive integers unless the charge type is ‘discount’ or ‘credit’.” (eg.,“-25000”), remove the minus sign unless the field explicitly represents a deduction (e.g., “discount” or “credit”)
+-Strictly Do NOT include quantity,auction_date,year, IGNORE THESE COMPLETELY
+-Very strictly Do NOT include any field whose value is zero or null—omit the field entirely from the output.
+-If no items found, return {"detected_language": "Unknown", "invoice_type": "N/A", "pages": {}} with empty arrays; empty optional sections if not applicable.
+-Focus on line-item data; ignore headers/footers unless they contain per-item info.
+-Pay special attention to multi-row headers, merged cells, rotated text, or multi-page items.
+-Do not include grand totals or unrelated fees.
+-Ensure no item-charge pair is missed.
+-Analyze systematically: Extract all combinations.
+-Return a COMPLETE, VALID JSON object. No trailing commas; end with '}'.
 `
 
 
@@ -187,7 +210,8 @@ export async function processInvoiceWithGemini(filePath) {
         },
       },
       PROMPT,
-    ]);
+    ]
+  );
 
     let text = "";
     try {
