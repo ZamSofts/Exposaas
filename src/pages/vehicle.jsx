@@ -3,7 +3,15 @@ import Head from "next/head";
 import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle, } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
-import { Plus, Edit, Trash2, Car, FileUp } from "lucide-react";
+import { Plus, Edit, Trash2, Car, FileUp, FileText } from "lucide-react";
+
+// Format currency with ¥ symbol
+const formatCurrency = (value) => {
+  if (value === null || value === undefined) return "-";
+  const num = parseFloat(value);
+  if (isNaN(num)) return "-";
+  return `¥${num.toLocaleString()}`;
+};
 
 export default function VehiclesPage() {
   const { session, status } = useAuth(["view:vehicle"], ["Sadmin"]);
@@ -270,7 +278,7 @@ export default function VehiclesPage() {
               <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                 <Car className="w-6 h-6 text-[var(--primary)]" />
               </div>
-              <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicles Management</h1>
+              <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicle testing</h1>
             </div>
             {isAllowed(["add:vehicle"], session) ? <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} /> : null}
           </div>
@@ -316,7 +324,7 @@ export default function VehiclesPage() {
                 <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
                 <div className="space-y-4">
                   <div>
-                     {/* <label className="input-label">Invoice Type</label>
+                    {/* <label className="input-label">Invoice Type</label>
                     <ReactSelect
                         required
                         value={invoiceType}
@@ -404,66 +412,110 @@ export default function VehiclesPage() {
               <thead className="bg-[var(--secondary)]">
                 <tr>
                   <th id="id">ID</th>
-                  <th id="name">Name</th>
-                  <th id="brand">Brand</th>
                   <th id="chassisNumber">Chassis Number</th>
-                  <th id="lotNumber">Lot Number</th>
+                  <th id="brand">Brand</th>
                   <th id="auction">Auction</th>
+                  <th id="lotNumber">Lot #</th>
+                  <th id="invoice">Invoice</th>
+                  <th id="bidAmount">Bid</th>
+                  <th id="bidTax">Bid Tax</th>
+                  <th id="auctionFee">Auction Fee</th>
+                  <th id="auctionTax">Auction Tax</th>
+                  <th id="insuranceFee">Insurance</th>
+                  <th id="insuranceTax">Ins. Tax</th>
+                  <th id="recyclingFee">Recycling</th>
+                  <th id="transportFee">Transport</th>
+                  <th id="otherFees">Other</th>
+                  <th id="totalCost">Total Cost</th>
                   <th id="status">Status</th>
-                  <th id="remarks">Remarks</th>
-                  <th id="createdAt">Registered At</th>
+                  <th id="createdAt">Registered</th>
                   {isAllowed(["edit:vehicle"], session) ? <th id="actions">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
                 {vehicles.map(v => (
                   <tr key={v.id} className="hover:bg-[var(--input)] transition-colors duration-200">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{v.id.toString().padStart(3, "0")}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
-                          <Car className="w-4 h-4 text-[var(--primary)]" />
-                        </div>
-                        <div className="text-sm font-medium text-[var(--foreground)]">{v.name || "-"}</div>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Car className="w-4 h-4 text-[var(--primary)]" />
+                        <span className="text-sm font-medium text-[var(--foreground)]">{v.chassisNumber}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.brand?.name || "-"}</div>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.brand?.name || "-"}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.chassisNumber}</div>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.auction || "-"}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.lotNumber || "-"}</div>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.lotNumber || "-"}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{v.auction || "-"}</div>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      {v.sourceInvoiceJob?.DocumentURL ? (
+                        <a
+                          href={v.sourceInvoiceJob.DocumentURL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 text-red-500 rounded hover:bg-red-500/20 transition-colors"
+                          title="View Invoice PDF"
+                        >
+                          <FileText className="w-4 h-4" />
+                        </a>
+                      ) : (
+                        <span className="text-[var(--secondary-foreground)]">-</span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex cursor-pointer items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]">{v?.status?.name}</span>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm font-medium text-[var(--foreground)]">{formatCurrency(v.bidAmount)}</span>
                     </td>
-                    <td className="px-6 py-4 min-w-[100px] max-w-[200px] whitespace-normal">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="px-3 py-1 text-sm font-medium text-[var(--foreground)] bg-[var(--primary)]/10 rounded-lg">{v.remarks || "-"}</span>
-                      </div>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.bidTax)}</span>
                     </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(v.createdAt).toLocaleString()}</td>
-
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.auctionFee)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.auctionTax)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.insuranceFee)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.insuranceTax)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.recyclingFee)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.transportFee)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.otherFees)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm font-bold text-[var(--primary)]">{formatCurrency(v.totalCost)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]">{v?.status?.name}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
+                      {new Date(v.createdAt).toLocaleDateString()}
+                    </td>
                     {isAllowed(["edit:vehicle"], session) && (
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
+                        <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => handleEditVehicle(v.id)}
-                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
+                            className="p-1.5 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded transition-all"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => deleteIt(v.id)}
-                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
+                            className="p-1.5 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded transition-all"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

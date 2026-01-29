@@ -87,7 +87,7 @@ model UserRole {
 model Vehicle {
   id            Int           @id @default(autoincrement())
   name          String?
-  chassisNumber String        
+  chassisNumber String
   remarks       String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -97,15 +97,31 @@ model Vehicle {
   customerId    Int?
   auction       String?
   lotNumber     String?
+
+  // Charge columns (acquisition costs from invoices/CSV)
+  bidAmount          Decimal?  @db.Decimal(12, 2)
+  bidTax             Decimal?  @db.Decimal(12, 2)
+  auctionFee         Decimal?  @db.Decimal(12, 2)
+  auctionTax         Decimal?  @db.Decimal(12, 2)
+  insuranceFee       Decimal?  @db.Decimal(12, 2)
+  insuranceTax       Decimal?  @db.Decimal(12, 2)
+  recyclingFee       Decimal?  @db.Decimal(12, 2)
+  transportFee       Decimal?  @db.Decimal(12, 2)
+  otherFees          Decimal?  @db.Decimal(12, 2)
+  totalCost          Decimal?  @db.Decimal(12, 2)
+  sourceInvoiceJobId Int?
+
+  // Relations
   brand         Brand         @relation(fields: [brandId], references: [id])
   company       Company       @relation(fields: [companyId], references: [id])
   status        VehicleStatus @relation(fields: [statusId], references: [id])
   customer      Customer?     @relation(fields: [customerId], references: [id])
+  sourceInvoiceJob InvoiceJobs? @relation(fields: [sourceInvoiceJobId], references: [id])
   documents     VehicleDocument[]
   payments      VehiclePayments[]
 
   @@unique([companyId, chassisNumber])
-
+  @@index([sourceInvoiceJobId])
 }
 
 model VehicleDocument {
@@ -167,12 +183,13 @@ model PaymentConfirmation {
 
 model InvoiceJobs {
   id          Int      @id @default(autoincrement())
-  DocumentURL String?       
-  Json        Json     
+  DocumentURL String?
+  Json        Json
   companyId   Int
   isEvaluated Boolean   @default(false)
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
+  vehicles    Vehicle[]  // Vehicles created from this invoice
 
   @@index([companyId])
 }

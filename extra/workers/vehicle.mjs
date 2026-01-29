@@ -4,6 +4,43 @@ import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
 import NotificationService from "../services/notificationService.mjs";
 
+// Map CSV headers (snake_case) to database columns (camelCase)
+// Also handles Gemini output mapping (shipping_fee → transportFee)
+const parseChargeFromCSV = (row) => {
+  const charges = {};
+
+  // CSV header → DB column mapping
+  const mapping = {
+    bid_amount: "bidAmount",
+    bid_tax: "bidTax",
+    auction_fee: "auctionFee",
+    auction_tax: "auctionTax",
+    insurance_fee: "insuranceFee",
+    insurance_tax: "insuranceTax",
+    recycling_fee: "recyclingFee",
+    transport_fee: "transportFee",
+    shipping_fee: "transportFee", // Gemini outputs shipping_fee, map to transportFee
+    other_fees: "otherFees",
+  };
+
+  for (const [csvKey, dbKey] of Object.entries(mapping)) {
+    const value = row[csvKey];
+    if (value !== undefined && value !== null && value !== "") {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) {
+        charges[dbKey] = parsed;
+      }
+    }
+  }
+
+  // Calculate totalCost if any charge field is present
+  if (Object.keys(charges).length > 0) {
+    charges.totalCost = Object.values(charges).reduce((sum, val) => sum + (val || 0), 0);
+  }
+
+  return charges;
+};
+
 let boss;
 
 (async () => {
@@ -77,6 +114,10 @@ let boss;
                   brand = await prisma.brand.findUnique({ where: { name: "-" } });
                 }
                 let brandId = brand?.id;
+
+                // Parse charge fields from CSV row
+                const charges = parseChargeFromCSV(row);
+
                 await prisma.vehicle.upsert({
                   where: {
                     companyId_chassisNumber: {
@@ -90,6 +131,7 @@ let boss;
                     brandId,
                     companyId,
                     statusId: 1,
+                    ...charges,
                   },
                   create: {
                     lotNumber,
@@ -98,6 +140,7 @@ let boss;
                     brandId,
                     companyId,
                     statusId: 1,
+                    ...charges,
                   },
                 });
                 count++;

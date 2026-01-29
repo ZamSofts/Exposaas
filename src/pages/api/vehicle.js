@@ -140,6 +140,41 @@ const includeRelations = {
   brand: { select: { name: true } },
   status: { select: { name: true } },
   documents: { select: { id: true, Url: true, createdAt: true } },
+  sourceInvoiceJob: { select: { id: true, DocumentURL: true } },
+};
+
+// Helper to parse charge fields from request body
+const parseChargeFields = body => {
+  const chargeFields = {};
+  const chargeKeys = [
+    "bidAmount",
+    "bidTax",
+    "auctionFee",
+    "auctionTax",
+    "insuranceFee",
+    "insuranceTax",
+    "recyclingFee",
+    "transportFee",
+    "otherFees",
+  ];
+
+  for (const key of chargeKeys) {
+    if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+      chargeFields[key] = parseFloat(body[key]);
+    }
+  }
+
+  // Calculate totalCost if any charge field is present
+  if (Object.keys(chargeFields).length > 0) {
+    chargeFields.totalCost = Object.values(chargeFields).reduce((sum, val) => sum + (val || 0), 0);
+  }
+
+  // Handle sourceInvoiceJobId
+  if (body.sourceInvoiceJobId !== undefined && body.sourceInvoiceJobId !== null && body.sourceInvoiceJobId !== "") {
+    chargeFields.sourceInvoiceJobId = parseInt(body.sourceInvoiceJobId);
+  }
+
+  return chargeFields;
 };
 
 export default async function handler(req, res) {
@@ -212,6 +247,9 @@ export default async function handler(req, res) {
         const { name, chassisNumber, brandId, remarks, companyId, statusId, customerId, auction, lotNumber } = req.body;
         await validateVehicle({ chassisNumber, brandId, companyId, statusId });
 
+        // Parse charge fields from request
+        const chargeFields = parseChargeFields(req.body);
+
         const vehicle = await prisma.vehicle.create({
           data: {
             name,
@@ -223,6 +261,7 @@ export default async function handler(req, res) {
             companyId: Number(companyId),
             statusId: Number(statusId),
             customerId: customerId && customerId !== "" ? Number(customerId) : null,
+            ...chargeFields,
           },
         });
 
@@ -260,7 +299,10 @@ export default async function handler(req, res) {
         const vehicleId = Number(id);
         if (!vehicleId) return res.status(400).json({ error: "Valid vehicle ID required" });
 
-  await validateVehicle({ chassisNumber, brandId, companyId, statusId, vehicleId });
+        await validateVehicle({ chassisNumber, brandId, companyId, statusId, vehicleId });
+
+        // Parse charge fields from request
+        const chargeFields = parseChargeFields(req.body);
 
         const updateData = {
           chassisNumber,
@@ -271,6 +313,7 @@ export default async function handler(req, res) {
           companyId: Number(companyId),
           statusId: Number(statusId),
           customerId: customerId && customerId !== "" ? Number(customerId) : null,
+          ...chargeFields,
         };
 
         if (name !== "null") {

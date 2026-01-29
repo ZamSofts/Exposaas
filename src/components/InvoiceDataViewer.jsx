@@ -3,7 +3,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 
 import { useAuth, API, Error, Toast, Loader, useConfirm } from "@/hooks/wrapper";
-import { ArrowLeft,  FileUp, ExternalLink, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, FileUp, ExternalLink, RefreshCw, Trash2, Car, Check, AlertTriangle } from "lucide-react";
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const router = useRouter();
@@ -26,6 +26,11 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(false);
+
+  // Create Vehicles Modal state
+  const [showCreateVehiclesModal, setShowCreateVehiclesModal] = useState(false);
+  const [createVehiclesLoading, setCreateVehiclesLoading] = useState(false);
+  const [vehiclesToCreate, setVehiclesToCreate] = useState([]);
 
   useEffect(() => {
     // Build editable object from incoming data, normalizing charges
@@ -139,10 +144,15 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       setPdfPage(1);
       setPdfError(false);
       setPdfLoading(true);
-      // Use number of parsed pages as a hint for total PDF pages when available
-      setTotalPages(Math.max(1, pageKeys.length || 1));
     }
-  }, [data?.blobUrl, pageKeys]);
+  }, [data?.blobUrl]);
+
+  // Update total pages separately when pageKeys changes (without reloading PDF)
+  useEffect(() => {
+    if (pageKeys.length > 0) {
+      setTotalPages(Math.max(1, pageKeys.length));
+    }
+  }, [pageKeys.length]);
 
   const handleSelectChassis = item => {
     setSelectedChassis(item);
@@ -315,9 +325,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         const next = { ...prev, [selectedPageKey]: true };
         const allSaved = pageKeys.every(k => next[k] === true);
         if (allSaved) {
-          setTimeout(() => {
-            if (typeof onBack === "function") onBack();
-          }, 200);
+          // All pages saved - prepare vehicles data and show modal
+          prepareVehiclesForCreation();
         }
         return next;
       });
@@ -329,6 +338,86 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Prepare all vehicles from all pages for the Create Vehicles modal
+  const prepareVehiclesForCreation = () => {
+    const allVehicles = [];
+    for (const key of pageKeys) {
+      const pageData = editable[key] || [];
+      for (const item of pageData) {
+        if (item.chassis_number) {
+          allVehicles.push({
+            chassis_number: item.chassis_number,
+            brand: item.brand || "",
+            auction: item.auction || "",
+            lot_number: item.lot_number || "",
+            charges: item.charges || [],
+          });
+        }
+      }
+    }
+    setVehiclesToCreate(allVehicles);
+    if (allVehicles.length > 0) {
+      setShowCreateVehiclesModal(true);
+    } else {
+      // No vehicles to create, just go back
+      if (typeof onBack === "function") onBack();
+    }
+  };
+
+  // Calculate total cost from charges array
+  const calculateVehicleTotalCost = (charges) => {
+    if (!Array.isArray(charges)) return 0;
+    return charges.reduce((sum, c) => {
+      const amount = parseFloat(c.amount);
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0);
+  };
+
+  // Format currency for display
+  const formatCurrency = (value) => {
+    if (value === null || value === undefined) return "-";
+    const num = parseFloat(value);
+    if (isNaN(num)) return "-";
+    return `¥${num.toLocaleString()}`;
+  };
+
+  // Create vehicles from invoice
+  const handleCreateVehicles = async () => {
+    if (!data?.id || vehiclesToCreate.length === 0) return;
+
+    setCreateVehiclesLoading(true);
+    try {
+      const res = await API("POST", "createVehiclesFromInvoice", {
+        invoiceJobId: data.id,
+        vehicles: vehiclesToCreate,
+      });
+
+      if (res.error) {
+        showToast(res.error, "error");
+        return;
+      }
+
+      showToast(res.message, "success");
+      setShowCreateVehiclesModal(false);
+
+      // Go back after a short delay
+      setTimeout(() => {
+        if (typeof onBack === "function") onBack();
+      }, 500);
+    } catch (err) {
+      console.error("Create vehicles error", err);
+      showToast("Error creating vehicles", "error");
+    } finally {
+      setCreateVehiclesLoading(false);
+    }
+  };
+
+  // Skip creating vehicles and just go back
+  const handleSkipCreateVehicles = () => {
+    setShowCreateVehiclesModal(false);
+    if (typeof onBack === "function") onBack();
   };
 
   const displayError = error ? (typeof error === "string" ? error : error && error.message ? error.message : String(error)) : "";
@@ -730,6 +819,100 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         </div>
         <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
       </div>
+
+      {/* Create Vehicles Modal */}
+      {showCreateVehiclesModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
+                <Car className="w-6 h-6 text-[var(--primary)]" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-[var(--foreground)]">Create Vehicles from Invoice</h3>
+                <p className="text-sm text-[var(--secondary-foreground)]">
+                  {vehiclesToCreate.length} vehicle{vehiclesToCreate.length !== 1 ? "s" : ""} found in this invoice
+                </p>
+              </div>
+            </div>
+
+            {/* Vehicle List */}
+            <div className="flex-1 overflow-auto mb-4 border border-[var(--border)] rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-[var(--secondary)] sticky top-0">
+                  <tr>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Chassis Number</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Brand</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Auction</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Lot #</th>
+                    <th className="text-right py-3 px-4 font-semibold text-[var(--foreground)]">Total Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {vehiclesToCreate.map((v, idx) => (
+                    <tr key={idx} className="border-t border-[var(--border)] hover:bg-[var(--secondary)]/30">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <Car className="w-4 h-4 text-[var(--primary)]" />
+                          <span className="font-medium text-[var(--foreground)]">{v.chassis_number}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-[var(--foreground)]">{v.brand || "-"}</td>
+                      <td className="py-3 px-4 text-[var(--foreground)]">{v.auction || "-"}</td>
+                      <td className="py-3 px-4 text-[var(--foreground)]">{v.lot_number || "-"}</td>
+                      <td className="py-3 px-4 text-right font-bold text-[var(--primary)]">
+                        {formatCurrency(calculateVehicleTotalCost(v.charges))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Info Box */}
+            <div className="mb-4 p-3 bg-[var(--primary)]/10 rounded-lg border border-[var(--primary)]/20 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-[var(--primary)] flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-[var(--foreground)]">
+                <p className="font-medium">What will happen:</p>
+                <ul className="mt-1 space-y-1 text-[var(--secondary-foreground)]">
+                  <li>• New vehicles will be created with charges from this invoice</li>
+                  <li>• Existing vehicles (same chassis) will be updated with new charge data</li>
+                  <li>• Invoice PDF will be linked to each vehicle</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleSkipCreateVehicles}
+                disabled={createVehiclesLoading}
+                className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
+              >
+                Skip
+              </button>
+              <button
+                onClick={handleCreateVehicles}
+                disabled={createVehiclesLoading || vehiclesToCreate.length === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg font-medium transition-all duration-200 disabled:opacity-50"
+              >
+                {createVehiclesLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Create {vehiclesToCreate.length} Vehicle{vehiclesToCreate.length !== 1 ? "s" : ""}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmComponent />
     </>
   );

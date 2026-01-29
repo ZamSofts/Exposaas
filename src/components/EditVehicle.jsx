@@ -3,7 +3,15 @@ import Head from "next/head";
 import { useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer, Toast, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import Payments from "@/components/Payments";
-import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files } from "lucide-react";
+import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files, DollarSign } from "lucide-react";
+
+// Format currency for display
+const formatCurrencyDisplay = (value) => {
+  if (value === null || value === undefined || value === "") return "";
+  const num = parseFloat(value);
+  if (isNaN(num)) return "";
+  return `¥${num.toLocaleString()}`;
+};
 
 export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const { session, status } = useAuth();
@@ -25,6 +33,27 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const [statusId, setStatusId] = useState(0);
   const [customerId, setCustomerId] = useState(null);
   const [remarks, setRemarks] = useState("");
+
+  // Charge fields
+  const [bidAmount, setBidAmount] = useState("");
+  const [bidTax, setBidTax] = useState("");
+  const [auctionFee, setAuctionFee] = useState("");
+  const [auctionTax, setAuctionTax] = useState("");
+  const [insuranceFee, setInsuranceFee] = useState("");
+  const [insuranceTax, setInsuranceTax] = useState("");
+  const [recyclingFee, setRecyclingFee] = useState("");
+  const [transportFee, setTransportFee] = useState("");
+  const [otherFees, setOtherFees] = useState("");
+
+  // Calculate total cost from charge fields
+  const calculateTotalCost = () => {
+    const charges = [bidAmount, bidTax, auctionFee, auctionTax, insuranceFee, insuranceTax, recyclingFee, transportFee, otherFees];
+    const total = charges.reduce((sum, val) => {
+      const num = parseFloat(val);
+      return sum + (isNaN(num) ? 0 : num);
+    }, 0);
+    return total;
+  };
 
   // Vehicle documents upload states
   const [vehicleDocuments, setVehicleDocuments] = useState([]);
@@ -102,6 +131,17 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setLotNumber(data.lotNumber || "");
     setAuction(data.auction || "");
     setRemarks(data.remarks || "");
+
+    // Populate charge fields
+    setBidAmount(data.bidAmount || "");
+    setBidTax(data.bidTax || "");
+    setAuctionFee(data.auctionFee || "");
+    setAuctionTax(data.auctionTax || "");
+    setInsuranceFee(data.insuranceFee || "");
+    setInsuranceTax(data.insuranceTax || "");
+    setRecyclingFee(data.recyclingFee || "");
+    setTransportFee(data.transportFee || "");
+    setOtherFees(data.otherFees || "");
 
     setDocumentsToDelete([]);
 
@@ -196,6 +236,17 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       formData.append("auction", auction);
       formData.append("remarks", remarks);
 
+      // Append charge fields
+      if (bidAmount) formData.append("bidAmount", bidAmount);
+      if (bidTax) formData.append("bidTax", bidTax);
+      if (auctionFee) formData.append("auctionFee", auctionFee);
+      if (auctionTax) formData.append("auctionTax", auctionTax);
+      if (insuranceFee) formData.append("insuranceFee", insuranceFee);
+      if (insuranceTax) formData.append("insuranceTax", insuranceTax);
+      if (recyclingFee) formData.append("recyclingFee", recyclingFee);
+      if (transportFee) formData.append("transportFee", transportFee);
+      if (otherFees) formData.append("otherFees", otherFees);
+
       // Only append new vehicle document files
       const newFiles = vehicleDocuments.filter(docObj => !docObj.isExisting && docObj.file);
       newFiles.forEach(docObj => {
@@ -279,6 +330,15 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                 </button>
 
                 <button
+                  onClick={() => setActiveTab("charges")}
+                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
+                    activeTab === "charges" ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
+                  }`}
+                >
+                  <DollarSign className="w-4 h-4" />
+                  Charges
+                </button>
+                <button
                   onClick={() => setActiveTab("documents")}
                   className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
                     activeTab === "documents" ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
@@ -345,6 +405,118 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                       <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="input-style" placeholder="Enter remarks..." rows={3} />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeTab === "charges" && (
+                <div>
+                  <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">Acquisition Charges</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="input-label">Bid Amount</label>
+                      <input
+                        type="number"
+                        value={bidAmount}
+                        onChange={e => setBidAmount(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Bid Tax</label>
+                      <input
+                        type="number"
+                        value={bidTax}
+                        onChange={e => setBidTax(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Auction Fee</label>
+                      <input
+                        type="number"
+                        value={auctionFee}
+                        onChange={e => setAuctionFee(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Auction Tax</label>
+                      <input
+                        type="number"
+                        value={auctionTax}
+                        onChange={e => setAuctionTax(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Insurance Fee</label>
+                      <input
+                        type="number"
+                        value={insuranceFee}
+                        onChange={e => setInsuranceFee(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Insurance Tax</label>
+                      <input
+                        type="number"
+                        value={insuranceTax}
+                        onChange={e => setInsuranceTax(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Recycling Fee</label>
+                      <input
+                        type="number"
+                        value={recyclingFee}
+                        onChange={e => setRecyclingFee(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Transport Fee</label>
+                      <input
+                        type="number"
+                        value={transportFee}
+                        onChange={e => setTransportFee(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="input-label">Other Fees</label>
+                      <input
+                        type="number"
+                        value={otherFees}
+                        onChange={e => setOtherFees(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Total Cost Display */}
+                  <div className="mt-8 p-4 bg-[var(--primary)]/10 rounded-lg border border-[var(--primary)]/20">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-medium text-[var(--foreground)]">Total Acquisition Cost</span>
+                      <span className="text-2xl font-bold text-[var(--primary)]">
+                        {formatCurrencyDisplay(calculateTotalCost())}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-[var(--secondary-foreground)] mt-4">
+                    These charges represent the acquisition costs for this vehicle. Total cost is calculated automatically.
+                  </p>
                 </div>
               )}
 
