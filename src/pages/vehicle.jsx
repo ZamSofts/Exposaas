@@ -278,7 +278,7 @@ export default function VehiclesPage() {
               <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                 <Car className="w-6 h-6 text-[var(--primary)]" />
               </div>
-              <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicle testing</h1>
+              <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicles Management</h1>
             </div>
             {isAllowed(["add:vehicle"], session) ? <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} /> : null}
           </div>

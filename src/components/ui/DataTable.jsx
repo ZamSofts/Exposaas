@@ -129,7 +129,7 @@ export default function DataTable({
                     if (React.isValidElement(header) && header.type === "th") {
                       const columnId = header.props.id;
                       const defaultHeaderClasses =
-                        "px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider";
+                        "px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider whitespace-nowrap";
                       const existingClasses = header.props.className || "";
 
                       if (columnId && onSort) {
