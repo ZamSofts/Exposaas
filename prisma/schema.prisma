@@ -44,6 +44,8 @@ model User {
   roles        UserRole[]
   customer     Customer?
   notifications Notification[]
+
+  @@index([companyId])
 }
 
 model Role {
@@ -108,8 +110,21 @@ model Vehicle {
   recyclingFee       Decimal?  @db.Decimal(12, 2)
   transportFee       Decimal?  @db.Decimal(12, 2)
   otherFees          Decimal?  @db.Decimal(12, 2)
+  taxProration       Decimal?  @db.Decimal(12, 2)
+  transportTax       Decimal?  @db.Decimal(12, 2)
+  taxSum             Decimal?  @db.Decimal(12, 2)
   totalCost          Decimal?  @db.Decimal(12, 2)
   sourceInvoiceJobId Int?
+
+  // Logistics/metadata columns
+  auctionDate            String?
+  session                String?
+  transportCompany       String?
+  deliverTo              String?
+  numberPlate            String?
+  titleTransferDeadline  DateTime?
+  containerNumber        String?
+  etd                    String?
 
   // Relations
   brand         Brand         @relation(fields: [brandId], references: [id])
@@ -122,6 +137,9 @@ model Vehicle {
 
   @@unique([companyId, chassisNumber])
   @@index([sourceInvoiceJobId])
+  @@index([brandId])
+  @@index([statusId])
+  @@index([customerId])
 }
 
 model VehicleDocument {
@@ -131,6 +149,8 @@ model VehicleDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
 }
 
 model VehiclePayments {
@@ -144,6 +164,8 @@ model VehiclePayments {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
 }
 
 model VehicleStatus {
@@ -164,6 +186,8 @@ model ChatMessage {
   userId    Int
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 
@@ -184,14 +208,23 @@ model PaymentConfirmation {
 model InvoiceJobs {
   id          Int      @id @default(autoincrement())
   DocumentURL String?
-  Json        Json
+  Json        Json?    // Extraction result for this page
   companyId   Int
   isEvaluated Boolean   @default(false)
+  status      String   @default("pending")  // pending, processing, completed, failed, empty
+  totalPages  Int?     // Total page count in PDF (legacy, kept for backwards compat)
+
+  // Per-page job fields (new architecture)
+  pageNumber          Int?      // Which page this is (1, 2, 3...) - null for legacy jobs
+  parentDocumentUrl   String?   // Original multi-page PDF URL (to group pages from same upload)
+  originalTotalPages  Int?      // Total pages in original PDF
+
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
   vehicles    Vehicle[]  // Vehicles created from this invoice
 
   @@index([companyId])
+  @@index([parentDocumentUrl])  // For grouping pages from same PDF
 }
 
 model Notification {

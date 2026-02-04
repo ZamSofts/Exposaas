@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer, Toast, Loader } from "@/hooks/wrapper";
+import { useAuth } from "@/hooks/useAuth";
+import Error from "@/components/ui/Error";
+import { API } from "@/lib/api";
+import { CustomSelect } from "@/components/ui/SingleSelecter";
+import { CustomButton } from "@/components/ui/CustomButton";
+import { FilePreviewer } from "@/components/ui/FilePreviewer";
+import { Toast } from "@/components/ui/CustomToast";
+import { Loader } from "@/components/ui/Loader";
 import Sidebar from "@/components/Sidebar";
 import Payments from "@/components/Payments";
-import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files, DollarSign } from "lucide-react";
+import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files, DollarSign, Truck } from "lucide-react";
 
 // Format currency for display
 const formatCurrencyDisplay = (value) => {
@@ -43,16 +50,35 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const [insuranceTax, setInsuranceTax] = useState("");
   const [recyclingFee, setRecyclingFee] = useState("");
   const [transportFee, setTransportFee] = useState("");
+  const [transportTax, setTransportTax] = useState("");
   const [otherFees, setOtherFees] = useState("");
+  const [taxProration, setTaxProration] = useState("");
+
+  // Logistics/metadata fields
+  const [auctionDate, setAuctionDate] = useState("");
+  const [sessionField, setSessionField] = useState("");
+  const [transportCompany, setTransportCompany] = useState("");
+  const [deliverTo, setDeliverTo] = useState("");
+  const [numberPlate, setNumberPlate] = useState("");
+  const [titleTransferDeadline, setTitleTransferDeadline] = useState("");
+  const [containerNumber, setContainerNumber] = useState("");
+  const [etd, setEtd] = useState("");
 
   // Calculate total cost from charge fields
   const calculateTotalCost = () => {
-    const charges = [bidAmount, bidTax, auctionFee, auctionTax, insuranceFee, insuranceTax, recyclingFee, transportFee, otherFees];
-    const total = charges.reduce((sum, val) => {
+    const charges = [bidAmount, bidTax, auctionFee, auctionTax, insuranceFee, insuranceTax, recyclingFee, transportFee, transportTax, taxProration, otherFees];
+    return charges.reduce((sum, val) => {
       const num = parseFloat(val);
       return sum + (isNaN(num) ? 0 : num);
     }, 0);
-    return total;
+  };
+
+  const calculateTaxSum = () => {
+    const taxes = [bidTax, auctionTax, insuranceTax, transportTax, taxProration];
+    return taxes.reduce((sum, val) => {
+      const num = parseFloat(val);
+      return sum + (isNaN(num) ? 0 : num);
+    }, 0);
   };
 
   // Vehicle documents upload states
@@ -141,7 +167,19 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setInsuranceTax(data.insuranceTax || "");
     setRecyclingFee(data.recyclingFee || "");
     setTransportFee(data.transportFee || "");
+    setTransportTax(data.transportTax || "");
     setOtherFees(data.otherFees || "");
+    setTaxProration(data.taxProration || "");
+
+    // Logistics/metadata fields
+    setAuctionDate(data.auctionDate || "");
+    setSessionField(data.session || "");
+    setTransportCompany(data.transportCompany || "");
+    setDeliverTo(data.deliverTo || "");
+    setNumberPlate(data.numberPlate || "");
+    setTitleTransferDeadline(data.titleTransferDeadline ? data.titleTransferDeadline.split("T")[0] : "");
+    setContainerNumber(data.containerNumber || "");
+    setEtd(data.etd || "");
 
     setDocumentsToDelete([]);
 
@@ -245,7 +283,19 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       if (insuranceTax) formData.append("insuranceTax", insuranceTax);
       if (recyclingFee) formData.append("recyclingFee", recyclingFee);
       if (transportFee) formData.append("transportFee", transportFee);
+      if (transportTax) formData.append("transportTax", transportTax);
       if (otherFees) formData.append("otherFees", otherFees);
+      if (taxProration) formData.append("taxProration", taxProration);
+
+      // Logistics/metadata fields
+      formData.append("auctionDate", auctionDate);
+      formData.append("session", sessionField);
+      formData.append("transportCompany", transportCompany);
+      formData.append("deliverTo", deliverTo);
+      formData.append("numberPlate", numberPlate);
+      formData.append("titleTransferDeadline", titleTransferDeadline);
+      formData.append("containerNumber", containerNumber);
+      formData.append("etd", etd);
 
       // Only append new vehicle document files
       const newFiles = vehicleDocuments.filter(docObj => !docObj.isExisting && docObj.file);
@@ -337,6 +387,15 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                 >
                   <DollarSign className="w-4 h-4" />
                   Charges
+                </button>
+                <button
+                  onClick={() => setActiveTab("logistics")}
+                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
+                    activeTab === "logistics" ? "bg-[var(--primary)] text-[var(--primary-foreground)]" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
+                  }`}
+                >
+                  <Truck className="w-4 h-4" />
+                  Logistics
                 </button>
                 <button
                   onClick={() => setActiveTab("documents")}
@@ -493,6 +552,16 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                       />
                     </div>
                     <div>
+                      <label className="input-label">Transport Tax</label>
+                      <input
+                        type="number"
+                        value={transportTax}
+                        onChange={e => setTransportTax(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
                       <label className="input-label">Other Fees</label>
                       <input
                         type="number"
@@ -502,21 +571,81 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                         placeholder="0"
                       />
                     </div>
+                    <div>
+                      <label className="input-label">Tax Proration</label>
+                      <input
+                        type="number"
+                        value={taxProration}
+                        onChange={e => setTaxProration(e.target.value)}
+                        className="input-style"
+                        placeholder="0"
+                      />
+                    </div>
                   </div>
 
-                  {/* Total Cost Display */}
-                  <div className="mt-8 p-4 bg-[var(--primary)]/10 rounded-lg border border-[var(--primary)]/20">
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-medium text-[var(--foreground)]">Total Acquisition Cost</span>
-                      <span className="text-2xl font-bold text-[var(--primary)]">
-                        {formatCurrencyDisplay(calculateTotalCost())}
-                      </span>
+                  {/* Total Cost & Tax Sum Display */}
+                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-[var(--primary)]/10 rounded-lg border border-[var(--primary)]/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-medium text-[var(--foreground)]">Total Acquisition Cost</span>
+                        <span className="text-2xl font-bold text-[var(--primary)]">
+                          {formatCurrencyDisplay(calculateTotalCost())}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      <div className="flex items-center justify-between">
+                        <span className="text-lg font-medium text-[var(--foreground)]">Tax Sum</span>
+                        <span className="text-2xl font-bold text-yellow-600">
+                          {formatCurrencyDisplay(calculateTaxSum())}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   <p className="text-xs text-[var(--secondary-foreground)] mt-4">
-                    These charges represent the acquisition costs for this vehicle. Total cost is calculated automatically.
+                    These charges represent the acquisition costs for this vehicle. Total cost and tax sum are calculated automatically.
                   </p>
+                </div>
+              )}
+
+              {activeTab === "logistics" && (
+                <div>
+                  <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">Logistics & Metadata</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                      <label className="input-label">Auction Date</label>
+                      <input type="text" value={auctionDate} onChange={e => setAuctionDate(e.target.value)} className="input-style" placeholder="e.g., 2025/06/09" />
+                    </div>
+                    <div>
+                      <label className="input-label">Session</label>
+                      <input type="text" value={sessionField} onChange={e => setSessionField(e.target.value)} className="input-style" placeholder="e.g., 885" />
+                    </div>
+                    <div>
+                      <label className="input-label">Transportation Company</label>
+                      <input type="text" value={transportCompany} onChange={e => setTransportCompany(e.target.value)} className="input-style" placeholder="Enter transport company..." />
+                    </div>
+                    <div>
+                      <label className="input-label">Deliver To</label>
+                      <input type="text" value={deliverTo} onChange={e => setDeliverTo(e.target.value)} className="input-style" placeholder="Delivery destination..." />
+                    </div>
+                    <div>
+                      <label className="input-label">Number Plate</label>
+                      <input type="text" value={numberPlate} onChange={e => setNumberPlate(e.target.value)} className="input-style" placeholder="Vehicle plate number..." />
+                    </div>
+                    <div>
+                      <label className="input-label">Title Transfer Deadline</label>
+                      <input type="date" value={titleTransferDeadline} onChange={e => setTitleTransferDeadline(e.target.value)} className="input-style" />
+                    </div>
+                    <div>
+                      <label className="input-label">Container Number</label>
+                      <input type="text" value={containerNumber} onChange={e => setContainerNumber(e.target.value)} className="input-style" placeholder="Shipping container #..." />
+                    </div>
+                    <div>
+                      <label className="input-label">ETD (Estimated Departure)</label>
+                      <input type="text" value={etd} onChange={e => setEtd(e.target.value)} className="input-style" placeholder="e.g., Feb 2025" />
+                    </div>
+                  </div>
                 </div>
               )}
 

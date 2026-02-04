@@ -25,12 +25,10 @@
 | bidAmount | Decimal | `bid_amount` | Vehicle winning bid |
 | bidTax | Decimal | `bid_tax` | Tax on bid |
 | auctionFee | Decimal | `auction_fee` | Auction commission |
-| auctionTax | Decimal | `auction_tax` | Tax on auction fee |
-| insuranceFee | Decimal | `insurance_fee` | Mandatory insurance (自賠責) |
-| insuranceTax | Decimal | `insurance_tax` | Tax on insurance |
 | recyclingFee | Decimal | `recycling_fee` | Recycling deposit |
 | transportFee | Decimal | `transport_fee` | Transport/delivery |
 | otherFees | Decimal | `other_fees` | Misc charges |
+| taxProration | Decimal | `insurance_fee` / `tax_proration` | 自賠責相当額 (mandatory insurance equivalent) |
 | totalCost | Decimal | (calculated) | Sum of all charges |
 | sourceInvoiceJobId | Int? | - | Links to original invoice (audit trail) |
 
@@ -100,9 +98,9 @@
 
 **Example CSV with charges:**
 ```csv
-chassis_number,brand,auction,lot_number,bid_amount,bid_tax,auction_fee,auction_tax,insurance_fee,recycling_fee
-GP5-30661,Honda,HAA,7122,500000,50000,30000,3000,23000,13000
-DA63T-248,Suzuki,USS,60238,350000,35000,25000,2500,23000,10000
+chassis_number,brand,auction,lot_number,bid_amount,bid_tax,auction_fee,insurance_fee,recycling_fee
+GP5-30661,Honda,HAA,7122,500000,50000,30000,23000,13000
+DA63T-248,Suzuki,USS,60238,350000,35000,25000,23000,10000
 ```
 
 **Existing CSVs still work** - charge columns are optional, will be null if missing.

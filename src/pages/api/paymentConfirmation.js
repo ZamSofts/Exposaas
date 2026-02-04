@@ -52,8 +52,17 @@ export default async function handler(req, res) {
           invoiceJobId: invoiceJobId || null,
         },
       });
+      // Mark InvoiceJob as evaluated directly
+      // In the new per-page architecture, each page is its own InvoiceJob
       if (invoiceJobId) {
-        await prisma.invoiceJobs.update({ where: { id: invoiceJobId }, data: { isEvaluated: true } });
+        try {
+          await prisma.invoiceJobs.update({
+            where: { id: invoiceJobId },
+            data: { isEvaluated: true }
+          });
+        } catch (jobUpdateErr) {
+          console.warn("Could not update InvoiceJob review status:", jobUpdateErr?.message);
+        }
       }
 
       const charges = [];

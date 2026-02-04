@@ -70,7 +70,7 @@ npx prisma studio  # View data
 - All auctions use same ~10 fee types
 - CSV import maps directly to columns
 
-**New columns:** `bidAmount`, `bidTax`, `auctionFee`, `auctionTax`, `insuranceFee`, `insuranceTax`, `recyclingFee`, `transportFee`, `otherFees`, `totalCost`, `sourceInvoiceJobId`
+**New columns:** `bidAmount`, `bidTax`, `auctionFee`, `recyclingFee`, `transportFee`, `otherFees`, `taxProration`, `totalCost`, `sourceInvoiceJobId`
 
 **Data entry methods:**
 1. PDF Invoice → AI extracts → Review → Save → Vehicles created with charges

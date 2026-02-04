@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, CustomButton, Loader, Toast } from "@/hooks/wrapper";
+import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useAuth } from "@/hooks/useAuth";
+import Error from "@/components/ui/Error";
+import { API } from "@/lib/api";
+import { CustomButton } from "@/components/ui/CustomButton";
+import { Loader } from "@/components/ui/Loader";
+import { Toast } from "@/components/ui/CustomToast";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, UserCheck, Building, EyeOff, Eye,Car } from "lucide-react";

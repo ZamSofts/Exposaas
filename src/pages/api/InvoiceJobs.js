@@ -1,4 +1,5 @@
 import { prisma, getSession } from "@/lib/useful";
+import { ensureQueue } from "../../../extra/queues/pgBoss.mjs";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
@@ -22,7 +23,10 @@ export default async function handler(req, res) {
 
       // single item
       if (id) {
-        const item = await prisma.invoiceJobs.findUnique({ where: { id }, ...(selectFields ? { select: selectFields } : {}) });
+        const item = await prisma.invoiceJobs.findUnique({
+          where: { id },
+          ...(selectFields ? { select: selectFields } : {})
+        });
         return res.status(200).json(item);
       }
 
@@ -46,17 +50,84 @@ export default async function handler(req, res) {
 
       if (!flatten) {
         const [items, total] = await Promise.all([
-          prisma.invoiceJobs.findMany({ where: finalWhere, ...(selectFields ? { select: selectFields } : {}), orderBy: { [sortBy]: sortOrder }, skip, take }),
+          prisma.invoiceJobs.findMany({
+            where: finalWhere,
+            ...(selectFields ? { select: selectFields } : {}),
+            orderBy: { [sortBy]: sortOrder },
+            skip,
+            take
+          }),
           prisma.invoiceJobs.count({ where: finalWhere }),
         ]);
 
         return res.json({ data: items, total });
       }
 
-      const rows = await prisma.invoiceJobs.findMany({ where: finalWhere, ...(selectFields ? { select: selectFields } : {}), orderBy: { [sortBy]: sortOrder } });
+      const rows = await prisma.invoiceJobs.findMany({
+        where: finalWhere,
+        ...(selectFields ? { select: selectFields } : {}),
+        orderBy: { [sortBy]: sortOrder }
+      });
       return res.json({ data: rows, total: rows.length });
     }
+
+    // POST: Retry a failed InvoiceJob
+    if (req.method === "POST") {
+      const { action, id } = req.body;
+
+      if (action === "retry" && id) {
+        // Find the failed job
+        const job = await prisma.invoiceJobs.findUnique({
+          where: { id: Number(id) }
+        });
+
+        if (!job) {
+          return res.status(404).json({ error: "InvoiceJob not found" });
+        }
+
+        // Check ownership (unless Sadmin)
+        if (session.role !== "Sadmin" && job.companyId !== session.companyId) {
+          return res.status(403).json({ error: "Not authorized to retry this job" });
+        }
+
+        // Only retry failed jobs
+        if (job.status !== "failed") {
+          return res.status(400).json({ error: `Cannot retry job with status: ${job.status}` });
+        }
+
+        // Reset job status to pending
+        await prisma.invoiceJobs.update({
+          where: { id: Number(id) },
+          data: {
+            status: "pending",
+            Json: null  // Clear previous error
+          }
+        });
+
+        // Re-queue the job for processing
+        const boss = await ensureQueue("gemini-extract-page");
+        await boss.send("gemini-extract-page", {
+          invoiceJobId: job.id,
+          pageUrl: job.DocumentURL,
+          pageNumber: job.pageNumber || 1,
+          totalPages: job.originalTotalPages || 1,
+          companyId: job.companyId,
+          userId: session.userId
+        });
+
+        console.log(`🔄 Retrying InvoiceJob #${job.id} (page ${job.pageNumber})`);
+
+        return res.status(200).json({
+          success: true,
+          message: `Job #${job.id} queued for retry`,
+          jobId: job.id
+        });
+      }
+
+      return res.status(400).json({ error: "Invalid action" });
+    }
   } catch (err) {
-    return res.status(500).json({ error: "Internal server error" });
+    console.error("InvoiceJobs API error:", err);
+    return res.status(500).json({ error: "Internal server error", details: err?.message });
   }
 }

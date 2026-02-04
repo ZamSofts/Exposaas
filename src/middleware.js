@@ -39,7 +39,7 @@ const PERMISSIONS = {
 };
 
 // Routes that don't require authentication
-const PUBLIC_ROUTES = ["/api/auth", "/_next", "/favicon.ico", "/public"];
+const PUBLIC_ROUTES = ["/api/auth"];
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
@@ -47,11 +47,6 @@ export async function middleware(request) {
 
   // Skip middleware for public routes
   if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
-
-  // Skip middleware for non-API routes (pages) - they can handle their own auth
-  if (!pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
@@ -103,15 +98,7 @@ export async function middleware(request) {
   }
 }
 
-// Configure which paths this middleware should run on
+// Only run middleware on API routes
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/api/:path*"],
 };

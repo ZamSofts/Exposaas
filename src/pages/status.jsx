@@ -1,7 +1,12 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm, useAuth, Error, API, CustomButton, Loader } from "@/hooks/wrapper";
+import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useAuth } from "@/hooks/useAuth";
+import Error from "@/components/ui/Error";
+import { API } from "@/lib/api";
+import { CustomButton } from "@/components/ui/CustomButton";
+import { Loader } from "@/components/ui/Loader";
 import Sidebar from "@/components/Sidebar";
 import { Plus, Edit, Trash2, Tag } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";

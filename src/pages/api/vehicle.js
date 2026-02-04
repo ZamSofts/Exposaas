@@ -1,6 +1,7 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile, putMultipleFiles } from "@/lib/blob.mjs";
 import multer from "multer";
+import { parseChargeFieldsFromFlat } from "../../../extra/utils/chargeMapping.mjs";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -123,6 +124,9 @@ const getSearchFilter = search =>
           { auction: { contains: search, mode: "insensitive" } },
           { lotNumber: { contains: search, mode: "insensitive" } },
           { remarks: { contains: search, mode: "insensitive" } },
+          { numberPlate: { contains: search, mode: "insensitive" } },
+          { containerNumber: { contains: search, mode: "insensitive" } },
+          { transportCompany: { contains: search, mode: "insensitive" } },
           { brand: { name: { contains: search, mode: "insensitive" } } },
           { status: { name: { contains: search, mode: "insensitive" } } },
         ],
@@ -139,42 +143,41 @@ const includeRelations = {
   company: { select: { name: true } },
   brand: { select: { name: true } },
   status: { select: { name: true } },
+  customer: { select: { id: true, name: true } },
   documents: { select: { id: true, Url: true, createdAt: true } },
   sourceInvoiceJob: { select: { id: true, DocumentURL: true } },
 };
 
-// Helper to parse charge fields from request body
-const parseChargeFields = body => {
-  const chargeFields = {};
-  const chargeKeys = [
-    "bidAmount",
-    "bidTax",
-    "auctionFee",
-    "auctionTax",
-    "insuranceFee",
-    "insuranceTax",
-    "recyclingFee",
-    "transportFee",
-    "otherFees",
-  ];
+// Helper to parse charge + metadata fields from request body
+const parseVehicleFields = body => {
+  // Charge fields (uses shared utility — includes totalCost and taxSum)
+  const fields = parseChargeFieldsFromFlat(body);
 
-  for (const key of chargeKeys) {
+  // sourceInvoiceJobId
+  if (body.sourceInvoiceJobId !== undefined && body.sourceInvoiceJobId !== null && body.sourceInvoiceJobId !== "") {
+    fields.sourceInvoiceJobId = parseInt(body.sourceInvoiceJobId);
+  }
+
+  // Metadata/logistics fields
+  const metadataKeys = [
+    "auctionDate", "session", "transportCompany", "deliverTo",
+    "numberPlate", "containerNumber", "etd",
+  ];
+  for (const key of metadataKeys) {
     if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
-      chargeFields[key] = parseFloat(body[key]);
+      fields[key] = body[key];
     }
   }
 
-  // Calculate totalCost if any charge field is present
-  if (Object.keys(chargeFields).length > 0) {
-    chargeFields.totalCost = Object.values(chargeFields).reduce((sum, val) => sum + (val || 0), 0);
+  // titleTransferDeadline (DateTime)
+  if (body.titleTransferDeadline !== undefined && body.titleTransferDeadline !== null && body.titleTransferDeadline !== "") {
+    const d = new Date(body.titleTransferDeadline);
+    if (!isNaN(d.getTime())) {
+      fields.titleTransferDeadline = d;
+    }
   }
 
-  // Handle sourceInvoiceJobId
-  if (body.sourceInvoiceJobId !== undefined && body.sourceInvoiceJobId !== null && body.sourceInvoiceJobId !== "") {
-    chargeFields.sourceInvoiceJobId = parseInt(body.sourceInvoiceJobId);
-  }
-
-  return chargeFields;
+  return fields;
 };
 
 export default async function handler(req, res) {
@@ -248,7 +251,7 @@ export default async function handler(req, res) {
         await validateVehicle({ chassisNumber, brandId, companyId, statusId });
 
         // Parse charge fields from request
-        const chargeFields = parseChargeFields(req.body);
+        const chargeFields = parseVehicleFields(req.body);
 
         const vehicle = await prisma.vehicle.create({
           data: {
@@ -302,7 +305,7 @@ export default async function handler(req, res) {
         await validateVehicle({ chassisNumber, brandId, companyId, statusId, vehicleId });
 
         // Parse charge fields from request
-        const chargeFields = parseChargeFields(req.body);
+        const chargeFields = parseVehicleFields(req.body);
 
         const updateData = {
           chassisNumber,

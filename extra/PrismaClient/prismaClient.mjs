@@ -17,11 +17,19 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
 // Graceful shutdown
 process.on("SIGTERM", async () => {
-  await prisma.$disconnect();
+  try {
+    await prisma.$disconnect();
+  } catch (e) {
+    console.error("❌ [prisma] Error disconnecting on SIGTERM:", e);
+  }
 });
 
 process.on("SIGINT", async () => {
-  await prisma.$disconnect();
+  try {
+    await prisma.$disconnect();
+  } catch (e) {
+    console.error("❌ [prisma] Error disconnecting on SIGINT:", e);
+  }
 });
 
 export { prisma };

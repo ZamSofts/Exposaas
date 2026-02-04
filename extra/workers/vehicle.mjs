@@ -3,43 +3,7 @@ import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
 import NotificationService from "../services/notificationService.mjs";
-
-// Map CSV headers (snake_case) to database columns (camelCase)
-// Also handles Gemini output mapping (shipping_fee → transportFee)
-const parseChargeFromCSV = (row) => {
-  const charges = {};
-
-  // CSV header → DB column mapping
-  const mapping = {
-    bid_amount: "bidAmount",
-    bid_tax: "bidTax",
-    auction_fee: "auctionFee",
-    auction_tax: "auctionTax",
-    insurance_fee: "insuranceFee",
-    insurance_tax: "insuranceTax",
-    recycling_fee: "recyclingFee",
-    transport_fee: "transportFee",
-    shipping_fee: "transportFee", // Gemini outputs shipping_fee, map to transportFee
-    other_fees: "otherFees",
-  };
-
-  for (const [csvKey, dbKey] of Object.entries(mapping)) {
-    const value = row[csvKey];
-    if (value !== undefined && value !== null && value !== "") {
-      const parsed = parseFloat(value);
-      if (!isNaN(parsed)) {
-        charges[dbKey] = parsed;
-      }
-    }
-  }
-
-  // Calculate totalCost if any charge field is present
-  if (Object.keys(charges).length > 0) {
-    charges.totalCost = Object.values(charges).reduce((sum, val) => sum + (val || 0), 0);
-  }
-
-  return charges;
-};
+import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.mjs";
 
 let boss;
 
@@ -115,8 +79,20 @@ let boss;
                 }
                 let brandId = brand?.id;
 
-                // Parse charge fields from CSV row
-                const charges = parseChargeFromCSV(row);
+                // Parse charge and metadata fields from CSV row
+                const charges = parseChargeFieldsFromFlat(row);
+                const metadata = parseMetadataFromCSV(row);
+
+                // Look up customer by name if provided
+                const customerName = row["customer"]?.trim() || null;
+                let customerId = null;
+                if (customerName) {
+                  const customer = await prisma.customer.findFirst({
+                    where: { name: { equals: customerName, mode: "insensitive" } },
+                    select: { id: true },
+                  });
+                  if (customer) customerId = customer.id;
+                }
 
                 await prisma.vehicle.upsert({
                   where: {
@@ -131,7 +107,9 @@ let boss;
                     brandId,
                     companyId,
                     statusId: 1,
+                    ...(customerId ? { customerId } : {}),
                     ...charges,
+                    ...metadata,
                   },
                   create: {
                     lotNumber,
@@ -140,7 +118,9 @@ let boss;
                     brandId,
                     companyId,
                     statusId: 1,
+                    ...(customerId ? { customerId } : {}),
                     ...charges,
+                    ...metadata,
                   },
                 });
                 count++;
@@ -237,28 +217,30 @@ let boss;
 
 // Graceful shutdown handling
 process.on("SIGTERM", async () => {
-  console.log("🛑 SIGTERM received, shutting down gracefully...");
+  console.log("🛑 [vehicle] SIGTERM received, shutting down gracefully...");
   try {
     if (boss && typeof boss.stop === "function") {
       await boss.stop();
-      console.log("✅ pg-boss stopped");
+      console.log("✅ [vehicle] pg-boss stopped");
     }
+    await prisma.$disconnect();
   } catch (error) {
-    console.error("❌ Error during shutdown:", error && error.message ? error.message : error);
+    console.error("❌ [vehicle] Error during shutdown:", error && error.message ? error.message : error);
   } finally {
     process.exit(0);
   }
 });
 
 process.on("SIGINT", async () => {
-  console.log("🛑 SIGINT received, shutting down gracefully...");
+  console.log("🛑 [vehicle] SIGINT received, shutting down gracefully...");
   try {
     if (boss && typeof boss.stop === "function") {
       await boss.stop();
-      console.log("✅ pg-boss stopped");
+      console.log("✅ [vehicle] pg-boss stopped");
     }
+    await prisma.$disconnect();
   } catch (error) {
-    console.error("❌ Error during shutdown:", error && error.message ? error.message : error);
+    console.error("❌ [vehicle] Error during shutdown:", error && error.message ? error.message : error);
   } finally {
     process.exit(0);
   }

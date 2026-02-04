@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, isAllowed, CustomButton, Toast, Loader, EditVehicle, } from "@/hooks/wrapper";
+import { useAuth } from "@/hooks/useAuth";
+import { useConfirm } from "@/components/ui/ConfirmModal";
+import Error from "@/components/ui/Error";
+import { API, isAllowed } from "@/lib/api";
+import { CustomButton } from "@/components/ui/CustomButton";
+import { Toast } from "@/components/ui/CustomToast";
+import { Loader } from "@/components/ui/Loader";
+import { EditVehicle } from "@/components/EditVehicle";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp, FileText } from "lucide-react";
@@ -422,11 +429,23 @@ export default function VehiclesPage() {
                   <th id="auctionFee">Auction Fee</th>
                   <th id="auctionTax">Auction Tax</th>
                   <th id="insuranceFee">Insurance</th>
-                  <th id="insuranceTax">Ins. Tax</th>
+                  <th id="insuranceTax">Insurance Tax</th>
                   <th id="recyclingFee">Recycling</th>
                   <th id="transportFee">Transport</th>
+                  <th id="transportTax">Transport Tax</th>
                   <th id="otherFees">Other</th>
+                  <th id="taxProration">Tax Proration</th>
+                  <th id="taxSum">Tax Sum</th>
                   <th id="totalCost">Total Cost</th>
+                  <th id="customer">Customer</th>
+                  <th id="auctionDate">Date</th>
+                  <th id="session">Session</th>
+                  <th id="transportCompany">Transport Co.</th>
+                  <th id="deliverTo">Deliver To</th>
+                  <th id="numberPlate">Plate #</th>
+                  <th id="titleTransferDeadline">Title Deadline</th>
+                  <th id="containerNumber">Container #</th>
+                  <th id="etd">ETD</th>
                   <th id="status">Status</th>
                   <th id="createdAt">Registered</th>
                   {isAllowed(["edit:vehicle"], session) ? <th id="actions">Actions</th> : null}
@@ -493,10 +512,46 @@ export default function VehiclesPage() {
                       <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.transportFee)}</span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.transportTax)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.otherFees)}</span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.taxProration)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm font-medium text-[var(--foreground)]">{formatCurrency(v.taxSum)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
                       <span className="text-sm font-bold text-[var(--primary)]">{formatCurrency(v.totalCost)}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.customer?.name || "-"}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.auctionDate || "-"}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.session || "-"}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.transportCompany || "-"}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.deliverTo || "-"}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.numberPlate || "-"}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
+                      {v.titleTransferDeadline ? new Date(v.titleTransferDeadline).toLocaleDateString() : "-"}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.containerNumber || "-"}</span>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-sm text-[var(--foreground)]">{v.etd || "-"}</span>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]">{v?.status?.name}</span>

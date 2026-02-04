@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import Head from "next/head";
-import { useAuth, CustomButton, Error ,Loader as customLoader} from "@/hooks/wrapper";
+import { useAuth } from "@/hooks/useAuth";
+import { CustomButton } from "@/components/ui/CustomButton";
+import Error from "@/components/ui/Error";
+import { Loader as customLoader } from "@/components/ui/Loader";
 import Sidebar from "@/components/Sidebar";
 import {  MessageCircle, Send, Users, Wifi, WifiOff } from "lucide-react";
 import wsClient from "@/lib/wsClient";

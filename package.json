@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"NEXT,WORKER,WS\" -c \"blue,green,yellow\" \"next dev\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" ",
+    "dev": "concurrently -n \"NEXT,WORKER,WS,INVOICE,PAGE\" -c \"blue,green,yellow,magenta,cyan\" \"next dev\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\"",
     "worker": "node -r dotenv/config extra/workers/vehicle.mjs",
     "ws": "node -r dotenv/config extra/webSocket/ws.mjs",
     "build": "next build",
-    "start": "concurrently -n \"NEXT,WORKER,WS,INVOICE\" -c \"blue,green,yellow,magenta\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\"",
+    "start": "concurrently -n \"NEXT,WORKER,WS,INVOICE,PAGE\" -c \"blue,green,yellow,magenta,cyan\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\"",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
@@ -22,6 +22,7 @@
     "multer": "^2.0.2",
     "next": "15.4.4",
     "next-auth": "^4.24.11",
+    "pdf-lib": "^1.17.1",
     "pg": "^8.16.3",
     "pg-boss": "^11.0.8",
     "prisma": "^6.14.0",

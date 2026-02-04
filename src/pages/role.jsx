@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useConfirm, useAuth, Error, API, MultiSelect, CustomButton, Loader } from "@/hooks/wrapper";
+import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useAuth } from "@/hooks/useAuth";
+import Error from "@/components/ui/Error";
+import { API } from "@/lib/api";
+import { MultiSelect } from "@/components/ui/MultiSelect";
+import { CustomButton } from "@/components/ui/CustomButton";
+import { Loader } from "@/components/ui/Loader";
 import Sidebar from "@/components/Sidebar";
 import DataTable from "@/components/ui/DataTable";
 import PermissionSelector from "@/components/ui/PermissionSelector";

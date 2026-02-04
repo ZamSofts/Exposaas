@@ -43,7 +43,9 @@ const CHARGE_TYPE_MAP = {
   insurance_tax: "insuranceTax",
   recycling_fee: "recyclingFee",
   transport_fee: "transportFee",
+  transport_tax: "transportTax",
   shipping_fee: "transportFee", // Gemini may output either
+  tax_proration: "taxProration",
   listing_fee: "otherFees", // Listing fee goes to otherFees
   other_fee: "otherFees",
   other_fees: "otherFees",

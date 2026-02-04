@@ -1,7 +1,79 @@
-import fs from "fs";
-import path from "path";
-import https from "https";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { downloadFile as downloadFromAzure } from "../../src/lib/blob.mjs";
+
+// Retry configuration for handling 429 rate limits
+const RETRY_CONFIG = {
+  maxRetries: 5,
+  baseDelayMs: 5000,       // Start with 5 second delay
+  maxDelayMs: 120000,      // Max 2 minute delay
+  backoffMultiplier: 2,    // Double delay each retry
+};
+
+/**
+ * Sleep helper
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Extract retry delay from 429 error response if available
+ * Gemini sometimes tells you how long to wait (e.g., "Please retry in 4.524463687s")
+ */
+function extractRetryDelay(error) {
+  const message = error?.message || String(error);
+  const match = message.match(/retry in ([\d.]+)s/i);
+  if (match) {
+    return Math.ceil(parseFloat(match[1]) * 1000) + 1000; // Convert to ms, add 1s buffer
+  }
+  return null;
+}
+
+/**
+ * Wrapper to call Gemini API with retry logic for 429 errors
+ */
+async function callGeminiWithRetry(model, content, pageNumber = 0) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    try {
+      console.log(`🤖 Page ${pageNumber}: Gemini API call (attempt ${attempt}/${RETRY_CONFIG.maxRetries})`);
+      const result = await model.generateContent(content);
+      return result;
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error?.message || String(error);
+
+      // Check if it's a rate limit error (429)
+      const isRateLimit = errorMessage.includes('429') ||
+                          errorMessage.includes('quota') ||
+                          errorMessage.includes('rate') ||
+                          errorMessage.includes('Too Many Requests');
+
+      if (!isRateLimit) {
+        // Not a rate limit error, don't retry
+        console.error(`❌ Page ${pageNumber}: Gemini error (not retryable):`, errorMessage);
+        throw error;
+      }
+
+      if (attempt === RETRY_CONFIG.maxRetries) {
+        console.error(`❌ Page ${pageNumber}: Max retries (${RETRY_CONFIG.maxRetries}) exceeded`);
+        throw error;
+      }
+
+      // Calculate delay with exponential backoff
+      const extractedDelay = extractRetryDelay(error);
+      const exponentialDelay = Math.min(
+        RETRY_CONFIG.baseDelayMs * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt - 1),
+        RETRY_CONFIG.maxDelayMs
+      );
+      const delayMs = extractedDelay || exponentialDelay;
+
+      console.warn(`⏳ Page ${pageNumber}: Rate limited (429). Waiting ${(delayMs / 1000).toFixed(1)}s before retry ${attempt + 1}/${RETRY_CONFIG.maxRetries}...`);
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
 
 const PROMPT = `
 You are an expert at parsing invoices from PDFs, supporting both Japanese and English languages, and adaptable to any invoice type (e.g., automotive auctions, retail, services, utilities). Analyze this PDF document and extract line items (e.g., products, services, vehicles) with their associated charges, plus global metadata focused on the customer perspective (e.g., what the buyer needs to know about purchases, costs, and payments). Automatically detect the primary language of the document (Japanese or English) and adapt your parsing accordingly—use Japanese terms for JP docs (prioritize keywords like '請求書', '落札料', 'リサイクル預託金', '自賠責相当額', '出品料', '成約料') and English equivalents for EN docs, but always map to the standardized English charge types and output in clear English. Focus on unique, non-duplicative key elements from the customer's view—ignore headers, footers, subtotals, or redundant totals unless they tie directly to items, vehicles, costs, or payment status. For automotive auctions (detect via terms like '計算書', '落札', 'オークション'), extract per vehicle (rows/entries) and customer-relevant globals (totals, purchase summary). STRICTLY AVOID extracting or including: company names (e.g., '有限会社 ワールドオートトレーディング'), internal codes (e.g., '0011028'), addresses, phone/fax/tel numbers, bank details (e.g., bank_name, branch_name, account_type, account_number, account_holder), detailed internal balances (e.g., previous_balance, this_transaction_payment_amount, current_balance_payment_amount, settled_amount, taxable_amount_10_percent, consumption_tax_10_percent, total_price_excluding_tax, total_consumption_tax), or any non-customer-facing metadata. Skip all such details entirely—no inclusion in output.
@@ -57,7 +129,7 @@ Extract fees and map them to these standardized types with amounts. Recognize va
   Keep ALL amounts.
 • Preserve invoice totals exactly.
 • You MUST ALWAYS extract the following fee fields, even if they are missing → return null:
-• bid_amount, bid_tax, auction_fee, auction_tax.
+• bid_amount, bid_tax, auction_fee, auction_tax, insurance_fee.
 
 • These fee fields are MANDATORY and must appear in the final JSON every time, without exception.
 
@@ -91,7 +163,6 @@ Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number
         { "type": "auction_fee", "amount": 15000 },
         { "type": "auction_tax", "amount": 1500 },
         { "type": "insurance_fee", "amount": 23000 },
-        { "type": "insurance_tax", "amount": 2300 },
         { "type": "recycling_fee", "amount": 13220 }
       ]
     }
@@ -112,53 +183,46 @@ Analyze systematically: Extract all combinations.
 Return a COMPLETE, VALID JSON object. No trailing commas; end with '}'.
 `
 
-
-async function downloadFile(url) {
-  return new Promise((resolve, reject) => {
-    try {
-      const chunks = [];
-      https.get(url, response => {
-        if (response.statusCode !== 200) {
-          reject(new Error(`Failed to download file: ${response.statusCode}`));
-          return;
-        }
-        response.on("data", c => chunks.push(c));
-        response.on("end", () => resolve(Buffer.concat(chunks)));
-        response.on("error", err => reject(err));
-      }).on("error", err => reject(err));
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
-
-export async function processInvoiceWithGemini(filePath) {
-  let localFilePath = null;
-  let downloadedBuffer = null;
+/**
+ * Process a single page PDF from Azure URL with Gemini
+ * Used by the per-page processing worker for improved accuracy on large PDFs
+ *
+ * @param {string} pageUrl - Azure Blob URL for the single-page PDF
+ * @param {number} pageNumber - Page number (for logging)
+ * @returns {Promise<Array>} - Array of vehicles extracted from this page (unwrapped from page_1)
+ */
+export async function processPageWithGemini(pageUrl, pageNumber) {
+  console.log(`🔄 Processing page ${pageNumber}: ${pageUrl}`);
 
   try {
-    console.log("🚀 Starting Gemini invoice processing for:", filePath);
-    
-    console.log("📥 Downloading from Azure Blob or reading local file...");
+    // Download from Azure Blob Storage (returns a stream)
+    console.log(`📥 Page ${pageNumber}: Attempting Azure download from: ${pageUrl}`);
 
-    const isUrl = /^https?:\/\//i.test(filePath);
-    if (isUrl) {
-      downloadedBuffer = await downloadFile(filePath);
-      console.log("✅ Downloaded into memory. Size:", `${(downloadedBuffer.length / (1024 * 1024)).toFixed(2)} MB`);
-      if (downloadedBuffer.length / (1024 * 1024) > 20) {
-        console.warn("⚠️  Warning: File size is large (>20MB). Processing may take longer or fail.");
-      }
-    } else {
-      // local file path
-      localFilePath = filePath;
-      if (!fs.existsSync(localFilePath)) throw new Error(`Local file not found: ${localFilePath}`);
-      const stats = fs.statSync(localFilePath);
-      const fileSizeMb = stats.size / (1024 * 1024);
-      console.log(`📄 File size: ${fileSizeMb.toFixed(2)} MB`);
-      if (fileSizeMb > 20) {
-        console.warn("⚠️  Warning: File size is large (>20MB). Processing may take longer or fail.");
-      }
+    let stream;
+    try {
+      stream = await downloadFromAzure(pageUrl);
+      console.log(`📥 Page ${pageNumber}: Stream received: ${stream ? 'yes' : 'null/undefined'}`);
+    } catch (downloadErr) {
+      console.error(`❌ Page ${pageNumber}: Azure download FAILED:`, downloadErr?.message || downloadErr);
+      throw downloadErr;
     }
+
+    if (!stream) {
+      throw new Error(`Azure download returned null/undefined stream for page ${pageNumber}`);
+    }
+
+    // Convert stream to buffer
+    const chunks = [];
+    for await (const chunk of stream) {
+      chunks.push(chunk);
+    }
+    const pdfBuffer = Buffer.concat(chunks);
+
+    if (pdfBuffer.length === 0) {
+      throw new Error(`Downloaded PDF is empty (0 bytes) for page ${pageNumber}`);
+    }
+
+    console.log(`📄 Page ${pageNumber} downloaded: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
 
     if (!process.env.GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY in environment");
@@ -167,19 +231,11 @@ export async function processInvoiceWithGemini(filePath) {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    if (!model) throw new Error("Unable to acquire Gemini model from client");
+    const base64Data = pdfBuffer.toString("base64");
 
-    let pdfBytes;
-    if (downloadedBuffer) {
-      pdfBytes = downloadedBuffer;
-    } else {
-      pdfBytes = fs.readFileSync(localFilePath);
-    }
-    const base64Data = pdfBytes.toString("base64");
+    console.log(`📤 Sending page ${pageNumber} to Gemini...`);
 
-    console.log("📤 Sending PDF to Gemini...");
-
-    const result = await model.generateContent([
+    const result = await callGeminiWithRetry(model, [
       {
         inlineData: {
           mimeType: "application/pdf",
@@ -187,8 +243,9 @@ export async function processInvoiceWithGemini(filePath) {
         },
       },
       PROMPT,
-    ]);
+    ], pageNumber);
 
+    // Extract text from response
     let text = "";
     try {
       if (result?.response?.text) {
@@ -203,13 +260,13 @@ export async function processInvoiceWithGemini(filePath) {
         text = String(result).slice(0, 10000);
       }
     } catch (err) {
-      console.warn("⚠️ Could not extract text via primary responders:", err?.message);
+      console.warn(`⚠️ Page ${pageNumber}: Could not extract text via primary responders:`, err?.message);
       text = String(result || "").slice(0, 10000);
     }
 
-    console.log(`📥 Gemini response received (${text.length} chars)`);
-    console.log("🔍  JSON from response...", text);
+    console.log(`📥 Page ${pageNumber}: Gemini response received (${text.length} chars)`);
 
+    // Parse JSON
     let cleanText = text
       .replace(/^```json/i, "")
       .replace(/```$/i, "")
@@ -218,36 +275,42 @@ export async function processInvoiceWithGemini(filePath) {
     let parsed = null;
     try {
       parsed = JSON.parse(cleanText);
-      console.log("✅ JSON parsed successfully");
+      console.log(`✅ Page ${pageNumber}: JSON parsed successfully`);
     } catch (e) {
-      console.warn("❌ JSON parse failed:", e.message);
+      console.warn(`❌ Page ${pageNumber}: JSON parse failed:`, e.message);
       const re = /({[\s\S]*}|\[[\s\S]*\])/m;
       const m = re.exec(cleanText);
       if (m) {
         try {
           parsed = JSON.parse(m[0]);
-          console.log("✅ Manually extracted JSON from response");
+          console.log(`✅ Page ${pageNumber}: Manually extracted JSON from response`);
         } catch (e2) {
-          console.warn("❌ Manual JSON extraction failed:", e2.message);
+          console.warn(`❌ Page ${pageNumber}: Manual JSON extraction failed:`, e2.message);
         }
       }
     }
 
     if (!parsed) {
-      console.error("❌ Could not parse JSON from Gemini response. Preview:\n", cleanText.slice(0, 1000));
-      return {};
+      console.error(`❌ Page ${pageNumber}: Could not parse JSON. Preview:\n`, cleanText.slice(0, 500));
+      return [];
     }
-    console.log("🚀 Gemini invoice processing completed successfully.",parsed);
-    return parsed;
+
+    // IMPORTANT: Return only the contents of page_1 to avoid nesting issues
+    // Gemini returns {"page_1": [...]} even for single-page PDFs
+    // We unwrap it here so the aggregator can properly merge: {"page_N": vehicles}
+    const vehicles = parsed["page_1"] || parsed["page_2"] || [];
+
+    // Handle case where parsed is already an array
+    if (Array.isArray(parsed)) {
+      console.log(`✅ Page ${pageNumber}: Extracted ${parsed.length} vehicles (direct array)`);
+      return parsed;
+    }
+
+    console.log(`✅ Page ${pageNumber}: Extracted ${vehicles.length} vehicles`);
+    return vehicles;
 
   } catch (error) {
-    console.error("❌ Error in processInvoiceWithGemini:", error?.message || error);
-    return {};
-  }
-  finally {
-    if (localFilePath && fs.existsSync(localFilePath)) {
-      fs.unlinkSync(localFilePath);
-      console.log("🗑️ Temporary file removed:", localFilePath);
-    }
+    console.error(`❌ Page ${pageNumber}: Error in processPageWithGemini:`, error?.message || error);
+    throw error; // Re-throw so the worker can handle retry/failure
   }
 }

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { signIn, getSession } from "next-auth/react";
 import { Geist } from "next/font/google";
-import { Error, Loader } from "@/hooks/wrapper";
+import Error from "@/components/ui/Error";
+import { Loader } from "@/components/ui/Loader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
