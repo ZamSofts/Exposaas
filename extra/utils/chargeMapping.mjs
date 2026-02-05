@@ -1,9 +1,4 @@
-/**
- * Single source of truth for charge type mappings.
- * Maps snake_case keys (CSV headers, Gemini output) to camelCase DB column names.
- */
 export const CHARGE_TYPE_MAP = {
-  // Programmatic snake_case keys (Gemini output)
   bid_amount: "bidAmount",
   bid_tax: "bidTax",
   auction_fee: "auctionFee",
@@ -28,9 +23,6 @@ export const CHARGE_TYPE_MAP = {
   "tax_(from_transportation)": "transportTax",
 };
 
-/**
- * Tax columns used to calculate taxSum.
- */
 export const TAX_COLUMNS = [
   "bidTax",
   "auctionTax",
@@ -39,9 +31,6 @@ export const TAX_COLUMNS = [
   "taxProration",
 ];
 
-/**
- * All charge columns summed into totalCost.
- */
 export const ALL_CHARGE_COLUMNS = [
   "bidAmount",
   "bidTax",
@@ -56,9 +45,6 @@ export const ALL_CHARGE_COLUMNS = [
   "otherFees",
 ];
 
-/**
- * Maps snake_case CSV headers for non-charge metadata to DB column names.
- */
 export const METADATA_CSV_MAP = {
   // Programmatic keys
   auction_date: "auctionDate",
@@ -79,11 +65,6 @@ export const METADATA_CSV_MAP = {
   "title_transfer_deadl...": "titleTransferDeadline",
 };
 
-/**
- * Parse charge fields from a flat object (CSV row or form body).
- * Accepts both camelCase and snake_case keys.
- * Auto-calculates totalCost and taxSum.
- */
 export function parseChargeFieldsFromFlat(row) {
   const charges = {};
 
@@ -117,9 +98,6 @@ export function parseChargeFieldsFromFlat(row) {
   return charges;
 }
 
-/**
- * Parse metadata fields from a CSV row (snake_case → camelCase).
- */
 export function parseMetadataFromCSV(row) {
   const metadata = {};
 

@@ -1,15 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import Head from "next/head";
-import { useAuth } from "@/hooks/useAuth";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import Error from "@/components/ui/Error";
-import { API, isAllowed } from "@/lib/api";
-import { CustomButton } from "@/components/ui/CustomButton";
-import { Toast } from "@/components/ui/CustomToast";
-import { Loader } from "@/components/ui/Loader";
-import { EditVehicle } from "@/components/EditVehicle";
+import { useAuth, useConfirm, API,Error,DataTable, isAllowed, CustomButton, Toast, Loader, EditVehicle, FilePreviewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import DataTable from "@/components/ui/DataTable";
 import { Plus, Edit, Trash2, Car, FileUp, FileText } from "lucide-react";
 
 // Format currency with ¥ symbol
@@ -40,6 +32,7 @@ export default function VehiclesPage() {
 
   const [edit, setEdit] = useState(null);
   const [currentView, setCurrentView] = useState("list");
+  const [documentPreview, setDocumentPreview] = useState(null);
 
   // Modal refs for click outside
   const csvModalRef = useRef(null);
@@ -49,7 +42,7 @@ export default function VehiclesPage() {
   const [perPage, setPerPage] = useState(5);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("asc");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   // Toast state
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
@@ -474,15 +467,14 @@ export default function VehiclesPage() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       {v.sourceInvoiceJob?.DocumentURL ? (
-                        <a
-                          href={v.sourceInvoiceJob.DocumentURL}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 text-red-500 rounded hover:bg-red-500/20 transition-colors"
-                          title="View Invoice PDF"
+                        <button
+                          onClick={() => setDocumentPreview({ url: v.sourceInvoiceJob.DocumentURL, fileName: `invoice_${v.sourceInvoiceJob.DocumentURL.split("/").pop()}` })}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-500 rounded hover:bg-green-500/20 transition-colors"
+                          title="Preview Invoice PDF"
+                          aria-label={`Preview invoice for vehicle ${v.id}`}
                         >
                           <FileText className="w-4 h-4" />
-                        </a>
+                        </button>
                       ) : (
                         <span className="text-[var(--secondary-foreground)]">-</span>
                       )}
@@ -584,8 +576,11 @@ export default function VehiclesPage() {
           </div>
         </div>
       </Sidebar>
+            {documentPreview && (
+              <FilePreviewer url={documentPreview.url} fileName={documentPreview.fileName} isOpen={true} onClose={() => setDocumentPreview(null)} trigger={null} />
+            )}
 
-      <ConfirmComponent />
+            <ConfirmComponent />
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
     </>
   );

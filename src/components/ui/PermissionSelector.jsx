@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 
-export default function PermissionSelector({
+export function PermissionSelector({
   static_permissions,
   permissions,
   setPermission,

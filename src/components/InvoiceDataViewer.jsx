@@ -1,13 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-
-import { useAuth } from "@/hooks/useAuth";
-import { API } from "@/lib/api";
-import Error from "@/components/ui/Error";
-import { Toast } from "@/components/ui/CustomToast";
-import { Loader } from "@/components/ui/Loader";
-import { useConfirm } from "@/components/ui/ConfirmModal";
+import { useAuth,API,useConfirm, Error, CustomSelect, CustomButton,DataTable, Loader, Toast, FilePreviewer } from "@/hooks/wrapper";
 import { ArrowLeft, FileUp, ExternalLink, RefreshCw, Trash2, Car, Check, AlertTriangle, FileText } from "lucide-react";
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {

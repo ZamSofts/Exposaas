@@ -7,7 +7,6 @@ let boss;
 
 (async () => {
   try {
-    console.log("[worker] starting: gemini-extract-page");
 
     boss = await ensureQueue("gemini-extract-page");
 
@@ -15,15 +14,8 @@ let boss;
       boss.on("error", err => console.error("[pg-boss] error:", err));
     }
 
-    console.log("[worker] registering handler for: gemini-extract-page");
-
-    // Process pages SEQUENTIALLY (teamConcurrency: 1) to avoid Gemini rate limits
-    // With retry logic in geminiProcess.mjs, we process one at a time to be safe
     await boss.work("gemini-extract-page", { teamConcurrency: 1 }, async ([job]) => {
       const { invoiceJobId, pageUrl, pageNumber, totalPages, companyId, userId } = job.data;
-
-      console.log(`📄 Processing page ${pageNumber}/${totalPages} for InvoiceJob #${invoiceJobId}`);
-      console.log(`📄 Page URL: ${pageUrl}`);
 
       try {
         // Update status to processing
@@ -46,8 +38,6 @@ let boss;
             status
           }
         });
-
-        console.log(`✅ InvoiceJob #${invoiceJobId} (page ${pageNumber}) completed: ${vehicles.length} vehicles, status=${status}`);
 
         // Send notification for this job
         if (userId) {
@@ -98,39 +88,30 @@ let boss;
         // Don't re-throw - we've recorded the failure
       }
     });
-
-    console.log("[worker] ready and waiting for jobs: gemini-extract-page");
   } catch (err) {
-    console.error("[worker] failed to start:", err && err.message ? err.message : err);
     process.exit(1);
   }
 })();
 
 process.on("SIGTERM", async () => {
-  console.log("🛑 [invoicePage] SIGTERM received, shutting down...");
   try {
     if (boss && typeof boss.stop === "function") {
       await boss.stop();
-      console.log("✅ [invoicePage] pg-boss stopped");
     }
     await prisma.$disconnect();
   } catch (error) {
-    console.error("❌ [invoicePage] Error during shutdown:", error);
   } finally {
     process.exit(0);
   }
 });
 
 process.on("SIGINT", async () => {
-  console.log("🛑 [invoicePage] SIGINT received, shutting down...");
   try {
     if (boss && typeof boss.stop === "function") {
       await boss.stop();
-      console.log("✅ [invoicePage] pg-boss stopped");
     }
     await prisma.$disconnect();
   } catch (error) {
-    console.error("❌ [invoicePage] Error during shutdown:", error);
   } finally {
     process.exit(0);
   }

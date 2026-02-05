@@ -1,11 +1,8 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useAuth } from "@/hooks/useAuth";
-import Error from "@/components/ui/Error";
-import { API } from "@/lib/api";
-import { InvoiceDataViewer } from "@/components/InvoiceDataViewer";
+import { Error, API,DataTable, InvoiceDataViewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import DataTable from "@/components/ui/DataTable";
 import { ReceiptText, CheckCircle2, Clock, AlertCircle, FileText, Car, Inbox, RefreshCw } from "lucide-react";
 
 export default function InvoiceJobsPage() {

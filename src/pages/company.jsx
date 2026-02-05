@@ -1,13 +1,8 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { useAuth } from "@/hooks/useAuth";
-import Error from "@/components/ui/Error";
-import { API } from "@/lib/api";
-import { Loader } from "@/components/ui/Loader";
+import { DataTable,useConfirm, Error, Loader, useAuth, API } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import DataTable from "@/components/ui/DataTable";
 import { Plus, Building2, Edit, Trash2 } from "lucide-react";
 
 export default function Company() {
