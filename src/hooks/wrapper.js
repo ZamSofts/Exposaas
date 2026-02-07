@@ -13,6 +13,8 @@ export { FilePreviewer } from "@/components/ui/FilePreviewer";
 export { Loader } from "@/components/ui/Loader";
 export { EditVehicle } from "@/components/EditVehicle";
 export { InvoiceDataViewer } from "@/components/InvoiceDataViewer";
+export { PermissionSelector } from "@/components/ui/PermissionSelector";
+export { default as DataTable } from "@/components/ui/DataTable";
 
 export const API = async (method, name, d = {}, isFile= false) => {
   if (method == "GET" || method == "DELETE") {
@@ -39,6 +41,43 @@ export const API = async (method, name, d = {}, isFile= false) => {
   });
   return await data.json();
 };
+
+export const isValid = (fieldsObj, setError) => {
+  for (const [fieldName, value] of Object.entries(fieldsObj)) {
+    // Trim the value in-place if it's a string
+    if (typeof value === "string") {
+      fieldsObj[fieldName] = value.trim();
+    }
+    // Check if required field is empty after trimming
+    if (!fieldsObj[fieldName]?.toString().trim()) {
+      const errorMsg = `${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)} is required`;
+      setError(errorMsg);
+      return false;
+    }
+    
+    if (["titleTransferDeadline", "auctionDate"].includes(fieldName)) {
+      if (!isValidDate(value)) {
+        const errorMsg = `Invalid date for ${fieldName}`;
+        setError(errorMsg);
+        return false;
+      }
+    }
+  }
+  setError("");
+  return true;
+};
+
+function isValidDate(dateString) {
+  if (!dateString) return false;
+
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return false; // invalid date
+
+  const year = date.getFullYear();
+  if (year < 1900 || year > 2100) return false;
+
+  return true;
+}
 
 
 

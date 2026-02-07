@@ -1,15 +1,7 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { useAuth } from "@/hooks/useAuth";
-import Error from "@/components/ui/Error";
-import { API } from "@/lib/api";
-import { MultiSelect } from "@/components/ui/MultiSelect";
-import { CustomButton } from "@/components/ui/CustomButton";
-import { Loader } from "@/components/ui/Loader";
+import { useConfirm, Error, API, MultiSelect, CustomButton, Loader, useAuth,DataTable,PermissionSelector } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import DataTable from "@/components/ui/DataTable";
-import PermissionSelector from "@/components/ui/PermissionSelector";
 
 import { Plus, Edit, Trash2, Shield } from "lucide-react";
 

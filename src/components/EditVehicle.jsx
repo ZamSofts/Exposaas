@@ -1,19 +1,12 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useAuth } from "@/hooks/useAuth";
-import Error from "@/components/ui/Error";
-import { API } from "@/lib/api";
-import { CustomSelect } from "@/components/ui/SingleSelecter";
-import { CustomButton } from "@/components/ui/CustomButton";
-import { FilePreviewer } from "@/components/ui/FilePreviewer";
-import { Toast } from "@/components/ui/CustomToast";
-import { Loader } from "@/components/ui/Loader";
+import { useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer, Toast, isValid, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import Payments from "@/components/Payments";
 import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files, DollarSign, Truck } from "lucide-react";
 
 // Format currency for display
-const formatCurrencyDisplay = (value) => {
+const formatCurrencyDisplay = value => {
   if (value === null || value === undefined || value === "") return "";
   const num = parseFloat(value);
   if (isNaN(num)) return "";
@@ -254,10 +247,11 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   };
 
   const editData = async () => {
+    if (!isValid({ auctionDate: auctionDate, titleTransferDeadline: titleTransferDeadline }, setError)) return;
     if (!brandId || !chassisNumber || !statusId) {
-      setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
-      return;
-    }
+        setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
+        return;
+      }
 
     setCustomLoader(true);
     setError("");
@@ -414,8 +408,8 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                     !vehicleId
                       ? "text-[var(--muted-foreground)] cursor-not-allowed opacity-50"
                       : activeTab === "payments"
-                      ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                      : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
+                        ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                        : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
                   }`}
                 >
                   <CreditCard className="w-4 h-4" />
@@ -473,113 +467,47 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                       <label className="input-label">Bid Amount</label>
-                      <input
-                        type="number"
-                        value={bidAmount}
-                        onChange={e => setBidAmount(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={bidAmount} onChange={e => setBidAmount(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Bid Tax</label>
-                      <input
-                        type="number"
-                        value={bidTax}
-                        onChange={e => setBidTax(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={bidTax} onChange={e => setBidTax(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Auction Fee</label>
-                      <input
-                        type="number"
-                        value={auctionFee}
-                        onChange={e => setAuctionFee(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={auctionFee} onChange={e => setAuctionFee(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Auction Tax</label>
-                      <input
-                        type="number"
-                        value={auctionTax}
-                        onChange={e => setAuctionTax(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={auctionTax} onChange={e => setAuctionTax(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Insurance Fee</label>
-                      <input
-                        type="number"
-                        value={insuranceFee}
-                        onChange={e => setInsuranceFee(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={insuranceFee} onChange={e => setInsuranceFee(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Insurance Tax</label>
-                      <input
-                        type="number"
-                        value={insuranceTax}
-                        onChange={e => setInsuranceTax(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={insuranceTax} onChange={e => setInsuranceTax(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Recycling Fee</label>
-                      <input
-                        type="number"
-                        value={recyclingFee}
-                        onChange={e => setRecyclingFee(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={recyclingFee} onChange={e => setRecyclingFee(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Transport Fee</label>
-                      <input
-                        type="number"
-                        value={transportFee}
-                        onChange={e => setTransportFee(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={transportFee} onChange={e => setTransportFee(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Transport Tax</label>
-                      <input
-                        type="number"
-                        value={transportTax}
-                        onChange={e => setTransportTax(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={transportTax} onChange={e => setTransportTax(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Other Fees</label>
-                      <input
-                        type="number"
-                        value={otherFees}
-                        onChange={e => setOtherFees(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={otherFees} onChange={e => setOtherFees(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Tax Proration</label>
-                      <input
-                        type="number"
-                        value={taxProration}
-                        onChange={e => setTaxProration(e.target.value)}
-                        className="input-style"
-                        placeholder="0"
-                      />
+                      <input type="number" value={taxProration} onChange={e => setTaxProration(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                   </div>
 
@@ -588,17 +516,13 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                     <div className="p-4 bg-[var(--primary)]/10 rounded-lg border border-[var(--primary)]/20">
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-medium text-[var(--foreground)]">Total Acquisition Cost</span>
-                        <span className="text-2xl font-bold text-[var(--primary)]">
-                          {formatCurrencyDisplay(calculateTotalCost())}
-                        </span>
+                        <span className="text-2xl font-bold text-[var(--primary)]">{formatCurrencyDisplay(calculateTotalCost())}</span>
                       </div>
                     </div>
                     <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                       <div className="flex items-center justify-between">
                         <span className="text-lg font-medium text-[var(--foreground)]">Tax Sum</span>
-                        <span className="text-2xl font-bold text-yellow-600">
-                          {formatCurrencyDisplay(calculateTaxSum())}
-                        </span>
+                        <span className="text-2xl font-bold text-yellow-600">{formatCurrencyDisplay(calculateTaxSum())}</span>
                       </div>
                     </div>
                   </div>
@@ -615,7 +539,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
                       <label className="input-label">Auction Date</label>
-                      <input type="text" value={auctionDate} onChange={e => setAuctionDate(e.target.value)} className="input-style" placeholder="e.g., 2025/06/09" />
+                      <input type="date" value={auctionDate} onChange={e => setAuctionDate(e.target.value)} className="input-style" placeholder="e.g., 2025/06/09" />
                     </div>
                     <div>
                       <label className="input-label">Session</label>

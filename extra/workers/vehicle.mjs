@@ -16,10 +16,7 @@ let boss;
       boss.on("error", err => console.error("[pg-boss] error:", err));
     }
 
-    console.log("[worker] registering handler for: vehicle");
-
     await boss.work("vehicle", async([job]) => {
-      console.log("🚗 Vehicle Job Started", job && job.id);
       const { filePath, companyId,userId } = job.data || {};
 
       if (!filePath) {
@@ -142,7 +139,6 @@ let boss;
                     ],
                     metadata: { processed: count, documentUrl: filePath }
                   });
-                  console.log("🔔 Success notification sent to user", userId);
                 } catch (notifyErr) {
                   console.error("❌ Failed to send success notification:", notifyErr);
                 }
@@ -166,7 +162,6 @@ let boss;
                     category: "error",
                     metadata: { documentUrl: filePath, error: error && error.message ? error.message : String(error) }
                   });
-                  console.log("🔔 Failure notification sent to user", userId);
                 } catch (notifyErr) {
                   console.error("❌ Failed to send failure notification:", notifyErr);
                 }
@@ -176,7 +171,6 @@ let boss;
             } finally {
               try {
                 await deleteFile(filePath);
-                console.log("Deleted blob:", filePath);
               } catch (deleteError) {
                 console.warn("Failed to delete blob:", deleteError.message);
               }
@@ -208,7 +202,6 @@ let boss;
       });
     });
 
-    console.log("✅ Vehicle worker created and listening for jobs...");
   } catch (err) {
     console.error("[worker] failed to start:", err && err.message ? err.message : err);
     process.exit(1);

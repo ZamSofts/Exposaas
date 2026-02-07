@@ -1,14 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useConfirm } from "@/components/ui/ConfirmModal";
-import { useAuth } from "@/hooks/useAuth";
-import Error from "@/components/ui/Error";
-import { API } from "@/lib/api";
-import { CustomSelect } from "@/components/ui/SingleSelecter";
-import { CustomButton } from "@/components/ui/CustomButton";
-import { Loader } from "@/components/ui/Loader";
-import { Toast } from "@/components/ui/CustomToast";
-import { FilePreviewer } from "@/components/ui/FilePreviewer";
-import DataTable from "@/components/ui/DataTable";
+import { useAuth,API,useConfirm, Error, CustomSelect, CustomButton,DataTable, Loader, Toast, FilePreviewer } from "@/hooks/wrapper";
 import { Plus, Edit, Trash2, DollarSign, FileUp, Calendar, Building2 } from "lucide-react";
 
 // Document Preview Component

@@ -1,48 +1,34 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { downloadFile as downloadFromAzure } from "../../src/lib/blob.mjs";
 
-// Retry configuration for handling 429 rate limits
 const RETRY_CONFIG = {
   maxRetries: 5,
-  baseDelayMs: 5000,       // Start with 5 second delay
-  maxDelayMs: 120000,      // Max 2 minute delay
-  backoffMultiplier: 2,    // Double delay each retry
+  baseDelayMs: 5000,      
+  maxDelayMs: 120000,      
+  backoffMultiplier: 2,
 };
 
-/**
- * Sleep helper
- */
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-/**
- * Extract retry delay from 429 error response if available
- * Gemini sometimes tells you how long to wait (e.g., "Please retry in 4.524463687s")
- */
 function extractRetryDelay(error) {
   const message = error?.message || String(error);
   const match = message.match(/retry in ([\d.]+)s/i);
   if (match) {
-    return Math.ceil(parseFloat(match[1]) * 1000) + 1000; // Convert to ms, add 1s buffer
+    return Math.ceil(parseFloat(match[1]) * 1000) + 1000; 
   }
   return null;
 }
 
-/**
- * Wrapper to call Gemini API with retry logic for 429 errors
- */
 async function callGeminiWithRetry(model, content, pageNumber = 0) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
     try {
-      console.log(`🤖 Page ${pageNumber}: Gemini API call (attempt ${attempt}/${RETRY_CONFIG.maxRetries})`);
       const result = await model.generateContent(content);
       return result;
     } catch (error) {
       lastError = error;
       const errorMessage = error?.message || String(error);
-
-      // Check if it's a rate limit error (429)
       const isRateLimit = errorMessage.includes('429') ||
                           errorMessage.includes('quota') ||
                           errorMessage.includes('rate') ||
@@ -50,12 +36,10 @@ async function callGeminiWithRetry(model, content, pageNumber = 0) {
 
       if (!isRateLimit) {
         // Not a rate limit error, don't retry
-        console.error(`❌ Page ${pageNumber}: Gemini error (not retryable):`, errorMessage);
         throw error;
       }
 
       if (attempt === RETRY_CONFIG.maxRetries) {
-        console.error(`❌ Page ${pageNumber}: Max retries (${RETRY_CONFIG.maxRetries}) exceeded`);
         throw error;
       }
 
@@ -67,7 +51,6 @@ async function callGeminiWithRetry(model, content, pageNumber = 0) {
       );
       const delayMs = extractedDelay || exponentialDelay;
 
-      console.warn(`⏳ Page ${pageNumber}: Rate limited (429). Waiting ${(delayMs / 1000).toFixed(1)}s before retry ${attempt + 1}/${RETRY_CONFIG.maxRetries}...`);
       await sleep(delayMs);
     }
   }
@@ -183,28 +166,13 @@ Analyze systematically: Extract all combinations.
 Return a COMPLETE, VALID JSON object. No trailing commas; end with '}'.
 `
 
-/**
- * Process a single page PDF from Azure URL with Gemini
- * Used by the per-page processing worker for improved accuracy on large PDFs
- *
- * @param {string} pageUrl - Azure Blob URL for the single-page PDF
- * @param {number} pageNumber - Page number (for logging)
- * @returns {Promise<Array>} - Array of vehicles extracted from this page (unwrapped from page_1)
- */
 export async function processPageWithGemini(pageUrl, pageNumber) {
-  console.log(`🔄 Processing page ${pageNumber}: ${pageUrl}`);
-
   try {
-    // Download from Azure Blob Storage (returns a stream)
-    console.log(`📥 Page ${pageNumber}: Attempting Azure download from: ${pageUrl}`);
-
     let stream;
     try {
       stream = await downloadFromAzure(pageUrl);
-      console.log(`📥 Page ${pageNumber}: Stream received: ${stream ? 'yes' : 'null/undefined'}`);
-    } catch (downloadErr) {
-      console.error(`❌ Page ${pageNumber}: Azure download FAILED:`, downloadErr?.message || downloadErr);
-      throw downloadErr;
+    } catch (err) {
+      throw new Error(`Failed to download page ${pageNumber} from Azure: ${err?.message || err}`);
     }
 
     if (!stream) {
@@ -222,8 +190,6 @@ export async function processPageWithGemini(pageUrl, pageNumber) {
       throw new Error(`Downloaded PDF is empty (0 bytes) for page ${pageNumber}`);
     }
 
-    console.log(`📄 Page ${pageNumber} downloaded: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
-
     if (!process.env.GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY in environment");
     }
@@ -232,8 +198,6 @@ export async function processPageWithGemini(pageUrl, pageNumber) {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const base64Data = pdfBuffer.toString("base64");
-
-    console.log(`📤 Sending page ${pageNumber} to Gemini...`);
 
     const result = await callGeminiWithRetry(model, [
       {
@@ -260,12 +224,9 @@ export async function processPageWithGemini(pageUrl, pageNumber) {
         text = String(result).slice(0, 10000);
       }
     } catch (err) {
-      console.warn(`⚠️ Page ${pageNumber}: Could not extract text via primary responders:`, err?.message);
+
       text = String(result || "").slice(0, 10000);
     }
-
-    console.log(`📥 Page ${pageNumber}: Gemini response received (${text.length} chars)`);
-
     // Parse JSON
     let cleanText = text
       .replace(/^```json/i, "")
@@ -275,42 +236,30 @@ export async function processPageWithGemini(pageUrl, pageNumber) {
     let parsed = null;
     try {
       parsed = JSON.parse(cleanText);
-      console.log(`✅ Page ${pageNumber}: JSON parsed successfully`);
     } catch (e) {
-      console.warn(`❌ Page ${pageNumber}: JSON parse failed:`, e.message);
       const re = /({[\s\S]*}|\[[\s\S]*\])/m;
       const m = re.exec(cleanText);
       if (m) {
         try {
           parsed = JSON.parse(m[0]);
-          console.log(`✅ Page ${pageNumber}: Manually extracted JSON from response`);
         } catch (e2) {
-          console.warn(`❌ Page ${pageNumber}: Manual JSON extraction failed:`, e2.message);
         }
       }
     }
 
     if (!parsed) {
-      console.error(`❌ Page ${pageNumber}: Could not parse JSON. Preview:\n`, cleanText.slice(0, 500));
       return [];
     }
 
-    // IMPORTANT: Return only the contents of page_1 to avoid nesting issues
-    // Gemini returns {"page_1": [...]} even for single-page PDFs
-    // We unwrap it here so the aggregator can properly merge: {"page_N": vehicles}
     const vehicles = parsed["page_1"] || parsed["page_2"] || [];
 
-    // Handle case where parsed is already an array
     if (Array.isArray(parsed)) {
-      console.log(`✅ Page ${pageNumber}: Extracted ${parsed.length} vehicles (direct array)`);
       return parsed;
     }
 
-    console.log(`✅ Page ${pageNumber}: Extracted ${vehicles.length} vehicles`);
     return vehicles;
 
   } catch (error) {
-    console.error(`❌ Page ${pageNumber}: Error in processPageWithGemini:`, error?.message || error);
-    throw error; // Re-throw so the worker can handle retry/failure
+    throw new Error(error);
   }
 }
