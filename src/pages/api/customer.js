@@ -23,7 +23,7 @@ export default async function handler(req, res) {
         const customer = await prisma.customer.findUnique({
           where: { id },
           include: {
-            user: { select: { id: true, username: true, companyId: true, password: true } },
+            user: { select: { id: true, username: true, companyId: true } },
             vehicles: {
               select: { id: true, name: true, chassisNumber: true },
             },
@@ -40,7 +40,6 @@ export default async function handler(req, res) {
           country: customer.country,
           uniqueId: customer.uniqueId,
           username: customer.user.username,
-          password: customer.user.password,
           createdAt: customer.createdAt,
           updatedAt: customer.updatedAt,
           vehicles: customer.vehicles,
@@ -92,7 +91,7 @@ export default async function handler(req, res) {
           orderBy: { [sortBy]: sortOrder },
           where: whereClause,
           include: {
-            user: { select: { id: true, username: true, password: true } },
+            user: { select: { id: true, username: true } },
             vehicles: { select: { id: true, name: true, chassisNumber: true } },
           },
         }),
@@ -105,7 +104,6 @@ export default async function handler(req, res) {
         country: c.country,
         uniqueId: c.uniqueId,
         username: c.user.username,
-        password: c.user.password,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         vehicles: c.vehicles,

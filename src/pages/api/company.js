@@ -90,7 +90,7 @@ export default async function handler(req, res) {
         where: { name, id: { not: id } },
       });
       if (d) {
-        res.status(409).json({ error: "Company name already exists", d, id });
+        return res.status(409).json({ error: "Company name already exists", d, id });
       }
 
       await prisma.company.update({

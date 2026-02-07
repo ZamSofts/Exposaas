@@ -149,7 +149,7 @@ export default function Customers() {
     setUserName(data.username || "");
     setCountry(data.country || "");
     setUniqueId(data.uniqueId);
-    setPassword(data.password || "");
+    setPassword("");
     setEdit(id);
     setCustomLoader(false);
   };

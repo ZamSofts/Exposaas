@@ -149,7 +149,7 @@ export default function StatusPage() {
                     <Error message={error} />
                   </div>
                   <div className="flex gap-3">
-                    <CustomButton title={edit === 0 ? "Add Role" : "Save Changes"} onClick={editData} className="btn-primary" />
+                    <CustomButton title={edit === 0 ? "Add Status" : "Save Changes"} onClick={editData} className="btn-primary" />
 
                     <CustomButton
                       title="Cancel"

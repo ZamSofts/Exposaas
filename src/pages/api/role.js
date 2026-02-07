@@ -2,9 +2,9 @@ import { prisma, getSession } from "@/lib/useful";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
-  /*   if (!["Sadmin", "Admin"].includes(session.role)) {
-    return res.status(403).json({ error: "Only administrators can view users" });
-  } */
+  if (!["Sadmin", "Admin"].includes(session.role)) {
+    return res.status(403).json({ error: "Only administrators can manage roles" });
+  }
 
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;
@@ -108,8 +108,7 @@ export default async function handler(req, res) {
 
       const reserved = ["customer", "sadmin"];
       if (reserved.includes(name.trim().toLowerCase())) {
-        setError(`Role name cannot be '${name}'. This is a reserved system role.`);
-        return;
+        return res.status(400).json({ error: `Role name cannot be '${name}'. This is a reserved system role.` });
       }
 
       const whereClause =
@@ -154,8 +153,7 @@ export default async function handler(req, res) {
       }
       const reserved = ["customer", "sadmin"];
       if (reserved.includes(name.trim().toLowerCase())) {
-        setError(`Role name cannot be '${name}'. This is a reserved system role.`);
-        return;
+        return res.status(400).json({ error: `Role name cannot be '${name}'. This is a reserved system role.` });
       }
 
       const existingRole = await prisma.role.findUnique({

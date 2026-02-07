@@ -166,7 +166,7 @@ export default function Userss() {
     }
     setIsLoading(false);
     setUserName(data.username);
-    setPassword(data.password);
+    setPassword("");
     setCompanyId(data.companyId);
     setRolesId(data.rolesId);
     setEdit(id);
@@ -340,7 +340,7 @@ export default function Userss() {
                 <th id="username">Username</th>
                 <th id="companyId">Company</th>
                 <th id="role">Role</th>
-                <th id="password">Password</th>
+
                 <th id="createdAt">Created Date</th>
                 <th className="text-right">Actions</th>
               </tr>
@@ -375,17 +375,6 @@ export default function Userss() {
                     </div>
                   </td>
 
-                  <td className="px-6  py-4  whitespace-nowrap">
-                    <div className="flex flex-row gap-3 items-center justify-center">
-                      <div className="text-sm font-medium text-[var(--foreground)]">{visiblePasswords.includes(user.id) ? user.password : "*******"}</div>
-
-                      <div className="text-sm font-medium text-[var(--foreground)]">
-                        <button onClick={() => togglePasswordVisibility(user.id)} className="text-gray-500 hover:text-gray-700">
-                          {visiblePasswords.includes(user.id) ? <Eye size={20} /> : <EyeOff size={20} />}
-                        </button>
-                      </div>
-                    </div>
-                  </td>
 
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">{new Date(user.createdAt).toLocaleString("en-GB")}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm">

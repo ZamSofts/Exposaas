@@ -502,7 +502,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
           }}
           className={`
           w-full mt-2 flex items-center space-x-3 px-3 py-2.5 rounded-lg 
-          text-[var(--secondary-foreground] hover:text-[var(--error)] 
+          text-[var(--secondary-foreground)] hover:text-[var(--error)] 
           hover:bg-[var(--secondary)] transition-all duration-200
         `}
         >

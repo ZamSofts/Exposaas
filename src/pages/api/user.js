@@ -42,7 +42,6 @@ export default async function handler(req, res) {
         return res.status(200).json({
           id: user.id,
           username: user.username,
-          password: user.password,
           companyId: user.companyId,
           createdAt: user.createdAt,
           rolesId: user.roles.map(r => r.roleId),
@@ -203,7 +202,6 @@ export default async function handler(req, res) {
       const formatted = users.map(u => ({
         id: u.id,
         username: u.username,
-        password: u.password,
         companyId: u.companyId,
         createdAt: u.createdAt,
         rolesId: u.roles.map(r => r.roleId),
@@ -258,9 +256,6 @@ export default async function handler(req, res) {
       if (!username) {
         return res.status(400).json({ error: "Username is required" });
       }
-      if (!password) {
-        return res.status(400).json({ error: "Password is required" });
-      }
       if (!companyId) {
         return res.status(400).json({ error: "Company is required" });
       }
@@ -281,7 +276,7 @@ export default async function handler(req, res) {
       transactionOps.push(
         prisma.user.update({
           where: { id },
-          data: { username, password, companyId: Number(companyId) },
+          data: { username, ...(password ? { password } : {}), companyId: Number(companyId) },
         })
       );
 

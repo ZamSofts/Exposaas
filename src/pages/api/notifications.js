@@ -128,9 +128,11 @@ export default async function handler(req, res) {
       if( !id ) {
         return res.status(400).json({ error: "Missing notificationId" });
       }
+      const userId = parseInt(session.id);
       await prisma.notification.delete({
         where: {
           id: parseInt(id),
+          userId: userId,
         },
       });
 
