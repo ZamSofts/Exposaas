@@ -15,22 +15,21 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === "GET") {
-      // Customers are linked to Users; restrict to customers whose user belongs to same company
-      const companyFilter = { user: { companyId: session?.companyId } };
+      const companyFilter = { companyId: session?.companyId };
 
       // ---- Load single customer ----
       if (id) {
         const customer = await prisma.customer.findUnique({
           where: { id },
           include: {
-            user: { select: { id: true, username: true, companyId: true } },
+            user: { select: { id: true, username: true } },
             vehicles: {
               select: { id: true, name: true, chassisNumber: true },
             },
           },
         });
 
-        if (!customer || customer.user?.companyId !== session?.companyId) {
+        if (!customer || customer.companyId !== session?.companyId) {
           return res.status(404).json({ error: "Customer not found" });
         }
 
@@ -39,7 +38,7 @@ export default async function handler(req, res) {
           name: customer.name,
           country: customer.country,
           uniqueId: customer.uniqueId,
-          username: customer.user.username,
+          username: customer.user?.username || null,
           createdAt: customer.createdAt,
           updatedAt: customer.updatedAt,
           vehicles: customer.vehicles,
@@ -103,7 +102,7 @@ export default async function handler(req, res) {
         name: c.name,
         country: c.country,
         uniqueId: c.uniqueId,
-        username: c.user.username,
+        username: c.user?.username || null,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
         vehicles: c.vehicles,
@@ -123,68 +122,65 @@ export default async function handler(req, res) {
       if (!uniqueId || uniqueId.trim() === "") {
         return res.status(400).json({ error: "Unique ID is required" });
       }
-      if (!username || username.trim() === "") {
-        return res.status(400).json({ error: "Username is required" });
-      }
-      if (!password || password.trim() === "") {
-        return res.status(400).json({ error: "Password is required" });
-      }
       if (!companyId) {
         return res.status(400).json({ error: "Company is required" });
-      }
-
-      // Check if uniqueId already exists globally
-      const existingByUnique = await prisma.customer.findFirst({
-        where: { uniqueId: { equals: uniqueId.trim(), mode: "insensitive" } },
-        select: { id: true },
-      });
-      if (existingByUnique) {
-        return res.status(409).json({ error: "Unique ID already exists" });
-      }
-
-      // Check if username already exists
-      const existingUser = await prisma.user.findUnique({ where: { username: username.trim() } });
-      if (existingUser) {
-        return res.status(409).json({ error: "Username already exists" });
       }
 
       // Ensure companyId matches session.companyId
       if (Number(companyId) !== session.companyId) {
         return res.status(403).json({ error: "Access denied: Cannot create customer for different company" });
       }
-      const customerRole = await prisma.role.findFirst({
-        where: {
-          name: {
-            equals: "Customer",
-            mode: "insensitive",
-          },
-          companyId: null,
-        },
+
+      // Check if uniqueId already exists for this company
+      const existingByUnique = await prisma.customer.findFirst({
+        where: { companyId: Number(companyId), uniqueId: { equals: uniqueId.trim(), mode: "insensitive" } },
+        select: { id: true },
       });
-
-      if (!customerRole) {
-        return res.status(500).json({ error: "System role 'customer' not found. Please run seed." });
+      if (existingByUnique) {
+        return res.status(409).json({ error: "Unique ID already exists" });
       }
-      // Create user and customer in a transaction
-      const result = await prisma.$transaction(async tx => {
-        const user = await tx.user.create({ data: { username: username.trim(), password: password.trim(), companyId: Number(companyId) } });
 
-        await tx.userRole.create({
-          data: {
-            userId: user.id,
-            roleId: customerRole.id,
-          },
+      const hasCredentials = username && username.trim() !== "" && password && password.trim() !== "";
+
+      if (hasCredentials) {
+        // Check if username already exists
+        const existingUser = await prisma.user.findUnique({ where: { username: username.trim() } });
+        if (existingUser) {
+          return res.status(409).json({ error: "Username already exists" });
+        }
+
+        const customerRole = await prisma.role.findFirst({
+          where: { name: { equals: "Customer", mode: "insensitive" }, companyId: null },
         });
+        if (!customerRole) {
+          return res.status(500).json({ error: "System role 'customer' not found. Please run seed." });
+        }
 
-        await tx.customer.create({
+        // Create user and customer in a transaction
+        await prisma.$transaction(async tx => {
+          const user = await tx.user.create({ data: { username: username.trim(), password: password.trim(), companyId: Number(companyId) } });
+          await tx.userRole.create({ data: { userId: user.id, roleId: customerRole.id } });
+          await tx.customer.create({
+            data: {
+              name: name.trim(),
+              country: country?.trim() || null,
+              uniqueId: uniqueId.trim(),
+              userId: user.id,
+              companyId: Number(companyId),
+            },
+          });
+        });
+      } else {
+        // Create customer without user account
+        await prisma.customer.create({
           data: {
             name: name.trim(),
             country: country?.trim() || null,
             uniqueId: uniqueId.trim(),
-            userId: user.id,
+            companyId: Number(companyId),
           },
         });
-      });
+      }
 
       return res.status(201).json({ message: "Customer created successfully" });
     }
@@ -203,31 +199,22 @@ export default async function handler(req, res) {
       if (!uniqueId || uniqueId.trim() === "") {
         return res.status(400).json({ error: "Unique ID is required" });
       }
-      if (!username || username.trim() === "") {
-        return res.status(400).json({ error: "Username is required" });
-      }
       if (!companyId) {
         return res.status(400).json({ error: "Company is required" });
       }
 
-      const currentCustomer = await prisma.customer.findUnique({ where: { id: customerId }, include: { user: { select: { id: true, companyId: true } } } });
+      const currentCustomer = await prisma.customer.findUnique({ where: { id: customerId }, include: { user: { select: { id: true } } } });
       if (!currentCustomer) {
         return res.status(404).json({ error: "Customer not found" });
       }
-      if (currentCustomer.user?.companyId !== session.companyId) {
+      if (currentCustomer.companyId !== session.companyId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      // Check uniqueId not used by another customer
-      const existingByUnique = await prisma.customer.findFirst({ where: { uniqueId: { equals: uniqueId.trim(), mode: "insensitive" }, id: { not: customerId } } });
+      // Check uniqueId not used by another customer in same company
+      const existingByUnique = await prisma.customer.findFirst({ where: { companyId: session.companyId, uniqueId: { equals: uniqueId.trim(), mode: "insensitive" }, id: { not: customerId } } });
       if (existingByUnique) {
         return res.status(409).json({ error: "Unique ID already exists" });
-      }
-
-      // Check username uniqueness (excluding current user)
-      const existingUserByName = await prisma.user.findFirst({ where: { username: username.trim(), id: { not: currentCustomer.user?.id } } });
-      if (existingUserByName) {
-        return res.status(409).json({ error: "Username already exists" });
       }
 
       // Ensure companyId matches session.companyId
@@ -235,13 +222,20 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: "Access denied: Cannot assign customer to different company" });
       }
 
-      // Update user (password optional) and customer in a transaction
+      // Update customer (and user if one exists)
       const result = await prisma.$transaction(async tx => {
-        // Update user
-        const userUpdateData = { username: username.trim() };
-        if (password && password.trim() !== "") userUpdateData.password = password.trim();
+        // Update user if customer has one and username is provided
+        if (currentCustomer.userId && username && username.trim() !== "") {
+          // Check username uniqueness (excluding current user)
+          const existingUserByName = await tx.user.findFirst({ where: { username: username.trim(), id: { not: currentCustomer.userId } } });
+          if (existingUserByName) {
+            throw new Error("Username already exists");
+          }
 
-        const updatedUser = await tx.user.update({ where: { id: currentCustomer.user.id }, data: userUpdateData });
+          const userUpdateData = { username: username.trim() };
+          if (password && password.trim() !== "") userUpdateData.password = password.trim();
+          await tx.user.update({ where: { id: currentCustomer.userId }, data: userUpdateData });
+        }
 
         // Update customer
         const updatedCustomer = await tx.customer.update({
@@ -254,10 +248,10 @@ export default async function handler(req, res) {
           include: { user: { select: { id: true, username: true } }, vehicles: { select: { id: true, name: true, chassisNumber: true } } },
         });
 
-        return { updatedUser, updatedCustomer };
+        return updatedCustomer;
       });
 
-      return res.status(200).json({ message: "Customer updated successfully", customer: result.updatedCustomer });
+      return res.status(200).json({ message: "Customer updated successfully", customer: result });
     }
 
     if (req.method === "DELETE") {
@@ -268,20 +262,29 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Customer id is required" });
       }
 
-      const customer = await prisma.customer.findUnique({ where: { id: customerId }, include: { user: { select: { companyId: true } } } });
+      const customer = await prisma.customer.findUnique({ where: { id: customerId } });
       if (!customer) {
         return res.status(404).json({ error: "Customer not found" });
       }
-
-      const vehicleCount = await prisma.vehicle.count({ where: { customerId } });
-      if (vehicleCount > 0) {
-        return res.status(400).json({ error: `Cannot delete customer. ${vehicleCount} vehicle(s) are still associated with this customer. Please reassign or remove the vehicles first.` });
+      if (customer.companyId !== session.companyId) {
+        return res.status(403).json({ error: "Access denied" });
       }
-      await prisma.$transaction([
-        prisma.userRole.deleteMany({ where: { userId: customer.userId } }),
-        prisma.customer.delete({ where: { id: customerId } }),
-        prisma.user.delete({ where: { id: customer.userId } }),
-      ]);
+
+      // Use transaction to atomically check vehicles + delete
+      await prisma.$transaction(async (tx) => {
+        const vehicleCount = await tx.vehicle.count({ where: { customerId } });
+        if (vehicleCount > 0) {
+          throw new Error(`Cannot delete customer. ${vehicleCount} vehicle(s) are still associated with this customer. Please reassign or remove the vehicles first.`);
+        }
+
+        if (customer.userId) {
+          await tx.userRole.deleteMany({ where: { userId: customer.userId } });
+        }
+        await tx.customer.delete({ where: { id: customerId } });
+        if (customer.userId) {
+          await tx.user.delete({ where: { id: customer.userId } });
+        }
+      });
 
       return res.status(200).json({ message: "Customer deleted successfully" });
     }

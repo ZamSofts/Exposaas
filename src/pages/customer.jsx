@@ -90,18 +90,20 @@ export default function Customers() {
       companyId: Number(session?.companyId),
     };
 
-    if (!newCustomer.username || !newCustomer.name || !newCustomer.password || !newCustomer.uniqueId || !newCustomer.companyId) {
+    if (!newCustomer.name || !newCustomer.uniqueId || !newCustomer.companyId) {
       setError(
-        !newCustomer.username
-          ? "Username is required"
-          : !newCustomer.name
+        !newCustomer.name
           ? "Customer name is required"
-          : !newCustomer.password
-          ? "Password is required"
           : !newCustomer.uniqueId
           ? "Unique ID is required"
           : "Please select a company"
       );
+      return;
+    }
+
+    // If username is provided, password is required too (and vice versa)
+    if ((newCustomer.username && !newCustomer.password) || (!newCustomer.username && newCustomer.password)) {
+      setError("Both username and password are required to create a login account");
       return;
     }
 
@@ -227,7 +229,7 @@ export default function Customers() {
                       className="input-style"
                       autoFocus
                     />
-                    <label className="input-label">Username</label>
+                    <label className="input-label">Username (optional)</label>
                     <input
                       type="text"
                       value={username}
@@ -271,7 +273,7 @@ export default function Customers() {
                       placeholder="Enter country (optional)..."
                       className="input-style"
                     />
-                      <label className="input-label">Password</label>
+                      <label className="input-label">Password (optional)</label>
                     <div className="relative w-full">
                       <input
                         type={showPassword ? "text" : "password"}

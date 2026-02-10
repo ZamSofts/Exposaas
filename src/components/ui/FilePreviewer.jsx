@@ -548,11 +548,10 @@ const WordDocumentViewer = ({ url, displayName, setIsLoading, setHasError, hasEr
   const handleLoadSuccess = () => {
     setIsLoading(false);
     setViewerStatus('success');
-    console.log(`✅ Document loaded successfully with ${currentViewerData.name}`);
   };
 
   const handleLoadError = () => {
-    console.warn(`❌ ${currentViewerData.name} failed to load document`);
+    // Viewer failed, try next fallback
     
     if (currentViewer < viewers.length - 1) {
       // Try next viewer

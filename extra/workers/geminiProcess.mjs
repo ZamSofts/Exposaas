@@ -68,12 +68,22 @@ Language Detection:
 
 Item Identification:
 - Carefully examine rows/fields labeled 'Item No.', 'Description', 'Product', 'Service', 'Chassis No.', 'VIN', '車台番号', '内容' (model), '出品No' (auction/listing number), or similar in each table/section.
-- Identifiers may be codes like DD51T-127679 (normalize hyphens/spaces), SKUs, serial numbers, or descriptions (e.g., 'HIACE VAN DX' or 'Honda Fit GP5'). For auctions: Extract auction date (開催日), year (年式), customer (客), vehicle price (車両代). Use the most unique identifier available; if none, use a descriptive summary.
+- Identifiers may be codes like DD51T-127679, SKUs, serial numbers, or descriptions (e.g., 'HIACE VAN DX' or 'Honda Fit GP5'). For auctions: Extract auction date (開催日), year (年式), customer (客), vehicle price (車両代). Use the most unique identifier available; if none, use a descriptive summary.
 - Scan all tables, text areas, and footers thoroughly; no item should be missed. Ignore non-line-item entries (e.g., headers, subtotals). For auctions: Count purchases (e.g., '落札 2台').
+
+Chassis Number Extraction (CRITICAL):
+- A chassis number is the FULL vehicle identifier: model code + serial number (e.g., "DA63T 482049", "WBAWA52020P301052").
+- In Japanese auction invoices, each vehicle cell often has TWO LINES:
+    Line 1: Vehicle description in Japanese (e.g., キャリイトラック 4WD KC パワステ) ← IGNORE this line
+    Line 2: Chassis code and serial (e.g., DA63T    482049) ← THIS is the chassis_number
+- Extract the COMPLETE second line as the chassis_number — model code AND serial number together. Output it exactly as printed (spaces are fine).
+- Each vehicle row MUST have a UNIQUE chassis_number. If two rows share the same model code (e.g., both DA63T), they WILL have different serial numbers — make sure you extract the full serial for each row.
+- NEVER return just the model code without the serial (e.g., "DA63T" alone is WRONG — it must be "DA63T 482049").
+- Full VINs with no space are also valid (e.g., "WBAWA52020P301052") — output as-is.
 
 Global Metadata Extraction (Customer-Focused; Essential for Auctions):
 - Document Summary: Date/time (e.g., '2025/06/09 – 17:28:45'), page number, invoice type (e.g., 'Proper Invoice (適格請求書)'), registration number (e.g., 'T3010001057135')—only if relevant to billing clarity.
-- Auction Name: Extract auction house name in both Japanese and English (e.g., {"ja": "HAA", "en": "HAA Auction"}) from logos, headers, or text (e.g., 'Tokyo Auto Auction' → {"ja": "東京オートオークション", "en": "Tokyo Auto Auction"}).
+- Auction Name: Extract the standard auction house name from logos, headers, or text. Use the well-known abbreviation/brand name and location — do NOT translate Japanese suffixes like 会場 (venue/hall). Examples: 'USS-R名古屋会場' → 'USS-R Nagoya', 'HAA神戸' → 'HAA Kobe', 'USS東京' → 'USS Tokyo', 'JU広島' → 'JU Hiroshima', 'TAA関東' → 'TAA Kanto'. Keep the auction brand (USS, HAA, TAA, JU, etc.) as-is and only romanize the location name.
 - Financial Globals: Previous balance (前回繰越金額, empty=0), this transaction total (今回御取引金額) with breakdown (claim amount, tax, other charges), total due (今回御取引合計), paid amount (精算済額), remaining balance (残高)—highlight if fully paid (0 JPY). Do not include detailed sub-breakdowns like taxable_amount_10_percent or consumption_tax_10_percent.
 - Customer Perspective: Purchases count, total cost, paid status, simplified summary (e.g., 'Two Honda Fit GP5 vehicles purchased for 358,620 JPY total, paid in full. Includes bids, fees, insurance, and recycling.').
 
@@ -82,7 +92,7 @@ Extract fees and map them to these standardized types with amounts. Recognize va
 - Base Price/Subtotal/Bid: '入札金額/落札価格/車両本体価格/商品価格/Vehicle Winning Bid Amount/車両代' or 'Unit Price/Subtotal/Item Price/Service Fee/Hammer Price/Bid Amount' → 'bid_amount' or 'subtotal'
 - Auction/Commission/Transaction Fee: 'オークション手数料/手数料/落札料/成約料' or 'Auction Fee/Commission/Buyer's Premium/Processing Fee/Contract Fee/Transaction Fee' → 'auction_fee' or 'commission_fee'
 - Listing Fee: '出品料' or 'Listing Fee' → 'listing_fee'
-- Tax (incl. VAT/Sales/Consumption): '税金/消費税' or 'Tax/VAT/Sales Tax/Consumption Tax' → 'tax' (usually % of subtotal; if specified, note subtype like 'bid_tax')
+- DO NOT extract tax amounts (bid_tax, auction_tax, consumption tax, etc.) — taxes are auto-calculated by the system. Skip all tax line items entirely.
 - Shipping/Transport: '輸送費/送料/陸送費' or 'Shipping/Delivery/Freight/Transport' → 'shipping_fee'
 - Storage/Warehouse: '保管料' or 'Storage Fee/Warehouse Charge' → 'storage_fee'
 - Documentation/Admin: '書類代/管理手数料' or 'Documentation Fee/Admin Fee/Paperwork/Handling' → 'admin_fee'
@@ -91,15 +101,14 @@ Extract fees and map them to these standardized types with amounts. Recognize va
 - Discount/Adjustment: '割引' or 'Discount/Adjustment/Credit' → 'discount' (negative amounts if applicable)
 - Other/Misc: 'その他/雑費' or 'Other/Miscellaneous/Additional/Utility' → 'other_fee'
 - Ignore grand totals, payments, or non-item-specific fees unless tied to a line item. Handle blank fees by skipping them (e.g., listing_fee=0 → omit).
-- Always convert amounts to integers: Remove commas, currency symbols (¥, $, €, etc.), spaces, or decimals (round if needed). Handle stacked/multi-line cells or formats like '250,000 / 25,000': Top/main value (before /) → primary fee; Bottom/sub (after /) → tax or secondary (e.g., 'subtotal_tax'). Detect quantities if present and multiply if needed (e.g., unit price * qty = subtotal).
+- Always convert amounts to integers: Remove commas, currency symbols (¥, $, €, etc.), spaces, or decimals (round if needed). For stacked/multi-line cells showing base + tax (e.g., '250,000 / 25,000'), extract ONLY the top/base value and ignore the tax value. Detect quantities if present and multiply if needed (e.g., unit price * qty = subtotal).
 
 # ====== EXTRACTION RULES — DO NOT IGNORE ======
 • Capture every numeric value exactly as it appears. Never drop numbers.
-• Map values to:
+• Map values to ONLY these types (NO tax types):
     vehicle_price / bid_amount
     auction_fee
     recycling_fee
-    tax
     shipping_fee
     insurance_fee
     other_fee
@@ -112,7 +121,8 @@ Extract fees and map them to these standardized types with amounts. Recognize va
   Keep ALL amounts.
 • Preserve invoice totals exactly.
 • You MUST ALWAYS extract the following fee fields, even if they are missing → return null:
-• bid_amount, bid_tax, auction_fee, auction_tax, insurance_fee.
+• bid_amount, auction_fee, insurance_fee.
+• NEVER extract tax fields (bid_tax, auction_tax, transport_tax, etc.) — taxes are auto-calculated.
 
 • These fee fields are MANDATORY and must appear in the final JSON every time, without exception.
 
@@ -130,21 +140,20 @@ Data Matching:
 STRICT: Output ONLY in the exact required JSON structure and keys. Do not add extra fields, explanations, summaries, text, or formatting. Return ONLY the specified JSON format, nothing else.
 
 REQUIRED OUTPUT FORMAT:
-Strictly return only Auction_name and Model translated into English from Japanese;
-If any category (e.g., bid_amount) returns two numeric values, assign the first as the base category (bid_amount) and automatically assign the second as its tax category (bid_tax).
+Strictly return only Model translated into English from Japanese. For Auction_name, use the standard brand name + romanized location (e.g., 'USS-R Nagoya', 'HAA Kobe') — do NOT translate 会場/会社 suffixes;
+If any category (e.g., bid_amount) returns two numeric values (e.g., stacked cells showing base + tax), extract ONLY the first/base value. Ignore the tax value — taxes are auto-calculated.
 Return ONLY a valid JSON object, page-wise for the PDF:
 Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number, Model, auction_date, year, quantity, charges[]); ignore all unrelated data.
 {
   "page_1": [
-        "auction":"HAA Auction (English translated)",
-        "chassis_number": "GP5 3066124" or "DA63T 248426" or "ZVW41-3012214" or "DD51T     12679" or "A200A   0005848" or "A201A              0017671" or "PC30MR-1" or "10710" or "PC30MR-1       10710" or "T-10A" or"T-10A       240-01",
+        "auction":"HAA Kobe" or "USS-R Nagoya" or "USS Tokyo" or "JU Hiroshima",
+        "auction_date": "2025/07/15",
+        "chassis_number": "DA63T 482049" or "DD51T 145148" or "ZVW51 6097706" or "A8FD25 70021" or "WBAWA52020P301052" or "LRW3F7FS0SC596822",
         "lot_number": "7122" or "60238",
         "brand": "Toyota" or "Hiace(English translated)" or "BMW(Any brand)" or "Corolla(or car name)",
         "charges": [
         { "type": "bid_amount", "amount": 250000 },
-        { "type": "bid_tax", "amount": 25000 },
         { "type": "auction_fee", "amount": 15000 },
-        { "type": "auction_tax", "amount": 1500 },
         { "type": "insurance_fee", "amount": 23000 },
         { "type": "recycling_fee", "amount": 13220 }
       ]
@@ -155,7 +164,7 @@ Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number
     ...
   ]
 }
-Strictly Do NOT include quantity,auction_date,year, IGNORE THESE COMPLETELY
+Strictly Do NOT include quantity or year — IGNORE THESE COMPLETELY. DO include auction_date (format: "YYYY/MM/DD").
 Strictly Do NOT include any field whose value is null—omit the field entirely from the output.
 If no items found, return {"detected_language": "Unknown", "invoice_type": "N/A", "pages": {}} with empty arrays; empty optional sections if not applicable.
 Focus on line-item data; ignore headers/footers unless they contain per-item info.

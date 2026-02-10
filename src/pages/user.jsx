@@ -323,6 +323,7 @@ export default function Userss() {
             title="Users"
             sortBy={sortBy}
             sortOrder={sortOrder}
+            disableSortColumns={["role"]}
           >
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">

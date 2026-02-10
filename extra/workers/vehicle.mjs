@@ -54,73 +54,139 @@ let boss;
           .on("data", data => results.push(data))
           .on("end", async () => {
             try {
+              // --- Pre-load brands & customers to avoid N+1 per row ---
+              const allBrands = await prisma.brand.findMany({ select: { id: true, name: true } });
+              const brandMap = new Map(allBrands.map(b => [b.name, b.id]));
+              if (!brandMap.has("-")) {
+                const created = await prisma.brand.create({ data: { name: "-" } });
+                brandMap.set("-", created.id);
+              }
+
+              // Collect unique brand names and customer names from CSV
+              const newBrandNames = new Set();
+              const customerNames = new Set();
               for (const row of results) {
-                const lotNumber = row["lot_number"] || null;
-                const auction = row["auction"] || null;
-                const chassisNumber = row["chassis_number"]?.trim() || null;
-                const brandName = row["brand"]?.trim() || null;
+                const bn = row["brand"]?.trim();
+                if (bn && bn !== "" && !brandMap.has(bn)) newBrandNames.add(bn);
+                const cn = row["customer"]?.trim();
+                if (cn) customerNames.add(cn);
+              }
 
-                if (!chassisNumber) continue;
-
-                // --- Find or create Brand ---
-                let brand = null;
-                if (brandName && brandName.trim() !== "") {
-                  brand = await prisma.brand.upsert({
-                    where: { name: brandName },
-                    update: {},
-                    create: { name: brandName },
-                  });
+              // Batch create missing brands (with race condition protection)
+              for (const name of newBrandNames) {
+                try {
+                  const created = await prisma.brand.create({ data: { name } });
+                  brandMap.set(name, created.id);
+                } catch (e) {
+                  if (e.code === "P2002") {
+                    // Brand was created by concurrent upload, fetch it
+                    const existing = await prisma.brand.findUnique({ where: { name } });
+                    if (existing) brandMap.set(name, existing.id);
+                  } else {
+                    throw e;
+                  }
                 }
-                if (!brand) {
-                  brand = await prisma.brand.findUnique({ where: { name: "-" } });
-                }
-                let brandId = brand?.id;
+              }
 
-                // Parse charge and metadata fields from CSV row
-                const charges = parseChargeFieldsFromFlat(row);
-                const metadata = parseMetadataFromCSV(row);
-
-                // Look up customer by name if provided
-                const customerName = row["customer"]?.trim() || null;
-                let customerId = null;
-                if (customerName) {
-                  const customer = await prisma.customer.findFirst({
-                    where: { name: { equals: customerName, mode: "insensitive" } },
-                    select: { id: true },
-                  });
-                  if (customer) customerId = customer.id;
-                }
-
-                await prisma.vehicle.upsert({
+              // Batch load customers (scoped to company)
+              const customerMap = new Map();
+              let newCustomerCount = 0;
+              if (customerNames.size > 0) {
+                const existingCustomers = await prisma.customer.findMany({
                   where: {
-                    companyId_chassisNumber: {
-                      companyId: Number(companyId),
-                      chassisNumber,
-                    },
+                    companyId: Number(companyId),
+                    name: { in: [...customerNames], mode: "insensitive" },
                   },
-                  update: {
-                    lotNumber,
-                    auction,
-                    brandId,
-                    companyId,
-                    statusId: 1,
-                    ...(customerId ? { customerId } : {}),
-                    ...charges,
-                    ...metadata,
-                  },
-                  create: {
-                    lotNumber,
-                    auction,
-                    chassisNumber,
-                    brandId,
-                    companyId,
-                    statusId: 1,
-                    ...(customerId ? { customerId } : {}),
-                    ...charges,
-                    ...metadata,
-                  },
+                  select: { id: true, name: true },
                 });
-                count++;
+                for (const c of existingCustomers) customerMap.set(c.name.toLowerCase(), c.id);
+
+                // Auto-create missing customers (with race condition protection)
+                for (const name of customerNames) {
+                  if (!customerMap.has(name.toLowerCase())) {
+                    try {
+                      const created = await prisma.customer.create({
+                        data: {
+                          name,
+                          companyId: Number(companyId),
+                          uniqueId: `CSV-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                        },
+                      });
+                      customerMap.set(name.toLowerCase(), created.id);
+                      newCustomerCount++;
+                    } catch (e) {
+                      if (e.code === "P2002") {
+                        // Customer was created by concurrent upload, fetch it
+                        const existing = await prisma.customer.findFirst({
+                          where: { companyId: Number(companyId), name: { equals: name, mode: "insensitive" } },
+                          select: { id: true },
+                        });
+                        if (existing) customerMap.set(name.toLowerCase(), existing.id);
+                      } else {
+                        throw e;
+                      }
+                    }
+                  }
+                }
+              }
+
+              // --- Process rows in a transaction (batch of 50) ---
+              const BATCH_SIZE = 50;
+              for (let i = 0; i < results.length; i += BATCH_SIZE) {
+                const batch = results.slice(i, i + BATCH_SIZE);
+                const ops = [];
+
+                for (const row of batch) {
+                  const lotNumber = row["lot_number"] || null;
+                  const auction = row["auction"] || null;
+                  const rawChassis = row["chassis_number"]?.trim() || null;
+                  const chassisNumber = rawChassis ? rawChassis.replace(/\s+/g, "-") : null;
+                  const brandName = row["brand"]?.trim() || null;
+
+                  if (!chassisNumber) continue;
+
+                  const brandId = (brandName && brandMap.get(brandName)) || brandMap.get("-");
+                  const charges = parseChargeFieldsFromFlat(row);
+                  const metadata = parseMetadataFromCSV(row);
+
+                  const customerName = row["customer"]?.trim() || null;
+                  const customerId = customerName ? (customerMap.get(customerName.toLowerCase()) || null) : null;
+
+                  ops.push(
+                    prisma.vehicle.upsert({
+                      where: {
+                        companyId_chassisNumber: {
+                          companyId: Number(companyId),
+                          chassisNumber,
+                        },
+                      },
+                      update: {
+                        lotNumber,
+                        auction,
+                        brandId,
+                        companyId,
+                        ...(customerId ? { customerId } : {}),
+                        ...charges,
+                        ...metadata,
+                      },
+                      create: {
+                        lotNumber,
+                        auction,
+                        chassisNumber,
+                        brandId,
+                        companyId,
+                        ...(customerId ? { customerId } : {}),
+                        ...charges,
+                        ...metadata,
+                      },
+                    })
+                  );
+                }
+
+                if (ops.length > 0) {
+                  await prisma.$transaction(ops);
+                  count += ops.length;
+                }
               }
 
               console.log("CSV Processed: ", count, "for company: ", companyId);
@@ -132,7 +198,7 @@ let boss;
                     userId,
                     companyId,
                     title: "Vehicle CSV Processed Successfully",
-                    message: `Processed ${count} vehicle(s) from the uploaded CSV.`,
+                    message: `Processed ${count} vehicle(s) from the uploaded CSV.${newCustomerCount > 0 ? ` ${newCustomerCount} new customer(s) created.` : ''}`,
                     category: "success",
                     actions: [
                       { label: "View Vehicles", url: "/vehicle" }

@@ -19,18 +19,24 @@ model Company {
   paymentConfirmations PaymentConfirmation[]
   InvoiceJobs   InvoiceJobs[]
   notifications Notification[]
+  customers Customer[]
 }
 
 model Customer {
   id        Int       @id @default(autoincrement())
   name      String
   country   String?
-  uniqueId  String     @unique
+  uniqueId  String
   vehicles  Vehicle[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
-  userId    Int       @unique
-  user      User      @relation(fields: [userId], references: [id])
+  userId    Int?      @unique
+  user      User?     @relation(fields: [userId], references: [id])
+  companyId Int
+  company   Company   @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, uniqueId])
+  @@index([companyId])
 }
 
 model User {
@@ -95,25 +101,19 @@ model Vehicle {
   updatedAt     DateTime      @updatedAt
   companyId     Int
   brandId       Int
-  statusId      Int
   customerId    Int?
   auction       String?
   lotNumber     String?
 
   // Charge columns (acquisition costs from invoices/CSV)
   bidAmount          Decimal?  @db.Decimal(12, 2)
-  bidTax             Decimal?  @db.Decimal(12, 2)
   auctionFee         Decimal?  @db.Decimal(12, 2)
-  auctionTax         Decimal?  @db.Decimal(12, 2)
   insuranceFee       Decimal?  @db.Decimal(12, 2)
-  insuranceTax       Decimal?  @db.Decimal(12, 2)
   recyclingFee       Decimal?  @db.Decimal(12, 2)
   transportFee       Decimal?  @db.Decimal(12, 2)
   otherFees          Decimal?  @db.Decimal(12, 2)
-  taxProration       Decimal?  @db.Decimal(12, 2)
-  transportTax       Decimal?  @db.Decimal(12, 2)
-  taxSum             Decimal?  @db.Decimal(12, 2)
-  totalCost          Decimal?  @db.Decimal(12, 2)
+  taxSum             Decimal?  @db.Decimal(12, 2)  // Auto-calculated: (bid + auction + insurance + transport + other) × 0.1
+  totalCost          Decimal?  @db.Decimal(12, 2)  // Auto-calculated: all fees + taxSum
   sourceInvoiceJobId Int?
 
   // Logistics/metadata columns
@@ -125,20 +125,21 @@ model Vehicle {
   titleTransferDeadline  DateTime?
   containerNumber        String?
   etd                    String?
+  documentStatus         String?
+  memo                   String?
 
   // Relations
   brand         Brand         @relation(fields: [brandId], references: [id])
   company       Company       @relation(fields: [companyId], references: [id])
-  status        VehicleStatus @relation(fields: [statusId], references: [id])
   customer      Customer?     @relation(fields: [customerId], references: [id])
   sourceInvoiceJob InvoiceJobs? @relation(fields: [sourceInvoiceJobId], references: [id])
   documents     VehicleDocument[]
   payments      VehiclePayments[]
 
   @@unique([companyId, chassisNumber])
+  @@index([companyId])
   @@index([sourceInvoiceJobId])
   @@index([brandId])
-  @@index([statusId])
   @@index([customerId])
 }
 
@@ -166,12 +167,6 @@ model VehiclePayments {
   vehicle   Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
-}
-
-model VehicleStatus {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique
-  vehicles Vehicle[]
 }
 
 model Brand {

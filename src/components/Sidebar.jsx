@@ -11,10 +11,6 @@ import {
   Truck,
   MessageCircle,
   Users,
-  Bookmark,
-  Contact,
-  Star,
-  Bug,
   Moon,
   Sun,
   LogOut,
@@ -24,8 +20,6 @@ import {
   Car,
   ChevronDown,
   ChevronRight,
-  Settings,
-  CheckCircle,
   ReceiptText,
 } from "lucide-react";
 import { isAllowed } from "../hooks/wrapper";
@@ -161,21 +155,6 @@ const getAllSidebarSections = () => [
         href: "/InvoiceJobs",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
-      },
-      {
-        id: "extras",
-        label: "Extras",
-        icon: <Settings size={20} />,
-        isDropdown: true,
-        roles: ["Sadmin", "admin"],
-        subItems: [
-          {
-            id: "manage-status",
-            label: "Manage Status",
-            href: "/status",
-            icon: <CheckCircle size={16} />,
-          },
-        ],
       },
     ],
   },

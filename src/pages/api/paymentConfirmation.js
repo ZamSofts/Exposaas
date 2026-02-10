@@ -87,27 +87,47 @@ export default async function handler(req, res) {
         }
       }
 
+      // --- Pre-load brands & vehicles to avoid N+1 in the loop ---
+      const uniqueChassis = [...new Set(charges.map(ch => String(ch.chassis_number || "").trim()).filter(Boolean))];
+      const uniqueBrandNames = [...new Set(charges.map(ch => {
+        const name = ch.brand && String(ch.brand).trim();
+        return name || "-";
+      }))];
+
+      // Batch load existing vehicles
+      const existingVehicles = await prisma.vehicle.findMany({
+        where: {
+          companyId: Number(companyId),
+          chassisNumber: { in: uniqueChassis },
+        },
+        select: { id: true, chassisNumber: true },
+      });
+      const vehicleMap = new Map(existingVehicles.map(v => [v.chassisNumber, v]));
+
+      // Batch load/create brands
+      const existingBrands = await prisma.brand.findMany({
+        where: { name: { in: uniqueBrandNames } },
+        select: { id: true, name: true },
+      });
+      const brandMap = new Map(existingBrands.map(b => [b.name, b.id]));
+
+      // Create any missing brands
+      for (const name of uniqueBrandNames) {
+        if (!brandMap.has(name)) {
+          const created = await prisma.brand.create({ data: { name } });
+          brandMap.set(name, created.id);
+        }
+      }
+
       for (const ch of charges) {
         try {
           const chassisNumber = String(ch.chassis_number || "").trim();
           if (!chassisNumber) continue;
-          let vehicle = await prisma.vehicle.findUnique({
-            where: {
-              companyId_chassisNumber: {
-                companyId: Number(companyId),
-                chassisNumber,
-              },
-            },
-          });
-          if (!vehicle) {
-            // determine brand name from parsed data, fallback to '-'
-            const brandName = ch.brand && String(ch.brand).trim() !== "" ? String(ch.brand).trim() : "-";
-            const brand = await prisma.brand.upsert({
-              where: { name: brandName },
-              update: {},
-              create: { name: brandName },
-            });
 
+          let vehicle = vehicleMap.get(chassisNumber);
+          if (!vehicle) {
+            const brandName = ch.brand && String(ch.brand).trim() !== "" ? String(ch.brand).trim() : "-";
+            const brandId = brandMap.get(brandName) || brandMap.get("-");
             const lotNumber = ch.lot_number && String(ch.lot_number).trim() !== "" ? String(ch.lot_number).trim() : null;
             const auction = ch.auction && String(ch.auction).trim() !== "" ? String(ch.auction).trim() : null;
 
@@ -115,19 +135,18 @@ export default async function handler(req, res) {
               data: {
                 chassisNumber,
                 companyId: Number(companyId),
-                brandId: brand.id,
+                brandId,
                 statusId: 1,
-                lotNumber: lotNumber,
-                auction: auction,
-                remarks: `Auto-added from payment confirmatio`,
+                lotNumber,
+                auction,
+                remarks: `Auto-added from payment confirmation`,
               },
             });
+            vehicleMap.set(chassisNumber, vehicle);
           }
 
           const amount = ch.amount == null || ch.amount === "" ? null : Number(ch.amount);
-          if (amount == null || isNaN(amount)) {
-            continue;
-          }
+          if (amount == null || isNaN(amount)) continue;
 
           await prisma.vehiclePayments.create({
             data: {

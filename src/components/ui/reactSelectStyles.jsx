@@ -63,3 +63,42 @@ export const customStyles = {
     },
   }),
 };
+
+// Compact variant for inline table cell editing
+export const compactStyles = {
+  ...customStyles,
+  control: (provided, state) => ({
+    ...customStyles.control(provided, state),
+    minHeight: "30px",
+    paddingLeft: "0.25rem",
+    paddingRight: "0.25rem",
+    borderRadius: "0.25rem",
+    fontSize: "0.875rem",
+  }),
+  valueContainer: (provided) => ({
+    ...provided,
+    padding: "0 4px",
+  }),
+  input: (provided) => ({
+    ...provided,
+    color: "var(--foreground)",
+    margin: 0,
+    padding: 0,
+  }),
+  indicatorsContainer: (provided) => ({
+    ...provided,
+    height: "28px",
+  }),
+  dropdownIndicator: (provided) => ({
+    ...provided,
+    padding: "2px",
+  }),
+  clearIndicator: (provided) => ({
+    ...provided,
+    padding: "2px",
+  }),
+  menu: (provided) => ({
+    ...customStyles.menu(provided),
+    minWidth: "180px",
+  }),
+};

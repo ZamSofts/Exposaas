@@ -18,7 +18,6 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const [activeTab, setActiveTab] = useState("basic");
 
   const [brand, setBrand] = useState([]);
-  const [vehicleStatus, setVehicleStatus] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [error, setError] = useState("");
   const [customLoader, setCustomLoader] = useState(false);
@@ -30,22 +29,16 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const [lotNumber, setLotNumber] = useState("");
   const [auction, setAuction] = useState("");
   const [companyId, setCompanyId] = useState(session?.companyId || null);
-  const [statusId, setStatusId] = useState(0);
   const [customerId, setCustomerId] = useState(null);
   const [remarks, setRemarks] = useState("");
 
   // Charge fields
   const [bidAmount, setBidAmount] = useState("");
-  const [bidTax, setBidTax] = useState("");
   const [auctionFee, setAuctionFee] = useState("");
-  const [auctionTax, setAuctionTax] = useState("");
   const [insuranceFee, setInsuranceFee] = useState("");
-  const [insuranceTax, setInsuranceTax] = useState("");
   const [recyclingFee, setRecyclingFee] = useState("");
   const [transportFee, setTransportFee] = useState("");
-  const [transportTax, setTransportTax] = useState("");
   const [otherFees, setOtherFees] = useState("");
-  const [taxProration, setTaxProration] = useState("");
 
   // Logistics/metadata fields
   const [auctionDate, setAuctionDate] = useState("");
@@ -56,22 +49,27 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const [titleTransferDeadline, setTitleTransferDeadline] = useState("");
   const [containerNumber, setContainerNumber] = useState("");
   const [etd, setEtd] = useState("");
+  const [documentStatus, setDocumentStatus] = useState("");
+  const [memo, setMemo] = useState("");
 
-  // Calculate total cost from charge fields
-  const calculateTotalCost = () => {
-    const charges = [bidAmount, bidTax, auctionFee, auctionTax, insuranceFee, insuranceTax, recyclingFee, transportFee, transportTax, taxProration, otherFees];
-    return charges.reduce((sum, val) => {
+  // Calculate tax: 10% of taxable fees (recyclingFee is tax-exempt)
+  const calculateTaxSum = () => {
+    const taxBase = [bidAmount, auctionFee, insuranceFee, transportFee, otherFees];
+    const sum = taxBase.reduce((s, val) => {
       const num = parseFloat(val);
-      return sum + (isNaN(num) ? 0 : num);
+      return s + (isNaN(num) ? 0 : num);
     }, 0);
+    return sum * 0.1;
   };
 
-  const calculateTaxSum = () => {
-    const taxes = [bidTax, auctionTax, insuranceTax, transportTax, taxProration];
-    return taxes.reduce((sum, val) => {
+  // Calculate total cost from all charge fields + tax
+  const calculateTotalCost = () => {
+    const charges = [bidAmount, auctionFee, insuranceFee, recyclingFee, transportFee, otherFees];
+    const sum = charges.reduce((s, val) => {
       const num = parseFloat(val);
-      return sum + (isNaN(num) ? 0 : num);
+      return s + (isNaN(num) ? 0 : num);
     }, 0);
+    return sum + calculateTaxSum();
   };
 
   // Vehicle documents upload states
@@ -112,9 +110,8 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setCustomLoader(true);
     setError("");
     try {
-      const [brandData, statusData, customerData] = await Promise.all([API("GET", "brand"), API("GET", "vehicleStatus"), API("GET", "customer?col=id,name,uniqueId")]);
+      const [brandData, customerData] = await Promise.all([API("GET", "brand"), API("GET", "customer?col=id,name,uniqueId")]);
       setBrand(!brandData.error ? brandData : []);
-      setVehicleStatus(!statusData.error ? statusData : []);
       setCustomers(
         !customerData.error
           ? customerData.map(c => ({
@@ -145,7 +142,6 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setBrandId(data.brandId);
     setChassisNumber(data.chassisNumber);
     setCompanyId(data.companyId);
-    setStatusId(data.statusId);
     setCustomerId(data.customerId || null);
     setLotNumber(data.lotNumber || "");
     setAuction(data.auction || "");
@@ -153,16 +149,11 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
 
     // Populate charge fields
     setBidAmount(data.bidAmount || "");
-    setBidTax(data.bidTax || "");
     setAuctionFee(data.auctionFee || "");
-    setAuctionTax(data.auctionTax || "");
     setInsuranceFee(data.insuranceFee || "");
-    setInsuranceTax(data.insuranceTax || "");
     setRecyclingFee(data.recyclingFee || "");
     setTransportFee(data.transportFee || "");
-    setTransportTax(data.transportTax || "");
     setOtherFees(data.otherFees || "");
-    setTaxProration(data.taxProration || "");
 
     // Logistics/metadata fields
     setAuctionDate(data.auctionDate || "");
@@ -173,6 +164,8 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
     setTitleTransferDeadline(data.titleTransferDeadline ? data.titleTransferDeadline.split("T")[0] : "");
     setContainerNumber(data.containerNumber || "");
     setEtd(data.etd || "");
+    setDocumentStatus(data.documentStatus || "");
+    setMemo(data.memo || "");
 
     setDocumentsToDelete([]);
 
@@ -218,6 +211,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
             name: file.name,
             size: file.size,
             type: file.type,
+            previewUrl: URL.createObjectURL(file),
           });
         }
       } else {
@@ -242,14 +236,19 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       setDocumentsToDelete(prev => [...prev, documentToRemove.id]);
     }
 
+    // Revoke object URL to free memory
+    if (documentToRemove && documentToRemove.previewUrl) {
+      URL.revokeObjectURL(documentToRemove.previewUrl);
+    }
+
     setVehicleDocuments(prev => prev.filter(file => file.id !== fileId));
     setError("");
   };
 
   const editData = async () => {
     if (!isValid({ auctionDate: auctionDate, titleTransferDeadline: titleTransferDeadline }, setError)) return;
-    if (!brandId || !chassisNumber || !statusId) {
-        setError(!brandId ? "Please select a brand" : !chassisNumber ? "Chassis number is required" : "Please select current status");
+    if (!brandId || !chassisNumber) {
+        setError(!brandId ? "Please select a brand" : "Chassis number is required");
         return;
       }
 
@@ -262,7 +261,6 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       formData.append("brandId", brandId);
       formData.append("chassisNumber", chassisNumber);
       formData.append("companyId", Number(session.companyId));
-      formData.append("statusId", statusId);
       formData.append("customerId", customerId || "");
       formData.append("lotNumber", lotNumber);
       formData.append("auction", auction);
@@ -270,16 +268,11 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
 
       // Append charge fields
       if (bidAmount) formData.append("bidAmount", bidAmount);
-      if (bidTax) formData.append("bidTax", bidTax);
       if (auctionFee) formData.append("auctionFee", auctionFee);
-      if (auctionTax) formData.append("auctionTax", auctionTax);
       if (insuranceFee) formData.append("insuranceFee", insuranceFee);
-      if (insuranceTax) formData.append("insuranceTax", insuranceTax);
       if (recyclingFee) formData.append("recyclingFee", recyclingFee);
       if (transportFee) formData.append("transportFee", transportFee);
-      if (transportTax) formData.append("transportTax", transportTax);
       if (otherFees) formData.append("otherFees", otherFees);
-      if (taxProration) formData.append("taxProration", taxProration);
 
       // Logistics/metadata fields
       formData.append("auctionDate", auctionDate);
@@ -290,6 +283,8 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
       formData.append("titleTransferDeadline", titleTransferDeadline);
       formData.append("containerNumber", containerNumber);
       formData.append("etd", etd);
+      formData.append("documentStatus", documentStatus);
+      formData.append("memo", memo);
 
       // Only append new vehicle document files
       const newFiles = vehicleDocuments.filter(docObj => !docObj.isExisting && docObj.file);
@@ -434,10 +429,6 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                       <CustomSelect data={brand} selectedId={brandId} setSelectedId={setBrandId} />
                     </div>
                     <div>
-                      <label className="input-label">Current Status *</label>
-                      <CustomSelect data={vehicleStatus} selectedId={statusId} setSelectedId={setStatusId} />
-                    </div>
-                    <div>
                       <label className="input-label">Chassis Number *</label>
                       <input type="text" value={chassisNumber} onChange={e => setChassisNumber(e.target.value)} className="input-style" placeholder="Enter chassis number..." />
                     </div>
@@ -470,24 +461,12 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                       <input type="number" value={bidAmount} onChange={e => setBidAmount(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
-                      <label className="input-label">Bid Tax</label>
-                      <input type="number" value={bidTax} onChange={e => setBidTax(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
                       <label className="input-label">Auction Fee</label>
                       <input type="number" value={auctionFee} onChange={e => setAuctionFee(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
-                      <label className="input-label">Auction Tax</label>
-                      <input type="number" value={auctionTax} onChange={e => setAuctionTax(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
                       <label className="input-label">Insurance Fee</label>
                       <input type="number" value={insuranceFee} onChange={e => setInsuranceFee(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="input-label">Insurance Tax</label>
-                      <input type="number" value={insuranceTax} onChange={e => setInsuranceTax(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
                       <label className="input-label">Recycling Fee</label>
@@ -498,16 +477,8 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                       <input type="number" value={transportFee} onChange={e => setTransportFee(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                     <div>
-                      <label className="input-label">Transport Tax</label>
-                      <input type="number" value={transportTax} onChange={e => setTransportTax(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
                       <label className="input-label">Other Fees</label>
                       <input type="number" value={otherFees} onChange={e => setOtherFees(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="input-label">Tax Proration</label>
-                      <input type="number" value={taxProration} onChange={e => setTaxProration(e.target.value)} className="input-style" placeholder="0" />
                     </div>
                   </div>
 
@@ -569,6 +540,14 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                       <label className="input-label">ETD (Estimated Departure)</label>
                       <input type="text" value={etd} onChange={e => setEtd(e.target.value)} className="input-style" placeholder="e.g., Feb 2025" />
                     </div>
+                    <div>
+                      <label className="input-label">Document Status</label>
+                      <input type="text" value={documentStatus} onChange={e => setDocumentStatus(e.target.value)} className="input-style" placeholder="e.g., Received, Pending..." />
+                    </div>
+                    <div>
+                      <label className="input-label">Memo</label>
+                      <input type="text" value={memo} onChange={e => setMemo(e.target.value)} className="input-style" placeholder="Notes..." />
+                    </div>
                   </div>
                 </div>
               )}
@@ -603,7 +582,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                             className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-[var(--secondary)]/30 rounded transition-colors"
                             onClick={() =>
                               setPreviewFile({
-                                url: docObj.isExisting ? docObj.docUrl : URL.createObjectURL(docObj.file),
+                                url: docObj.isExisting ? docObj.docUrl : docObj.previewUrl,
                                 fileName: docObj.name,
                               })
                             }
@@ -615,7 +594,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                                 <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
                               )
                             ) : docObj.type && docObj.type.includes("image") ? (
-                              <img src={URL.createObjectURL(docObj.file)} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
+                              <img src={docObj.previewUrl} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
                             ) : (
                               <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
                             )}

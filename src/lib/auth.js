@@ -11,7 +11,6 @@ export const authOptions = {
       },
       async authorize(credentials) {
         try {
-          console.log("Login attempt with credentials:", credentials);
           if (credentials?.username === "ad" && credentials?.password === "p") {
             const permissions=await prisma.permission.findMany({
               select: { name: true },

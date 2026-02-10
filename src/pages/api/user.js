@@ -1,16 +1,51 @@
 import { prisma, getSession } from "@/lib/useful";
 
+// Shared helper: get admin role IDs + check if current user is admin
+async function getAdminContext(session) {
+  if (session.role === "Sadmin") return { roleFilter: {} };
+
+  const [adminRoles, currentUserData] = await Promise.all([
+    prisma.role.findMany({
+      where: { name: { contains: "admin", mode: "insensitive" } },
+      select: { id: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: Number(session.id) },
+      select: { roles: { select: { roleId: true } } },
+    }),
+  ]);
+
+  const adminIds = adminRoles.map(r => r.id);
+  const isCurrentUserAdmin = currentUserData?.roles?.some(ur => adminIds.includes(ur.roleId));
+
+  if (adminRoles.length > 0 && !isCurrentUserAdmin) {
+    return {
+      roleFilter: { roles: { none: { roleId: { in: adminIds } } } },
+    };
+  }
+  return { roleFilter: {} };
+}
+
+// Format user with role names from a pre-loaded map
+function formatUser(user, roleMap) {
+  return {
+    id: user.id,
+    username: user.username,
+    companyId: user.companyId,
+    createdAt: user.createdAt,
+    rolesId: user.roles.map(r => r.roleId),
+    rolesnames: user.roles.map(r => roleMap.get(r.roleId) || "Unknown"),
+    company: user.company,
+  };
+}
+
 export default async function handler(req, res) {
-  // Session is GUARANTEED to exist because middleware already checked it
-  // and would have returned 401 if not authenticated
   const session = await getSession(req, res);
 
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
-  const search = String(req.query.search || "")
-    .trim()
-    .toLowerCase();
+  const search = String(req.query.search || "").trim().toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
   const col = req.query.col ? String(req.query.col).split(",") : null;
   const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
@@ -18,16 +53,14 @@ export default async function handler(req, res) {
   try {
     if (req.method === "GET") {
       const userCompanyId = session?.companyId;
-
-      // filter depends on role
       const filterByCompany = session.role === "Sadmin" ? {} : { companyId: userCompanyId };
 
-      // ---- Load single user ----
+      // ---- Load single user (include role names in one round-trip) ----
       if (id) {
         const user = await prisma.user.findUnique({
           where: { id },
           include: {
-            roles: { select: { roleId: true } },
+            roles: { include: { role: { select: { id: true, name: true } } } },
             company: { select: { name: true } },
           },
         });
@@ -35,67 +68,21 @@ export default async function handler(req, res) {
         if (!user || (session.role !== "Sadmin" && user.companyId !== userCompanyId)) {
           return res.status(404).json({ error: "User not found" });
         }
-        const rolesnames = await prisma.role.findMany({
-          where: { id: { in: user.roles.map(r => r.roleId) } },
-          select: { id: true, name: true },
-        });
+
         return res.status(200).json({
           id: user.id,
           username: user.username,
           companyId: user.companyId,
           createdAt: user.createdAt,
           rolesId: user.roles.map(r => r.roleId),
-          rolesnames: user.roles.map(r => rolesnames.find(role => role.id === r.roleId)?.name || "Unknown"),
+          rolesnames: user.roles.map(r => r.role?.name || "Unknown"),
           company: user.company,
         });
       }
 
-      // ---- Specific fields ----
+      // ---- Specific fields (dropdown lists etc.) ----
       if (selectFields) {
-        // Additional filter to hide Admin users based on user role
-        let roleFilter = {};
-        if (session.role !== "Sadmin") {
-          // Get Admin role IDs
-          const adminRoles = await prisma.role.findMany({
-            where: {
-              name: {
-                contains: "admin",
-                mode: "insensitive",
-              },
-            },
-            select: { id: true },
-          });
-
-          // Check if current user is an admin
-          const currentUserData = await prisma.user.findUnique({
-            where: { id: Number(session.id) },
-            include: {
-              roles: {
-                include: {
-                  role: { select: { id: true, name: true } },
-                },
-              },
-            },
-          });
-
-          const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => adminRoles.some(adminRole => adminRole.id === userRole.roleId));
-
-          if (adminRoles.length > 0) {
-            if (isCurrentUserAdmin) {
-              // Admin users: Show other admins + non-admins (show everyone in their company)
-              // No additional filtering needed - they can see all users in their company
-            } else {
-              // Non-admin users: Hide all admin users
-              roleFilter = {
-                roles: {
-                  none: {
-                    roleId: { in: adminRoles.map(role => role.id) },
-                  },
-                },
-              };
-            }
-          }
-        }
+        const { roleFilter } = await getAdminContext(session);
 
         const users = await prisma.user.findMany({
           select: {
@@ -110,177 +97,92 @@ export default async function handler(req, res) {
           orderBy: { [sortBy]: sortOrder },
         });
 
-        const formatted = users.map(u => ({
-          ...u,
-          rolesId: u.roles.map(r => r.roleId),
-        }));
-
-        return res.status(200).json(formatted);
+        return res.status(200).json(
+          users.map(u => ({ ...u, rolesId: u.roles.map(r => r.roleId) }))
+        );
       }
 
-      // ---- All with pagination ----
+      // ---- Paginated list ----
+      const { roleFilter } = await getAdminContext(session);
 
-      // Additional filter to hide Admin users based on user role
-      let roleFilter = {};
-      if (session.role !== "Sadmin") {
-        // Get Admin role IDs
-        const adminRoles = await prisma.role.findMany({
-          where: {
-            name: {
-              contains: "admin",
-              mode: "insensitive",
-            },
-          },
-          select: { id: true },
-        });
-
-        // Check if current user is an admin
-        const currentUserData = await prisma.user.findUnique({
-          where: { id: Number(session.id) },
-          include: {
-            roles: {
-              include: {
-                role: { select: { id: true, name: true } },
-              },
-            },
-          },
-        });
-
-        const isCurrentUserAdmin = currentUserData?.roles?.some(userRole => adminRoles.some(adminRole => adminRole.id === userRole.roleId));
-
-        if (adminRoles.length > 0) {
-          if (isCurrentUserAdmin) {
-            // Admin users: Show other admins + non-admins (show everyone in their company)
-            // No additional filtering needed - they can see all users in their company
-          } else {
-            // Non-admin users: Hide all admin users
-            roleFilter = {
-              roles: {
-                none: {
-                  roleId: { in: adminRoles.map(role => role.id) },
-                },
-              },
-            };
-          }
-        }
-      }
+      const whereClause = {
+        ...filterByCompany,
+        ...roleFilter,
+        username: { contains: search, mode: "insensitive", not: session.name },
+        customer: null,
+      };
 
       const [users, total] = await Promise.all([
         prisma.user.findMany({
           skip: (page - 1) * limit,
           take: limit,
           orderBy: { [sortBy]: sortOrder },
-          where: {
-            ...filterByCompany,
-            ...roleFilter,
-            username: {
-              contains: search,
-              mode: "insensitive",
-              not: session.name,
-            },
-            customer: null,
-          },
+          where: whereClause,
           include: {
-            roles: { select: { roleId: true } },
+            roles: { include: { role: { select: { id: true, name: true } } } },
             company: { select: { name: true } },
           },
         }),
-        prisma.user.count({
-          where: {
-            ...filterByCompany,
-            ...roleFilter,
-            username: { contains: search, mode: "insensitive", not: session.name },
-          },
-        }),
+        prisma.user.count({ where: whereClause }),
       ]);
-      const rolesnames = await prisma.role.findMany({
-        where: {
-          id: { in: users.flatMap(u => u.roles.map(r => r.roleId)) },
-        },
-        select: { id: true, name: true },
-      });
-      const formatted = users.map(u => ({
-        id: u.id,
-        username: u.username,
-        companyId: u.companyId,
-        createdAt: u.createdAt,
-        rolesId: u.roles.map(r => r.roleId),
-        rolesnames: u.roles.map(r => rolesnames.find(role => role.id === r.roleId)?.name || "Unknown"),
-        company: u.company,
-      }));
 
-      return res.status(200).json({ user: formatted, total });
+      // Build role map from already-included data (zero extra queries)
+      const roleMap = new Map();
+      for (const u of users) {
+        for (const ur of u.roles) {
+          if (ur.role && !roleMap.has(ur.roleId)) {
+            roleMap.set(ur.roleId, ur.role.name);
+          }
+        }
+      }
+
+      return res.status(200).json({
+        user: users.map(u => formatUser(u, roleMap)),
+        total,
+      });
     }
+
     if (req.method === "PUT") {
       const { username, password, companyId, rolesId } = req.body;
-      if (username === "") {
-        return res.status(400).json({ error: "Username is required" });
-      }
-      if (password === "") {
-        return res.status(400).json({ error: "Password is required" });
-      }
-      if (!companyId) {
-        return res.status(400).json({ error: "Company is required" });
-      }
+      if (username === "") return res.status(400).json({ error: "Username is required" });
+      if (password === "") return res.status(400).json({ error: "Password is required" });
+      if (!companyId) return res.status(400).json({ error: "Company is required" });
+
       const d = await prisma.user.findFirst({
-        where: {
-          username: { equals: username, mode: "insensitive" },
-        },
+        where: { username: { equals: username, mode: "insensitive" } },
         select: { username: true },
       });
-      if (d) {
-        return res.status(409).json({ error: "Username already exists" });
-      }
+      if (d) return res.status(409).json({ error: "Username already exists" });
+
       await prisma.user.create({
         data: {
           username,
           password,
           companyId: Number(companyId),
-          roles: {
-            create: rolesId.map(roleId => ({ roleId })),
-          },
-        },
-        include: {
-          roles: {
-            include: { role: true },
-          },
+          roles: { create: rolesId.map(roleId => ({ roleId })) },
         },
       });
-      res.status(201).json({
-        message: "User created successfully",
-      });
+
+      res.status(201).json({ message: "User created successfully" });
     }
 
     if (req.method === "POST") {
       const { id, username, password, companyId, rolesId } = req.body;
-      if (!username) {
-        return res.status(400).json({ error: "Username is required" });
-      }
-      if (!companyId) {
-        return res.status(400).json({ error: "Company is required" });
-      }
+      if (!username) return res.status(400).json({ error: "Username is required" });
+      if (!companyId) return res.status(400).json({ error: "Company is required" });
+
       const d = await prisma.user.findFirst({
-        where: {
-          username: { equals: username, mode: "insensitive" },
-          id: { not: id },
-        },
+        where: { username: { equals: username, mode: "insensitive" }, id: { not: id } },
       });
-      if (d) {
-        return res.status(409).json({ error: "Username already exists" });
-      }
+      if (d) return res.status(409).json({ error: "Username already exists" });
 
-      // Start transaction array
-      const transactionOps = [];
-
-      // 1️⃣ Always update basic info
-      transactionOps.push(
+      const transactionOps = [
         prisma.user.update({
           where: { id },
           data: { username, ...(password ? { password } : {}), companyId: Number(companyId) },
-        })
-      );
+        }),
+      ];
 
-      // 2️⃣ Only update roles if rolesId is provided
       if (Array.isArray(rolesId)) {
         const existingRoles = await prisma.userRole.findMany({
           where: { userId: id },
@@ -289,26 +191,20 @@ export default async function handler(req, res) {
 
         const existingRoleIds = existingRoles.map(r => r.roleId).sort();
         const newRoleIds = [...rolesId].sort();
-
         const rolesChanged = existingRoleIds.length !== newRoleIds.length || existingRoleIds.some((r, idx) => r !== newRoleIds[idx]);
 
         if (rolesChanged) {
           transactionOps.push(
             prisma.userRole.deleteMany({ where: { userId: id } }),
-            prisma.userRole.createMany({
-              data: rolesId.map(roleId => ({
-                userId: id,
-                roleId,
-              })),
-            })
+            prisma.userRole.createMany({ data: rolesId.map(roleId => ({ userId: id, roleId })) })
           );
         }
       }
 
       await prisma.$transaction(transactionOps);
-
       res.status(201).json({ message: "User updated successfully" });
     }
+
     if (req.method === "DELETE") {
       const { id } = req.query;
       const userId = Number(id);
@@ -325,21 +221,13 @@ export default async function handler(req, res) {
       }
 
       await prisma.$transaction([
-        // Delete user roles first
         prisma.userRole.deleteMany({ where: { userId } }),
-
-        // Delete all chat messages associated with this user
         prisma.chatMessage.deleteMany({ where: { userId } }),
-
         prisma.customer.deleteMany({ where: { userId } }),
-
-        // Finally delete the user
         prisma.user.delete({ where: { id: userId } }),
       ]);
 
-      res.status(200).json({
-        message: "User and all associated data deleted successfully",
-      });
+      res.status(200).json({ message: "User and all associated data deleted successfully" });
     }
   } catch (error) {
     console.error("API error:", error);

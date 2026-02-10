@@ -36,7 +36,7 @@ export const putFile = async (file, path) => {
   // Upload file
   const fileBuffer = file.buffer || file;
   const fileSize = fileBuffer.length;
-  console.log("Uploading file to Azure Blob Storage:", fileName, "Size:", fileSize);
+  // Upload to Azure Blob Storage
   await blockBlobClient.upload(fileBuffer, fileSize, {
     blobHTTPHeaders: {
       blobContentType: file.mimetype || "application/octet-stream",
@@ -74,7 +74,7 @@ export const putMultipleFiles = async (files, path) => {
     // Upload file
     const fileBuffer = file.buffer || file;
     const fileSize = fileBuffer.length;
-    console.log("Uploading file to Azure Blob Storage:", fileName, "Size:", fileSize);
+    // Upload to Azure Blob Storage
     await blockBlobClient.upload(fileBuffer, fileSize, {
       blobHTTPHeaders: {
         blobContentType: file.mimetype || "application/octet-stream",

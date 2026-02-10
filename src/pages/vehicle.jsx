@@ -1,16 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Head from "next/head";
-import { useAuth, useConfirm, API,Error,DataTable, isAllowed, CustomButton, Toast, Loader, EditVehicle, FilePreviewer } from "@/hooks/wrapper";
+import { useAuth, useConfirm, API, Error, DataTable, isAllowed, Toast, Loader, EditVehicle, FilePreviewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import { Plus, Edit, Trash2, Car, FileUp, FileText } from "lucide-react";
-
-// Format currency with ¥ symbol
-const formatCurrency = (value) => {
-  if (value === null || value === undefined) return "-";
-  const num = parseFloat(value);
-  if (isNaN(num)) return "-";
-  return `¥${num.toLocaleString()}`;
-};
+import { Plus, FileUp, Search, Filter } from "lucide-react";
+import useFileUpload from "@/hooks/useFileUpload";
+import FileUploadModal from "@/components/ui/FileUploadModal";
+import VehicleRow from "@/components/VehicleRow";
+import VehicleFilters from "@/components/VehicleFilters";
+import { VEHICLE_COLUMNS } from "@/config/vehicleColumns";
 
 export default function VehiclesPage() {
   const { session, status } = useAuth(["view:vehicle"], ["Sadmin"]);
@@ -21,35 +18,81 @@ export default function VehiclesPage() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
-  const [invoiceFile, setInvoiceFile] = useState(null);
-  //const [invoiceType,setInvoiceType]= useState("");
   const [invoiceFileModal, setInvoiceFileModal] = useState(false);
-
-
-  const [csvFile, setCsvFile] = useState(null);
   const [csvFileModal, setCsvFileModal] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const csvUpload = useFileUpload({
+    endpoint: "addVehicle", method: "POST",
+    validExtensions: ["csv"], validMimeTypes: ["text/csv", "application/vnd.ms-excel"],
+    fileLabel: "CSV",
+  });
+  const invoiceUpload = useFileUpload({
+    endpoint: "addInvoice", method: "PUT",
+    validExtensions: ["pdf"], validMimeTypes: ["application/pdf"],
+    fileLabel: "Invoice",
+  });
 
   const [edit, setEdit] = useState(null);
   const [currentView, setCurrentView] = useState("list");
   const [documentPreview, setDocumentPreview] = useState(null);
+
+  // Dropdown / combobox options for inline editing
+  const [brandOptions, setBrandOptions] = useState([]);
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [suggestions, setSuggestions] = useState({});
+
+  // Memoize dropdown options object so VehicleRow memo isn't broken
+  const dropdownOpts = useMemo(() => ({ brandOptions, customerOptions }), [brandOptions, customerOptions]);
 
   // Modal refs for click outside
   const csvModalRef = useRef(null);
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(5);
+  const [perPage, setPerPage] = useState(25);
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Filter state
+  const [filters, setFilters] = useState([]);
+  const [conjunction, setConjunction] = useState("and");
+  const [showFilters, setShowFilters] = useState(false);
+  const filterTimeoutRef = useRef(null);
 
   // Toast state
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
   useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, search, sortBy, sortOrder]);
+    clearTimeout(filterTimeoutRef.current);
+    filterTimeoutRef.current = setTimeout(() => {
+      loadData();
+    }, filters.length > 0 ? 400 : 0);
+    return () => clearTimeout(filterTimeoutRef.current);
+  }, [currentPage, perPage, search, sortBy, sortOrder, filters, conjunction]);
+
+  // Load dropdown options for inline editing and filter dropdowns
+  useEffect(() => {
+    if (!session) return;
+    const loadOptions = async () => {
+      const [brandData, customerData, suggestionsData] = await Promise.all([
+        API("GET", "brand"),
+        API("GET", "customer?col=id,name,uniqueId"),
+        API("GET", "vehicleSuggestions?fields=auction,transportCompany,deliverTo,documentStatus"),
+      ]);
+      if (!brandData.error) {
+        setBrandOptions(brandData.map(b => ({ value: b.id, label: b.name })));
+      }
+      if (!customerData.error) {
+        setCustomerOptions(customerData.map(c => ({ value: c.id, label: `${c.name}-${c.uniqueId}` })));
+      }
+      if (!suggestionsData.error) {
+        setSuggestions(suggestionsData);
+      }
+    };
+    loadOptions();
+  }, [session]);
 
   // Handle click outside modal to close
   useEffect(() => {
@@ -65,9 +108,33 @@ export default function VehiclesPage() {
     };
   }, []);
 
-  const showToast = (message, type = "success") => {
+  const showToast = useCallback((message, type = "success") => {
     setToast({ id: Date.now(), message, type });
-  };
+  }, []);
+
+  // Inline charge editing
+  const canEditCharges = isAllowed(["edit:vehicle"], session);
+
+  const handleInlineSave = useCallback((vehicleId, updatedVehicle) => {
+    setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, ...updatedVehicle } : v)));
+    showToast("Updated", "success");
+  }, [showToast]);
+
+  const handleInlineError = useCallback(msg => {
+    showToast(msg || "Failed to update", "error");
+  }, [showToast]);
+
+  // Build combobox options from suggestions (memoized per field)
+  const comboOpts = useCallback((field) =>
+    (suggestions[field] || []).map(v => ({ value: v, label: v })),
+  [suggestions]);
+
+  // Filter is "active" when it has field + operator + value (or isEmpty/isNotEmpty which need no value)
+  const isFilterActive = (f) =>
+    f.field && f.operator &&
+    (["isEmpty", "isNotEmpty"].includes(f.operator) || (f.value !== "" && f.value != null));
+
+  const activeFilterCount = filters.filter(isFilterActive).length;
 
   const loadData = async () => {
     setIsLoading(true);
@@ -79,6 +146,19 @@ export default function VehiclesPage() {
       sortBy,
       sortOrder,
     });
+
+    const activeFilters = filters.filter(isFilterActive);
+    if (activeFilters.length > 0) {
+      params.set("filters", JSON.stringify({
+        conjunction,
+        conditions: activeFilters.map(f => ({
+          field_name: f.field,
+          operator: f.operator,
+          value: f.value,
+        })),
+      }));
+    }
+
     const data = await API("GET", `vehicle?${params}`);
     if (data.error) {
       setError(data.error);
@@ -100,110 +180,26 @@ export default function VehiclesPage() {
     setCurrentPage(1);
   };
 
+  const handleFiltersChange = useCallback((newFilters) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+  }, []);
+
   const handlePageChange = (page, perPageValue) => {
     setCurrentPage(page);
     setPerPage(perPageValue);
   };
 
-  const handleFileChange = e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const fileExtension = file.name.split(".").pop()?.toLowerCase();
-    if (fileExtension !== "csv" || !["text/csv", "application/vnd.ms-excel"].includes(file.type)) {
-      setError("Only valid CSV files are allowed!");
-      setCsvFile(null);
-      return;
-    }
-    setCsvFile(file);
-    setError("");
-  };
-
-  const handleInvoiceFileChange = e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const fileExtension = file.name.split(".").pop()?.toLowerCase();
-    if (fileExtension !== "pdf" || !["application/pdf"].includes(file.type)) {
-      setError("Only valid invoice files are allowed!");
-      setInvoiceFile(null);
-      return;
-    }
-    setInvoiceFile(file);
-    setError("");
-  };
-
-  // Fake progress bar for CSV upload
-  const uploadCsv = async () => {
-    if (!csvFile) {
-      setError("Please select a valid CSV file first.");
-      showToast("Please select a valid CSV file first.", "error");
-      return;
-    }
-    setUploadProgress(1);
-    let fakeProgress = 1;
-    const interval = setInterval(() => {
-      fakeProgress += Math.random() * 10;
-      if (fakeProgress < 90) {
-        setUploadProgress(Math.floor(fakeProgress));
-      }
-    }, 200);
-    const formData = new FormData();
-    formData.append("file", csvFile);
-    const response = await API("POST", "addVehicle", formData, true);
-
-    clearInterval(interval);
-    setUploadProgress(100);
-
-    setTimeout(() => setUploadProgress(0), 1000);
-
-    if (response.error) {
-      setError(response.error);
-      showToast(response.error, "error");
-      return;
-    }
+  const handleUploadSuccess = (response, modalCloser) => {
     showToast(response.message, "success");
-    setCsvFileModal(false);
-    setCsvFile(null);
+    modalCloser(false);
     setError("");
     loadData();
   };
 
-  // Fake progress bar for Invoice upload
-  const uploadInvoice = async () => {
-    if (!invoiceFile) {
-      setError("Please select a valid Invoice file first.");
-      showToast("Please select a valid Invoice file first.", "error");
-      return;
-    }
-    setUploadProgress(1);
-    let fakeProgress = 1;
-    const interval = setInterval(() => {
-      fakeProgress += Math.random() * 10;
-      if (fakeProgress < 90) {
-        setUploadProgress(Math.floor(fakeProgress));
-      }
-    }, 200);
-    const formData = new FormData();
-    formData.append("file", invoiceFile);
-    //formData.append("invoiceType", invoiceType);
-    const response = await API("PUT", "addInvoice", formData, true);
-
-    clearInterval(interval);
-    setUploadProgress(100);
-
-    setTimeout(() => setUploadProgress(0), 1000);
-
-    if (response.error) {
-      setError(response.error);
-      showToast(response.error, "error");
-      return;
-    }
-    showToast(response.message, "success");
-    // setInvoiceResponse(response.data);
-    // setIsInvoiceDataView(true);
-    setInvoiceFileModal(false);
-    setInvoiceFile(null);
-    setError("");
-    loadData();
+  const handleUploadError = (msg) => {
+    setError(msg);
+    showToast(msg, "error");
   };
 
   const deleteIt = async id => {
@@ -233,7 +229,8 @@ export default function VehiclesPage() {
   const resetForm = () => {
     setError("");
     setEdit(null);
-    setCsvFile(null);
+    csvUpload.reset();
+    invoiceUpload.reset();
     setCsvFileModal(false);
     setCustomLoader(false);
     setInvoiceFileModal(false);
@@ -245,10 +242,10 @@ export default function VehiclesPage() {
     setCurrentView("form");
   };
 
-  const handleEditVehicle = vehicleId => {
+  const handleEditVehicle = useCallback(vehicleId => {
     setEdit(vehicleId);
     setCurrentView("form");
-  };
+  }, []);
 
   const handleBackToList = () => {
     setCurrentView("list");
@@ -271,305 +268,146 @@ export default function VehiclesPage() {
         <title>Vehicles Management - ExpoSaaS</title>
       </Head>
       <Sidebar>
-        <div className="p-8 bg-[var(--background)] min-h-screen relative">
-          {/* Header Section */}
-          <div className="mb-8 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
-                <Car className="w-6 h-6 text-[var(--primary)]" />
-              </div>
-              <h1 className="text-3xl font-bold text-[var(--foreground)]">Vehicles Management</h1>
-            </div>
-            {isAllowed(["add:vehicle"], session) ? <CustomButton title="Add Vehicle" onClick={handleAddVehicle} className="btn-primary" icon={<Plus className="w-5 h-5" />} /> : null}
-          </div>
-
-          {/* CSV Upload Modal */}
-          {csvFileModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div ref={csvModalRef} className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="input-label">Upload CSV File</label>
-                    <input type="file" accept=".csv" onChange={handleFileChange} className="input-style" />
-                    {csvFile && (
-                      <p className="text-sm text-[var(--secondary-foreground)] mt-2">
-                        Selected file: <strong>{csvFile.name}</strong>
-                      </p>
-                    )}
-                  </div>
-                  <Error message={error} />
-                  {uploadProgress > 0 && (
-                    <div className="w-full bg-[var(--border)] rounded h-3 mb-2">
-                      <div className="bg-[var(--primary)] h-3 rounded transition-all duration-200" style={{ width: `${uploadProgress}%` }}></div>
-                      <div className="text-xs text-right mt-1 text-[var(--foreground)]">{uploadProgress}%</div>
-                    </div>
-                  )}
-                  <div className="flex gap-3">
-                    <CustomButton title="Upload & Sync" onClick={uploadCsv} className="btn-primary" />
-                    <CustomButton
-                      title="Cancel"
-                      onClick={resetForm}
-                      className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {invoiceFileModal && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-              <div className="bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full max-w-md">
-                <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">Upload File</h3>
-                <div className="space-y-4">
-                  <div>
-                    {/* <label className="input-label">Invoice Type</label>
-                    <ReactSelect
-                        required
-                        value={invoiceType}
-                        onChange={setInvoiceType}
-                        placeholder="Select Invoice Type"
-                        options={invoiceTypesOptions}
-                      /> */}
-
-                    <label className="input-label">Upload Invoice File</label>
-                    <input type="file" accept=".pdf" onChange={handleInvoiceFileChange} className="input-style" />
-                    {invoiceFile && (
-                      <p className="text-sm text-[var(--secondary-foreground)] mt-2">
-                        Selected file: <strong>{invoiceFile.name}</strong>
-                      </p>
-                    )}
-                  </div>
-                  <Error message={error} />
-                  {uploadProgress > 0 && (
-                    <div className="w-full bg-[var(--border)] rounded h-3 mb-2">
-                      <div className="bg-[var(--primary)] h-3 rounded transition-all duration-200" style={{ width: `${uploadProgress}%` }}></div>
-                      <div className="text-xs text-right mt-1 text-[var(--foreground)]">{uploadProgress}%</div>
-                    </div>
-                  )}
-                  <div className="flex gap-3">
-                    <CustomButton title="Upload & Sync" onClick={uploadInvoice} className="btn-primary" />
-                    <CustomButton
-                      title="Cancel"
-                      onClick={resetForm}
-                      className="px-4 py-2 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded-lg font-medium transition-all duration-200"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[var(--secondary-foreground)] text-sm font-medium">Total Vehicles</p>
-                  <p className="text-2xl font-bold text-[var(--foreground)]">{isLoading ? "..." : total}</p>
-                </div>
-                <div className="p-3 bg-[var(--primary)]/10 rounded-lg">
-                  <Car className="w-6 h-6 text-[var(--primary)]" />
-                </div>
-              </div>
-            </div>
-          </div>
+        <div className="p-2 bg-[var(--background)] min-h-screen">
+          {/* Upload Modals */}
+          <FileUploadModal
+            isOpen={csvFileModal}
+            label="Upload CSV File"
+            accept=".csv"
+            file={csvUpload.file}
+            progress={csvUpload.progress}
+            error={csvUpload.error || error}
+            onFileChange={csvUpload.validate}
+            onUpload={() => csvUpload.upload({ onSuccess: (r) => handleUploadSuccess(r, setCsvFileModal), onError: handleUploadError })}
+            onCancel={resetForm}
+            modalRef={csvModalRef}
+          />
+          <FileUploadModal
+            isOpen={invoiceFileModal}
+            label="Upload Invoice File"
+            accept=".pdf"
+            file={invoiceUpload.file}
+            progress={invoiceUpload.progress}
+            error={invoiceUpload.error || error}
+            onFileChange={invoiceUpload.validate}
+            onUpload={() => invoiceUpload.upload({ onSuccess: (r) => handleUploadSuccess(r, setInvoiceFileModal), onError: handleUploadError })}
+            onCancel={resetForm}
+          />
 
           <Error message={error} />
           {customLoader && <Loader />}
 
-          <div className="relative">
-            {isAllowed(["add:csv"], session) ? (
-              <>
-                <div className="absolute right-0 top-0 hidden md:block">
-                  <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
-                </div>
-                <div className="absolute right-60 top-0 hidden md:block">
-                  <CustomButton title="Upload Invoice" onClick={() => setInvoiceFileModal(!invoiceFileModal)} className="btn-primary" icon={<FileUp className="w-5 h-5" />} />
-                </div>
-                <div className="block md:hidden mb-3">
-                  <CustomButton title="Upload CSV File" onClick={() => setCsvFileModal(!csvFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
-                </div>
-                <div className="block md:hidden mb-3">
-                  <CustomButton title="Upload Invoice" onClick={() => setInvoiceFileModal(!invoiceFileModal)} className="w-full btn-primary" icon={<FileUp className="w-5 h-5" />} />
-                </div>
-              </>
-            ) : null}
+          {/* Spreadsheet Toolbar */}
+          <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-[var(--surface)] border border-[var(--border)] border-b-0">
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">
+              Vehicles ({isLoading ? "..." : total})
+            </h2>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--secondary-foreground)]" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSearch(searchInput); }}
+                  className="pl-7 pr-2 py-1 text-xs bg-[var(--input)] border border-[var(--border)] rounded
+                             text-[var(--foreground)] placeholder-[var(--secondary-foreground)]
+                             focus:outline-none focus:border-[var(--primary)] w-48"
+                />
+              </div>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-1 px-2 py-1 text-xs font-medium border rounded transition-colors
+                  ${activeFilterCount > 0
+                    ? "bg-[var(--primary)] text-white border-[var(--primary)]"
+                    : "bg-[var(--secondary)] text-[var(--foreground)] border-[var(--border)] hover:bg-[var(--border)]"
+                  }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              </button>
+              {isAllowed(["add:csv"], session) && (
+                <>
+                  <button
+                    onClick={() => setInvoiceFileModal(true)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium
+                               bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)]
+                               rounded hover:bg-[var(--border)] transition-colors"
+                  >
+                    <FileUp className="w-3.5 h-3.5" /> Invoice
+                  </button>
+                  <button
+                    onClick={() => setCsvFileModal(true)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium
+                               bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)]
+                               rounded hover:bg-[var(--border)] transition-colors"
+                  >
+                    <FileUp className="w-3.5 h-3.5" /> CSV
+                  </button>
+                </>
+              )}
+              {isAllowed(["add:vehicle"], session) && (
+                <button
+                  onClick={handleAddVehicle}
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium
+                             bg-[var(--primary)] text-white rounded hover:bg-[var(--primary-hover)]
+                             transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add
+                </button>
+              )}
+            </div>
+          </div>
 
+          {/* Filter panel */}
+          {showFilters && (
+            <VehicleFilters
+              filters={filters}
+              conjunction={conjunction}
+              onFiltersChange={handleFiltersChange}
+              onConjunctionChange={setConjunction}
+              brandOptions={brandOptions}
+              customerOptions={customerOptions}
+              suggestions={suggestions}
+            />
+          )}
+
+          <div>
             <DataTable
               data={vehicles}
               total={total}
               isLoading={isLoading}
-              searchPlaceholder="Search Vehicles..."
-              onSearch={handleSearch}
+              showSearch={false}
               onSort={handleSort}
               onPageChange={handlePageChange}
-              title="Vehicles"
               sortBy={sortBy}
               sortOrder={sortOrder}
+              variant="spreadsheet"
             >
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  <th id="id">ID</th>
-                  <th id="chassisNumber">Chassis Number</th>
-                  <th id="brand">Brand</th>
-                  <th id="auction">Auction</th>
-                  <th id="lotNumber">Lot #</th>
-                  <th id="invoice">Invoice</th>
-                  <th id="bidAmount">Bid</th>
-                  <th id="bidTax">Bid Tax</th>
-                  <th id="auctionFee">Auction Fee</th>
-                  <th id="auctionTax">Auction Tax</th>
-                  <th id="insuranceFee">Insurance</th>
-                  <th id="insuranceTax">Insurance Tax</th>
-                  <th id="recyclingFee">Recycling</th>
-                  <th id="transportFee">Transport</th>
-                  <th id="transportTax">Transport Tax</th>
-                  <th id="otherFees">Other</th>
-                  <th id="taxProration">Tax Proration</th>
-                  <th id="taxSum">Tax Sum</th>
-                  <th id="totalCost">Total Cost</th>
-                  <th id="customer">Customer</th>
-                  <th id="auctionDate">Date</th>
-                  <th id="session">Session</th>
-                  <th id="transportCompany">Transport Co.</th>
-                  <th id="deliverTo">Deliver To</th>
-                  <th id="numberPlate">Plate #</th>
-                  <th id="titleTransferDeadline">Title Deadline</th>
-                  <th id="containerNumber">Container #</th>
-                  <th id="etd">ETD</th>
-                  <th id="status">Status</th>
-                  <th id="createdAt">Registered</th>
-                  {isAllowed(["edit:vehicle"], session) ? <th id="actions">Actions</th> : null}
+                  {VEHICLE_COLUMNS.map((col) => {
+                    if (col.type === "actions" && !isAllowed(col.requirePermission, session)) return null;
+                    return <th key={col.id} id={col.id} style={{ width: col.width }}>{col.label}</th>;
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {vehicles.map(v => (
-                  <tr key={v.id} className="hover:bg-[var(--input)] transition-colors duration-200">
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm font-mono text-[var(--secondary-foreground)]">#{v.id.toString().padStart(3, "0")}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <Car className="w-4 h-4 text-[var(--primary)]" />
-                        <span className="text-sm font-medium text-[var(--foreground)]">{v.chassisNumber}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.brand?.name || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.auction || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.lotNumber || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {v.sourceInvoiceJob?.DocumentURL ? (
-                        <button
-                          onClick={() => setDocumentPreview({ url: v.sourceInvoiceJob.DocumentURL, fileName: `invoice_${v.sourceInvoiceJob.DocumentURL.split("/").pop()}` })}
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-500 rounded hover:bg-green-500/20 transition-colors"
-                          title="Preview Invoice PDF"
-                          aria-label={`Preview invoice for vehicle ${v.id}`}
-                        >
-                          <FileText className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <span className="text-[var(--secondary-foreground)]">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm font-medium text-[var(--foreground)]">{formatCurrency(v.bidAmount)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.bidTax)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.auctionFee)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.auctionTax)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.insuranceFee)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.insuranceTax)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.recyclingFee)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.transportFee)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--secondary-foreground)]">{formatCurrency(v.transportTax)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.otherFees)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{formatCurrency(v.taxProration)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm font-medium text-[var(--foreground)]">{formatCurrency(v.taxSum)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm font-bold text-[var(--primary)]">{formatCurrency(v.totalCost)}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.customer?.name || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.auctionDate || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.session || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.transportCompany || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.deliverTo || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.numberPlate || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                      {v.titleTransferDeadline ? new Date(v.titleTransferDeadline).toLocaleDateString() : "-"}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.containerNumber || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-sm text-[var(--foreground)]">{v.etd || "-"}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--success)]/10 text-[var(--success)]">{v?.status?.name}</span>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-[var(--secondary-foreground)]">
-                      {new Date(v.createdAt).toLocaleDateString()}
-                    </td>
-                    {isAllowed(["edit:vehicle"], session) && (
-                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => handleEditVehicle(v.id)}
-                            className="p-1.5 text-[var(--secondary-foreground)] hover:text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded transition-all"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteIt(v.id)}
-                            className="p-1.5 text-[var(--secondary-foreground)] hover:text-[var(--error)] hover:bg-[var(--error)]/10 rounded transition-all"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    )}
-                  </tr>
+                  <VehicleRow
+                    key={v.id}
+                    vehicle={v}
+                    canEdit={canEditCharges}
+                    dropdownOptions={dropdownOpts}
+                    comboOpts={comboOpts}
+                    onInlineSave={handleInlineSave}
+                    onInlineError={handleInlineError}
+                    onEdit={handleEditVehicle}
+                    onDelete={deleteIt}
+                    setDocumentPreview={setDocumentPreview}
+                    session={session}
+                  />
                 ))}
               </tbody>
             </DataTable>

@@ -8,6 +8,9 @@ async function initBoss() {
       connectionString: process.env.DATABASE_URL,
       archiveCompletedJobsEvery: "1 hour",
       deleteExpiredJobsEvery: "1 hour",
+      retryLimit: 3,
+      retryDelay: 30,           // seconds between retries
+      expireInHours: 24,        // jobs expire after 24h
     });
 
     await boss.start();

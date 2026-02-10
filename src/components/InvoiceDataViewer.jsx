@@ -6,7 +6,6 @@ import { ArrowLeft, FileUp, ExternalLink, RefreshCw, Trash2, Car, Check, AlertTr
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const router = useRouter();
-  console.log("received data from invoicejob page", data);
   const { confirm, ConfirmComponent } = useConfirm();
 
   // Get vehicles from data - supports both new and legacy formats

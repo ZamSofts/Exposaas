@@ -1,6 +1,59 @@
-import React, { useState, useEffect, cloneElement } from "react";
+import React, { useState, useEffect, useRef, useMemo, cloneElement } from "react";
 import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
+import { useVirtualizer } from "@tanstack/react-virtual";
+
+/** Count the number of <th> columns in the first <thead> <tr>. */
+function getColumnCount(children) {
+  return React.Children.toArray(children).reduce((count, c) => {
+    if (React.isValidElement(c) && c.type === "thead") {
+      const firstRow = React.Children.toArray(c.props.children)[0];
+      if (React.isValidElement(firstRow) && firstRow.type === "tr") {
+        return React.Children.count(firstRow.props.children);
+      }
+    }
+    return count;
+  }, 0);
+}
+
+// Virtual tbody for spreadsheet mode — only renders visible rows
+function VirtualTbody({ rows, scrollContainerRef, estimateSize = 32 }) {
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => estimateSize,
+    overscan: 10,
+  });
+
+  const virtualRows = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+
+  return (
+    <tbody>
+      {virtualRows.length > 0 && (
+        <tr aria-hidden="true">
+          <td
+            style={{ height: virtualRows[0].start, padding: 0, border: "none" }}
+            colSpan={9999}
+          />
+        </tr>
+      )}
+      {virtualRows.map((virtualRow) => rows[virtualRow.index])}
+      {virtualRows.length > 0 && (
+        <tr aria-hidden="true">
+          <td
+            style={{
+              height: totalSize - virtualRows[virtualRows.length - 1].end,
+              padding: 0,
+              border: "none",
+            }}
+            colSpan={9999}
+          />
+        </tr>
+      )}
+    </tbody>
+  );
+}
 
 export default function DataTable({
   children,
@@ -15,12 +68,16 @@ export default function DataTable({
   emptyMessage = "No data found",
   emptyIcon,
   emptyAction,
-  initialPerPage = 5,
+  initialPerPage = 25,
   showPagination = true,
   showSearch = true,
   sortBy = "",
   sortOrder = "asc",
+  variant = "default",
+  disableSortColumns = [],
 }) {
+  const isSpreadsheet = variant === "spreadsheet";
+  const scrollContainerRef = useRef(null);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(initialPerPage);
@@ -69,8 +126,7 @@ export default function DataTable({
 
   const renderSortArrows = (columnId) => {
     if (!onSort) return null;
-    if(columnId==='role') return null; // Disable sorting for role column
-    if(columnId==='permissions') return null; // Disable sorting for col column
+    if (disableSortColumns.includes(columnId)) return null;
     return (
       <div className="flex flex-col">
 
@@ -119,7 +175,16 @@ export default function DataTable({
         if (child.type === "thead") {
           return cloneElement(
             child,
-            {},
+            {
+              className: `${child.props.className || ""} sticky top-0 z-10`.trim(),
+              ...(isSpreadsheet && {
+                style: {
+                  ...(child.props.style || {}),
+                  // Cover sub-pixel gap from border-collapse so content doesn't peek above the sticky header
+                  boxShadow: "0 -2px 0 0 var(--secondary), 0 1px 0 0 var(--border)",
+                },
+              }),
+            },
             React.Children.map(child.props.children, (row) => {
               if (React.isValidElement(row) && row.type === "tr") {
                 return cloneElement(
@@ -128,8 +193,9 @@ export default function DataTable({
                   React.Children.map(row.props.children, (header) => {
                     if (React.isValidElement(header) && header.type === "th") {
                       const columnId = header.props.id;
-                      const defaultHeaderClasses =
-                        "px-6 py-4 text-left text-sm font-medium text-[var(--secondary-foreground)] uppercase tracking-wider whitespace-nowrap";
+                      const defaultHeaderClasses = isSpreadsheet
+                        ? "px-2 py-1.5 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider whitespace-nowrap overflow-hidden border border-[var(--border)]"
+                        : "px-3 py-2 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider whitespace-nowrap";
                       const existingClasses = header.props.className || "";
 
                       if (columnId && onSort) {
@@ -139,7 +205,7 @@ export default function DataTable({
                             ...header.props,
                             className: `${defaultHeaderClasses} ${existingClasses} cursor-pointer`.trim(),
                           },
-                          <div className="flex items-center gap-2" onClick={() => handleSort(columnId)}>
+                          <div className="flex items-center gap-1" onClick={() => handleSort(columnId)}>
                             {header.props.children}
                             {renderSortArrows(columnId)}
                           </div>
@@ -162,39 +228,19 @@ export default function DataTable({
         }
 
         if (child.type === "tbody") {
-          if (isLoading) {
-            // Count columns for loading colspan
-            const headerCount = React.Children.toArray(children).reduce((count, c) => {
-              if (React.isValidElement(c) && c.type === "thead") {
-                const firstRow = React.Children.toArray(c.props.children)[0];
-                if (React.isValidElement(firstRow) && firstRow.type === "tr") {
-                  return React.Children.count(firstRow.props.children);
-                }
-              }
-              return count;
-            }, 0);
+          const headerCount = getColumnCount(children);
 
+          if (isLoading) {
             return (
-              <tbody className="divide-y divide-[var(--border)]">
-                <Skeleton columns={headerCount} rows={perPage} />
+              <tbody className={isSpreadsheet ? "" : "divide-y divide-[var(--border)]"}>
+                <Skeleton columns={headerCount} rows={isSpreadsheet ? Math.min(perPage, 30) : perPage} variant={variant} />
               </tbody>
             );
           }
 
           if (data.length === 0) {
-            // Count columns for empty colspan
-            const headerCount = React.Children.toArray(children).reduce((count, c) => {
-              if (React.isValidElement(c) && c.type === "thead") {
-                const firstRow = React.Children.toArray(c.props.children)[0];
-                if (React.isValidElement(firstRow) && firstRow.type === "tr") {
-                  return React.Children.count(firstRow.props.children);
-                }
-              }
-              return count;
-            }, 0);
-
             return (
-              <tbody className="divide-y divide-[var(--border)]">
+              <tbody className={isSpreadsheet ? "" : "divide-y divide-[var(--border)]"}>
                 <tr>
                   <td colSpan={headerCount} className="text-center py-12">
                     {emptyIcon && <div className="mx-auto mb-4">{emptyIcon}</div>}
@@ -203,6 +249,17 @@ export default function DataTable({
                   </td>
                 </tr>
               </tbody>
+            );
+          }
+
+          // Spreadsheet mode: virtualize rows for performance
+          if (isSpreadsheet) {
+            const rows = React.Children.toArray(child.props.children);
+            return (
+              <VirtualTbody
+                rows={rows}
+                scrollContainerRef={scrollContainerRef}
+              />
             );
           }
 
@@ -216,8 +273,15 @@ export default function DataTable({
     });
   };
 
+  // Memoize children processing to avoid re-traversing on every render
+  const processedChildren = useMemo(
+    () => processChildren(children),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [children, isLoading, data.length, sortBy, sortOrder, isSpreadsheet, perPage]
+  );
+
   return (
-    <div className="space-y-6">
+    <div className={isSpreadsheet ? "" : "space-y-6"}>
       {/* Search Section */}
       {showSearch && (
         <div className="mb-6">
@@ -253,22 +317,27 @@ export default function DataTable({
       )}
 
       {/* Table */}
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden shadow-lg">
+      <div className={isSpreadsheet
+        ? "bg-[var(--surface)] border border-[var(--border)] overflow-hidden"
+        : "bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden shadow-lg"
+      }>
         {title && (
-          <div className="p-6 border-b border-[var(--border)]">
-            <h2 className="text-xl font-semibold text-[var(--foreground)]">
-              {title} ({isLoading ? "..." : data.length})
+          <div className="px-4 py-3 border-b border-[var(--border)]">
+            <h2 className="text-base font-semibold text-[var(--foreground)]">
+              {title} ({isLoading ? "..." : total})
             </h2>
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full">{processChildren(children)}</table>
+        <div ref={isSpreadsheet ? scrollContainerRef : undefined} className={isSpreadsheet ? "overflow-auto max-h-[calc(100vh-140px)] spreadsheet-scroll" : "overflow-auto max-h-[calc(100vh-280px)]"}>
+          <table className={isSpreadsheet ? "w-full border-collapse" : "w-full"} style={isSpreadsheet ? { tableLayout: "fixed" } : undefined}>
+            {processedChildren}
+          </table>
         </div>
 
         {/* Pagination Controls */}
         {showPagination && (
-          <div className="px-6 py-4 border-t border-[var(--border)] bg-[var(--surface)]">
+          <div className={isSpreadsheet ? "px-3 py-1 border-t border-[var(--border)] bg-[var(--surface)]" : "px-4 py-2 border-t border-[var(--border)] bg-[var(--surface)]"}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">
@@ -277,13 +346,15 @@ export default function DataTable({
                     value={perPage}
                     onChange={(e) => handlePerPageChange(Number(e.target.value))}
                     className="px-3 py-1 bg-[var(--input)] border border-[var(--border)] rounded-lg
-                             text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 
+                             text-[var(--foreground)] text-sm focus:outline-none focus:ring-2
                              focus:ring-[var(--primary)] focus:border-transparent transition-all duration-200">
-                    <option value={5}>5</option>
                     <option value={10}>10</option>
-                    <option value={20}>20</option>
+                    <option value={25}>25</option>
                     <option value={50}>50</option>
                     <option value={100}>100</option>
+                    <option value={500}>500</option>
+                    <option value={1000}>1000</option>
+                    <option value={2000}>2000</option>
                   </select>
                 </div>
                 <div className="text-sm text-[var(--secondary-foreground)]">

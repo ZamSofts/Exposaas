@@ -1,5 +1,4 @@
 import { prisma, getSession } from "@/lib/useful";
-import { ensureQueue } from "../../../extra/queues/pgBoss.mjs";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
@@ -104,7 +103,8 @@ export default async function handler(req, res) {
           }
         });
 
-        // Re-queue the job for processing
+        // Re-queue the job for processing (dynamic import to avoid bundling pg-boss for GET requests)
+        const { ensureQueue } = await import("../../../extra/queues/pgBoss.mjs");
         const boss = await ensureQueue("gemini-extract-page");
         await boss.send("gemini-extract-page", {
           invoiceJobId: job.id,

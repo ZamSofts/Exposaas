@@ -338,6 +338,7 @@ export default function Role() {
             title="Roles"
             sortBy={sortBy}
             sortOrder={sortOrder}
+            disableSortColumns={["permissions"]}
           >
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">

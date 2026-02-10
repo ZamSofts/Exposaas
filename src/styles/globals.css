@@ -22,6 +22,30 @@
   --error: hsl(0, 84.2%, 60.2%);
 
   --radius: 8px;
+
+  /* Badge (neutral bg + colored dot) */
+  --badge-bg: #21262d;
+  --badge-border: #30363d;
+  --badge-text: #e6edf3;
+  --badge-bg-hover: #30363d;
+
+  /* Dot palette */
+  --dot-red: #f87171;
+  --dot-green: #34d399;
+  --dot-blue: #60a5fa;
+  --dot-purple: #a78bfa;
+  --dot-orange: #fb923c;
+  --dot-pink: #f472b6;
+  --dot-teal: #2dd4bf;
+  --dot-yellow: #facc15;
+  --dot-indigo: #818cf8;
+  --dot-emerald: #6ee7b7;
+  --dot-sky: #38bdf8;
+  --dot-fuchsia: #e879f9;
+  --dot-stone: #a8a29e;
+  --dot-amber: #fbbf24;
+  --dot-lime: #a3e635;
+  --dot-cyan: #22d3ee;
 }
 
 /* Light Theme */
@@ -46,6 +70,30 @@
   --error: hsl(0, 84.2%, 60.2%);
 
   --radius: 8px;
+
+  /* Badge (neutral bg + colored dot) — light mode */
+  --badge-bg: #f3f4f6;
+  --badge-border: #d1d5db;
+  --badge-text: #374151;
+  --badge-bg-hover: #e5e7eb;
+
+  /* Dot palette — light mode (slightly more saturated) */
+  --dot-red: #ef4444;
+  --dot-green: #22c55e;
+  --dot-blue: #3b82f6;
+  --dot-purple: #8b5cf6;
+  --dot-orange: #f97316;
+  --dot-pink: #ec4899;
+  --dot-teal: #14b8a6;
+  --dot-yellow: #eab308;
+  --dot-indigo: #6366f1;
+  --dot-emerald: #10b981;
+  --dot-sky: #0ea5e9;
+  --dot-fuchsia: #d946ef;
+  --dot-stone: #78716c;
+  --dot-amber: #f59e0b;
+  --dot-lime: #84cc16;
+  --dot-cyan: #06b6d4;
 }
 
 body {
@@ -109,6 +157,32 @@ body {
 .scrollbar-primary::-webkit-scrollbar-thumb:hover {
   background: var(--primary-hover);
   opacity: 1;
+}
+
+/* Spreadsheet table scrollbar — always visible, higher contrast */
+.spreadsheet-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.spreadsheet-scroll::-webkit-scrollbar-track {
+  background: var(--secondary);
+  border-left: 1px solid var(--border);
+}
+
+.spreadsheet-scroll::-webkit-scrollbar-thumb {
+  background: var(--secondary-foreground);
+  border-radius: 5px;
+  border: 2px solid var(--secondary);
+}
+
+.spreadsheet-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+.spreadsheet-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: var(--secondary-foreground) var(--secondary);
 }
 
 /* Hidden scrollbar but still scrollable */

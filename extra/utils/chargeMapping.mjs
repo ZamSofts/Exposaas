@@ -1,16 +1,11 @@
 export const CHARGE_TYPE_MAP = {
   bid_amount: "bidAmount",
-  bid_tax: "bidTax",
   auction_fee: "auctionFee",
-  auction_tax: "auctionTax",
   insurance_fee: "insuranceFee",
-  insurance_tax: "insuranceTax",
   recycling_fee: "recyclingFee",
   recycle_fee: "recyclingFee",
   transport_fee: "transportFee",
   shipping_fee: "transportFee",
-  tax_proration: "taxProration",
-  transport_tax: "transportTax",
   other_fee: "otherFees",
   other_fees: "otherFees",
   listing_fee: "otherFees",
@@ -19,31 +14,27 @@ export const CHARGE_TYPE_MAP = {
   winning_price: "bidAmount",
   auction_house_charges: "auctionFee",
   transportation: "transportFee",
-  "tax_(from_auction)": "auctionTax",
-  "tax_(from_transportation)": "transportTax",
 };
-
-export const TAX_COLUMNS = [
-  "bidTax",
-  "auctionTax",
-  "insuranceTax",
-  "transportTax",
-  "taxProration",
-];
 
 export const ALL_CHARGE_COLUMNS = [
   "bidAmount",
-  "bidTax",
   "auctionFee",
-  "auctionTax",
   "insuranceFee",
-  "insuranceTax",
   "recyclingFee",
   "transportFee",
-  "transportTax",
-  "taxProration",
   "otherFees",
 ];
+
+// Columns included in tax base (recyclingFee is tax-exempt)
+export const TAX_BASE_COLUMNS = [
+  "bidAmount",
+  "auctionFee",
+  "insuranceFee",
+  "transportFee",
+  "otherFees",
+];
+
+export const TAX_RATE = 0.1;
 
 export const METADATA_CSV_MAP = {
   // Programmatic keys
@@ -58,12 +49,28 @@ export const METADATA_CSV_MAP = {
   container_number: "containerNumber",
   container_numer: "containerNumber", // typo in spreadsheet header
   etd: "etd",
-  memo: "remarks",
-
-  // Human-readable CSV headers (after normalization)
-  "transportation_co...": "transportCompany",
-  "title_transfer_deadl...": "titleTransferDeadline",
+  document: "documentStatus",
+  document_status: "documentStatus",
+  memo: "memo",
 };
+
+/**
+ * Calculate taxSum and totalCost from charge fields.
+ * Used for inline single-field updates where one charge column changes.
+ * @param {Object} currentCharges — current vehicle record (with charge columns)
+ * @param {string} updatedField — the field being changed
+ * @param {number|null} updatedValue — the new value for that field
+ * @returns {{ taxSum: number, totalCost: number }}
+ */
+export function calculateTaxAndTotal(currentCharges, updatedField, updatedValue) {
+  const charges = {};
+  for (const col of ALL_CHARGE_COLUMNS) {
+    charges[col] = col === updatedField ? (updatedValue || 0) : (currentCharges[col] ? Number(currentCharges[col]) : 0);
+  }
+  const taxSum = TAX_BASE_COLUMNS.reduce((sum, col) => sum + (charges[col] || 0), 0) * TAX_RATE;
+  const totalCost = ALL_CHARGE_COLUMNS.reduce((sum, col) => sum + (charges[col] || 0), 0) + taxSum;
+  return { taxSum, totalCost };
+}
 
 export function parseChargeFieldsFromFlat(row) {
   const charges = {};
@@ -86,14 +93,13 @@ export function parseChargeFieldsFromFlat(row) {
     }
   }
 
-  if (Object.keys(charges).length > 0) {
-    charges.totalCost = ALL_CHARGE_COLUMNS.reduce(
-      (sum, col) => sum + (charges[col] || 0), 0
-    );
-    charges.taxSum = TAX_COLUMNS.reduce(
-      (sum, col) => sum + (charges[col] || 0), 0
-    );
-  }
+  // Always calculate — null/empty = 0
+  charges.taxSum = TAX_BASE_COLUMNS.reduce(
+    (sum, col) => sum + (charges[col] || 0), 0
+  ) * TAX_RATE;
+  charges.totalCost = ALL_CHARGE_COLUMNS.reduce(
+    (sum, col) => sum + (charges[col] || 0), 0
+  ) + charges.taxSum;
 
   return charges;
 }

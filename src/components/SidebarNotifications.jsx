@@ -190,25 +190,9 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
   // Request notification permission on component mount
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().then(permission => {
-        console.log("🔔 Sidebar notification permission:", permission);
-      });
+      Notification.requestPermission();
     }
   }, []);
-
-  // Debug: indicate the component mounted in browser console
-  useEffect(() => {
-    console.log("🔔 SidebarNotifications mounted", {
-      isCollapsed,
-      session: session
-        ? {
-            id: session.id,
-            username: session.username,
-            companyId: session.companyId,
-          }
-        : "No session",
-    });
-  }, [isCollapsed, session]);
 
   // Close notification dropdown when clicking outside
   useEffect(() => {
