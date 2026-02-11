@@ -338,14 +338,13 @@ export default function Role() {
             title="Roles"
             sortBy={sortBy}
             sortOrder={sortOrder}
-            disableSortColumns={["permissions"]}
           >
             {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
                 <th id="id">ID</th>
                 <th id="name">Name</th>
-                <th id="permissions">Permissions</th>
+                <th >Permissions</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>

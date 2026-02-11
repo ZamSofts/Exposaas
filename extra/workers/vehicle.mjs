@@ -188,10 +188,6 @@ let boss;
                   count += ops.length;
                 }
               }
-
-              console.log("CSV Processed: ", count, "for company: ", companyId);
-
-              // Send success notification if userId/companyId provided
               if (userId && companyId) {
                 try {
                   await NotificationService.createAndSend({
@@ -214,10 +210,7 @@ let boss;
 
               resolve({ processed: count });
             } catch (error) {
-              console.error(error);
               console.log({ error: "Database insert/update failed" });
-
-              // Notify user of failure if possible
               if (userId && companyId) {
                 try {
                   await NotificationService.createAndSend({

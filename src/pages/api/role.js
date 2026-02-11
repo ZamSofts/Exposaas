@@ -2,9 +2,6 @@ import { prisma, getSession } from "@/lib/useful";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
-  if (!["Sadmin", "Admin"].includes(session.role)) {
-    return res.status(403).json({ error: "Only administrators can manage roles" });
-  }
 
   const id = Number(req.query.id);
   const page = Number(req.query.page) || 1;

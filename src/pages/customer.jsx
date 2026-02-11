@@ -22,7 +22,6 @@ export default function Customers() {
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [visiblePasswords, setVisiblePasswords] = useState([]);
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
   // Pagination and search states
@@ -34,11 +33,9 @@ export default function Customers() {
   const [sortBy, setSortBy] = useState("id");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  // Reload data when pagination, search, or sorting changes
   useEffect(() => {
     loadData();
-  }, [currentPage, perPage, search, sortBy, sortOrder]);
-
+  }, [currentPage, perPage, search, sortBy, sortOrder]); 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
   };

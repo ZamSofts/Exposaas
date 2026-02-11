@@ -74,7 +74,6 @@ export default function DataTable({
   sortBy = "",
   sortOrder = "asc",
   variant = "default",
-  disableSortColumns = [],
 }) {
   const isSpreadsheet = variant === "spreadsheet";
   const scrollContainerRef = useRef(null);
@@ -126,7 +125,7 @@ export default function DataTable({
 
   const renderSortArrows = (columnId) => {
     if (!onSort) return null;
-    if (disableSortColumns.includes(columnId)) return null;
+
     return (
       <div className="flex flex-col">
 
