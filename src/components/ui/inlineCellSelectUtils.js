@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { getColorForValue } from "@/lib/colorLabel";
 
-/** Auto-focus a react-select ref on mount. */
 export function useAutoFocusSelect(selectRef) {
   useEffect(() => {
     if (selectRef.current) {
@@ -10,7 +9,6 @@ export function useAutoFocusSelect(selectRef) {
   }, []);
 }
 
-/** Create an Escape key handler that calls onCancel. */
 export function handleEscapeKey(onCancel) {
   return (e) => {
     if (e.key === "Escape") {
@@ -20,10 +18,6 @@ export function handleEscapeKey(onCancel) {
   };
 }
 
-/**
- * Format option label with a color dot.
- * @param {boolean} isCreatable — if true, skip color for __isNew__ options
- */
 export function formatOptionLabelWithColor(option, { isCreatable = false } = {}) {
   if (isCreatable && option.__isNew__) return option.label;
   const dotColor = getColorForValue(option.label);
@@ -40,7 +34,6 @@ export function formatOptionLabelWithColor(option, { isCreatable = false } = {})
   );
 }
 
-/** Shared react-select props for portaled inline menus. */
 export const SHARED_SELECT_PROPS = {
   menuPortalTarget: typeof document !== "undefined" ? document.body : null,
   menuPosition: "fixed",

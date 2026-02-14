@@ -1,18 +1,18 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import {useAuth , API,useConfirm  } from "@/hooks/wrapper";
-import { Bell, X, CheckCircle, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
+import { Bell, X, CheckCircle, AlertCircle, Trash2 } from "lucide-react";
 import wsClient from "@/lib/wsClient";
 
 const SidebarNotifications = ({ isCollapsed = false }) => {
   const { session } = useAuth([], ["sadmin", "customer"]);
   const { confirm, ConfirmComponent } = useConfirm();
-  const wsRef = useRef(null);
   const buttonRef = useRef(null);
   const [notifications, setNotifications] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ right: 0, left: "auto" });
+  const hasLoadedRef = useRef(false);
 
   const loadNotifications = useCallback(async () => {
     if (!session?.id) return;
@@ -180,12 +180,12 @@ const SidebarNotifications = ({ isCollapsed = false }) => {
     };
   }, [session?.id, session?.companyId, session?.username, handleNotification]);
 
-  // Load notifications on mount
-  useEffect(() => {
-    if (session?.id) {
-      loadNotifications();
-    }
-  }, [session?.id, loadNotifications]);
+ useEffect(() => {
+  if (showNotifications && session?.id && !hasLoadedRef.current) {
+    loadNotifications();
+    hasLoadedRef.current = true;
+  }
+}, [showNotifications, session?.id, loadNotifications]);
 
   // Request notification permission on component mount
   useEffect(() => {

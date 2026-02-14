@@ -13,7 +13,6 @@ export const CHARGE_TYPE_MAP = {
   admin_fee: "otherFees",
   discount: "otherFees",
 
-  // Human-readable CSV headers (after csv-parser normalization: lowercase, spaces→underscores)
   winning_price: "bidAmount",
   auction_house_charges: "auctionFee",
   transportation: "transportFee",
@@ -28,7 +27,6 @@ export const ALL_CHARGE_COLUMNS = [
   "otherFees",
 ];
 
-// Columns included in tax base (recyclingFee is tax-exempt)
 export const TAX_BASE_COLUMNS = [
   "bidAmount",
   "auctionFee",
@@ -57,14 +55,6 @@ export const METADATA_CSV_MAP = {
   memo: "memo",
 };
 
-/**
- * Calculate taxSum and totalCost from charge fields.
- * Used for inline single-field updates where one charge column changes.
- * @param {Object} currentCharges — current vehicle record (with charge columns)
- * @param {string} updatedField — the field being changed
- * @param {number|null} updatedValue — the new value for that field
- * @returns {{ taxSum: number, totalCost: number }}
- */
 export function calculateTaxAndTotal(currentCharges, updatedField, updatedValue) {
   const charges = {};
   for (const col of ALL_CHARGE_COLUMNS) {

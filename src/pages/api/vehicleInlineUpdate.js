@@ -141,7 +141,7 @@ export default async function handler(req, res) {
       },
     });
 
-    return res.json({ message: "Updated", vehicle: updated });
+    return res.json({ message: "Vehicle Updated successfully", vehicle: updated });
   } catch (error) {
     console.error("Inline update error:", error);
     if (error.code === "P2002") {

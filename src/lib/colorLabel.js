@@ -1,11 +1,3 @@
-/**
- * Deterministic color assignment for badge dots.
- *
- * Returns a CSS variable name (e.g. "var(--dot-blue)") for a given string value.
- * The same value always maps to the same dot color.
- * Light/dark adaptation handled by CSS variables in globals.css.
- */
-
 const DOT_PALETTE = [
   "var(--dot-blue)",
   "var(--dot-green)",
@@ -33,11 +25,6 @@ function hashString(str) {
   return Math.abs(hash);
 }
 
-/**
- * Get a dot color CSS variable for a value.
- * @param {string} value
- * @returns {string|null} CSS variable string like "var(--dot-blue)", or null if empty
- */
 export function getColorForValue(value) {
   if (!value) return null;
   const str = String(value).trim();

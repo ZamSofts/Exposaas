@@ -33,8 +33,8 @@ model Customer {
   updatedAt DateTime  @updatedAt
   userId    Int?      @unique
   user      User?     @relation(fields: [userId], references: [id])
-  companyId Int
-  company   Company   @relation(fields: [companyId], references: [id])
+  companyId Int?
+  company   Company?   @relation(fields: [companyId], references: [id])
 
   @@unique([companyId, uniqueId])
   @@index([companyId])

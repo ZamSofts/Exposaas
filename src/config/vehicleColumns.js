@@ -1,18 +1,3 @@
-/**
- * Vehicle spreadsheet column definitions.
- *
- * Each column defines how it is rendered in both <thead> and <tbody>.
- * Column `type` values:
- *   "text" | "number" | "date" | "dropdown" | "combobox"  → EditableCell
- *   "static"                → custom render function in a read-only <td>
- *   "readonly-currency"     → formatted ¥ value, not editable
- *   "actions"               → Edit/Delete buttons (requires permission)
- *
- * `optionsKey` for dropdowns: key in dropdownOptions object (e.g. "brandOptions")
- * `optionsKey` for comboboxes: key in suggestions object (e.g. "auction")
- */
-
-// Format currency with ¥ symbol
 export const formatCurrency = (value) => {
   if (value === null || value === undefined) return "-";
   const num = parseFloat(value);
@@ -218,12 +203,6 @@ export const VEHICLE_COLUMNS = [
   },
 ];
 
-// ── Filter configuration (Lark Base style) ──────────────────────────
-
-/**
- * Operators available per filter type.
- * Each entry: { value: "prismaOperator", label: "Display label" }
- */
 export const FILTER_OPERATORS = {
   text: [
     { value: "is", label: "Is" },
@@ -269,20 +248,14 @@ export const FILTER_OPERATORS = {
   ],
 };
 
-/**
- * Columns available for filtering, derived from VEHICLE_COLUMNS.
- * Excludes static and actions columns.
- */
 export const FILTERABLE_COLUMNS = VEHICLE_COLUMNS
   .filter(col => !["static", "actions"].includes(col.type))
   .map(col => {
-    // Normalize filter type
     let filterType = col.type;
     if (filterType === "readonly-currency" || filterType === "readonly-currency-primary") {
       filterType = "number";
     }
 
-    // Prisma path for relation fields (brand → brand.name, customer → customer.name)
     let prismaPath = col.field;
     if (col.id === "brand") prismaPath = "brand.name";
     else if (col.id === "customer") prismaPath = "customer.name";

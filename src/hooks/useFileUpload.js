@@ -1,24 +1,11 @@
 import { useState } from "react";
 import { API } from "@/hooks/wrapper";
 
-/**
- * Reusable file upload hook with validation and fake progress bar.
- *
- * @param {Object} config
- * @param {string}   config.endpoint        API endpoint name (e.g. "addVehicle")
- * @param {string}   config.method          HTTP method (e.g. "POST" | "PUT")
- * @param {string[]} config.validExtensions Allowed file extensions (e.g. ["csv"])
- * @param {string[]} config.validMimeTypes  Allowed MIME types
- * @param {string}   config.fileLabel       Human label for error messages (e.g. "CSV")
- *
- * @returns {{ file, progress, error, validate, upload, reset }}
- */
 export default function useFileUpload({ endpoint, method, validExtensions, validMimeTypes, fileLabel }) {
   const [file, setFile] = useState(null);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
 
-  /** Validate a file input change event. Sets file or error. */
   const validate = (e) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
@@ -33,12 +20,6 @@ export default function useFileUpload({ endpoint, method, validExtensions, valid
     setError("");
   };
 
-  /**
-   * Upload the file with a fake progress bar.
-   * @param {Object}   callbacks
-   * @param {Function} callbacks.onSuccess  Called with API response on success
-   * @param {Function} callbacks.onError    Called with error message string
-   */
   const upload = async ({ onSuccess, onError } = {}) => {
     if (!file) {
       const msg = `Please select a valid ${fileLabel} file first.`;

@@ -85,10 +85,13 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   useEffect(() => {
     if (status === "authenticated" && session) {
       setCompanyId(Number(session.companyId));
-      loadInitialData();
     }
   }, [status, session]);
 
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+  
   useEffect(() => {
     if (isEditMode) {
       loadData();
@@ -248,9 +251,9 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const editData = async () => {
     if (!isValid({ auctionDate: auctionDate, titleTransferDeadline: titleTransferDeadline }, setError)) return;
     if (!brandId || !chassisNumber) {
-        setError(!brandId ? "Please select a brand" : "Chassis number is required");
-        return;
-      }
+      setError(!brandId ? "Please select a brand" : "Chassis number is required");
+      return;
+    }
 
     setCustomLoader(true);
     setError("");
