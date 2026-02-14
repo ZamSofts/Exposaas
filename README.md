@@ -1,709 +1,89 @@
-# ExpoSaaS - Next.js with PostgreSQL
+# Exposaas
 
-A clean Next.js application with PostgreSQL backend integration.
+AI-powered invoice data extraction for Japanese car exporters. Upload auction invoice PDFs, extract vehicle and charge data with Gemini AI, review and correct with human-in-the-loop, and track payments.
 
-## 🏗️ Project Structure
+## Prerequisites
 
-### Frontend (Next.js)
+- Node.js 22+
+- PostgreSQL 14+
+- Azure Blob Storage account
+- Google Gemini API key
 
-- **Pages**: `src/pages/` - Your React components that become routes
-- **Components**: Can be added in `src/components/` for reusable UI
-- **Styles**: `src/styles/` - CSS and styling files
+## Local Development
 
-### Backend (API Routes)
-
-- **API Routes**: `src/pages/api/` - Your backend endpoints
-- **Database**: `src/lib/db.ts` - PostgreSQL connection utilities
-- **Current Endpoints**:
-  - `GET /api/users` - Fetch all users
-  - `POST /api/users` - Create a new user
-
-## 🗄️ Database Setup
-
-1. **Install PostgreSQL** on your system
-2. **Create a database** called `exposaas_db`
-3. **Update database credentials** in `.env.local`:
-   ```
-   DATABASE_URL=postgresql://username:password@localhost:5432/exposaas_db
-   ```
-4. **Initialize the database**:
-   ```bash
-   npm run init-db
-   ```
-
-## 🚀 Getting Started
-
-1. **Install dependencies**:
-
+1. **Install dependencies:**
    ```bash
    npm install
    ```
 
-2. **Set up environment variables**:
-
-   - Copy `.env.local` and update with your PostgreSQL credentials
-
-3. **Initialize database**:
-
+2. **Set up environment variables:**
    ```bash
-   npm run init-db
+   cp .env.example .env
+   # Edit .env with your credentials
    ```
 
-4. **Start development server**:
+3. **Set up database:**
+   ```bash
+   npx prisma migrate dev
+   ```
 
+4. **Start development server:**
    ```bash
    npm run dev
    ```
+   This starts Next.js + all workers + WebSocket server concurrently.
 
-5. **Open your browser** to [http://localhost:3000](http://localhost:3000)
+5. Open [http://localhost:3000](http://localhost:3000)
 
-6. **Test the database** by visiting [http://localhost:3000/users](http://localhost:3000/users)
+## Production Deployment (Docker)
 
-## 📁 File Explanations
+1. **Prepare environment file:**
+   ```bash
+   cp .env.example .env.docker
+   # Edit .env.docker with production values:
+   #   - DATABASE_URL → production PostgreSQL
+   #   - GEMINI_API_KEY → production key
+   #   - AZURE_* → production storage
+   #   - NEXT_PUBLIC_WS_URL → ws://<server-ip>:5000
+   #   - NEXTAUTH_SECRET → generate with: openssl rand -base64 32
+   ```
 
-- **`src/pages/_app.tsx`** - Root component that wraps all pages
-- **`src/pages/index.tsx`** - Home page
-- **`src/pages/users.tsx`** - User management page (frontend)
-- **`src/pages/api/users.ts`** - User API endpoints (backend)
-- **`src/lib/db.ts`** - Database connection and query utilities
-- **`scripts/init-db.ts`** - Database initialization script
+2. **Build and start:**
+   ```bash
+   docker-compose up --build -d
+   ```
 
-## 🛠️ Available Scripts
+3. **Verify:**
+   ```bash
+   docker logs exposaas
+   ```
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run init-db` - Initialize database tables and sample data
+## Updating Production
 
-## 📚 Next Steps
-
-1. **Learn Next.js fundamentals**:
-
-   - Pages and routing
-   - API routes
-   - Static and server-side rendering
-
-2. **Extend the database**:
-
-   - Add more tables in `scripts/init-db.ts`
-   - Create new API endpoints in `src/pages/api/`
-
-3. **Build features**:
-   - User authentication
-   - CRUD operations
-   - File uploads
-   - Email notificationss
-
-## 🔗 Useful Resources
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [React Documentation](https://reactjs.org/docs/)
-
+```bash
+git pull origin main
+docker-compose up --build -d
 ```
-Exposaas
-├─ .prettierrc
-├─ cleanup-jobs.js
-├─ eslint.config.mjs
-├─ inspect-redis.js
-├─ memory-monitor.js
-├─ next.config.js
-├─ package-lock.json
-├─ package.json
-├─ postcss.config.mjs
-├─ prisma
-│  ├─ migrations
-│  │  ├─ 20250810070258_initial_schema
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810070403_add_company_details
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810093108_dd
-│  │  │  └─ migration.sql
-│  │  ├─ 20250815163921_update_for_detlet
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820124624_add_vehicle_model
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820145741_add_brand_table
-│  │  │  └─ migration.sql
-│  │  ├─ 20250822044739_add_vehicle_status
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
-│  │  │  └─ migration.sql
-│  │  └─ migration_lock.toml
-│  ├─ schema.prisma
-│  └─ seed.js
-├─ public
-│  ├─ favicon.ico
-│  ├─ file.svg
-│  ├─ globe.svg
-│  ├─ next.svg
-│  ├─ vercel.svg
-│  └─ window.svg
-├─ README.md
-├─ src
-│  ├─ components
-│  │  ├─ Sidebar.jsx
-│  │  └─ ui
-│  │     ├─ ConfirmModal.jsx
-│  │     ├─ CustomButton.jsx
-│  │     ├─ CustomToast.jsx
-│  │     ├─ DataTable.jsx
-│  │     ├─ Error.jsx
-│  │     ├─ MultiSelect.jsx
-│  │     ├─ SingleSelecter.jsx
-│  │     └─ Skeleton.jsx
-│  ├─ generated
-│  ├─ hooks
-│  │  ├─ useAuth.js
-│  │  ├─ useTheme.js
-│  │  └─ wrapper.js
-│  ├─ lib
-│  │  ├─ auth.js
-│  │  ├─ db.js
-│  │  └─ useful.js
-│  ├─ middleware.js
-│  ├─ pages
-│  │  ├─ api
-│  │  │  ├─ addVehicle.js
-│  │  │  ├─ auth
-│  │  │  │  └─ [...nextauth].js
-│  │  │  ├─ brand.js
-│  │  │  ├─ company.js
-│  │  │  ├─ permission.js
-│  │  │  ├─ role.js
-│  │  │  ├─ socket_io.js
-│  │  │  ├─ user.js
-│  │  │  ├─ vehicle.js
-│  │  │  └─ vehicleStatus.js
-│  │  ├─ chat.jsx
-│  │  ├─ company.jsx
-│  │  ├─ dashboard.jsx
-│  │  ├─ index.jsx
-│  │  ├─ role.jsx
-│  │  ├─ user.jsx
-│  │  ├─ vehicle.jsx
-│  │  ├─ _app.jsx
-│  │  └─ _document.jsx
-│  ├─ queues
-│  │  └─ vehicle.js
-│  ├─ styles
-│  │  └─ globals.css
-│  ├─ utils
-│  │  └─ reactSelectStyles.js
-│  └─ workers
-│     ├─ prismaClient.js
-│     └─ vehicle.js
-└─ uploads
 
-```
-```
-Exposaas
-├─ .prettierrc
-├─ cleanup-jobs.js
-├─ eslint.config.mjs
-├─ inspect-redis.js
-├─ memory-monitor.js
-├─ next.config.js
-├─ package-lock.json
-├─ package.json
-├─ postcss.config.mjs
-├─ prisma
-│  ├─ migrations
-│  │  ├─ 20250810070258_initial_schema
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810070403_add_company_details
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810093108_dd
-│  │  │  └─ migration.sql
-│  │  ├─ 20250815163921_update_for_detlet
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820124624_add_vehicle_model
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820145741_add_brand_table
-│  │  │  └─ migration.sql
-│  │  ├─ 20250822044739_add_vehicle_status
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
-│  │  │  └─ migration.sql
-│  │  └─ migration_lock.toml
-│  ├─ schema.prisma
-│  └─ seed.js
-├─ public
-│  ├─ favicon.ico
-│  ├─ file.svg
-│  ├─ globe.svg
-│  ├─ next.svg
-│  ├─ vercel.svg
-│  └─ window.svg
-├─ README.md
-├─ src
-│  ├─ components
-│  │  ├─ Sidebar.jsx
-│  │  └─ ui
-│  │     ├─ ConfirmModal.jsx
-│  │     ├─ CustomButton.jsx
-│  │     ├─ CustomToast.jsx
-│  │     ├─ DataTable.jsx
-│  │     ├─ Error.jsx
-│  │     ├─ MultiSelect.jsx
-│  │     ├─ SingleSelecter.jsx
-│  │     └─ Skeleton.jsx
-│  ├─ generated
-│  ├─ hooks
-│  │  ├─ useAuth.js
-│  │  ├─ useTheme.js
-│  │  └─ wrapper.js
-│  ├─ lib
-│  │  ├─ auth.js
-│  │  ├─ db.js
-│  │  └─ useful.js
-│  ├─ middleware.js
-│  ├─ pages
-│  │  ├─ api
-│  │  │  ├─ addVehicle.js
-│  │  │  ├─ auth
-│  │  │  │  └─ [...nextauth].js
-│  │  │  ├─ brand.js
-│  │  │  ├─ company.js
-│  │  │  ├─ permission.js
-│  │  │  ├─ role.js
-│  │  │  ├─ socket_io.js
-│  │  │  ├─ user.js
-│  │  │  ├─ vehicle.js
-│  │  │  └─ vehicleStatus.js
-│  │  ├─ chat.jsx
-│  │  ├─ company.jsx
-│  │  ├─ dashboard.jsx
-│  │  ├─ index.jsx
-│  │  ├─ role.jsx
-│  │  ├─ user.jsx
-│  │  ├─ vehicle.jsx
-│  │  ├─ _app.jsx
-│  │  └─ _document.jsx
-│  ├─ queues
-│  │  └─ vehicle.js
-│  ├─ styles
-│  │  └─ globals.css
-│  ├─ utils
-│  │  └─ reactSelectStyles.js
-│  └─ workers
-│     ├─ prismaClient.js
-│     └─ vehicle.js
-└─ uploads
+## Rollback
 
+```bash
+docker-compose down
+git checkout <previous-commit>
+docker-compose up --build -d
 ```
-```
-Exposaas
-├─ .prettierrc
-├─ cleanup-jobs.js
-├─ eslint.config.mjs
-├─ extra
-│  ├─ queues
-│  │  └─ vehicle.js
-│  ├─ webSocket
-│  │  └─ ws-server.js
-│  └─ workers
-│     ├─ prismaClient.js
-│     └─ vehicle.js
-├─ inspect-redis.js
-├─ memory-monitor.js
-├─ next.config.js
-├─ package-lock.json
-├─ package.json
-├─ postcss.config.mjs
-├─ prisma
-│  ├─ migrations
-│  │  ├─ 20250810070258_initial_schema
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810070403_add_company_details
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810093108_dd
-│  │  │  └─ migration.sql
-│  │  ├─ 20250815163921_update_for_detlet
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820124624_add_vehicle_model
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820145741_add_brand_table
-│  │  │  └─ migration.sql
-│  │  ├─ 20250822044739_add_vehicle_status
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
-│  │  │  └─ migration.sql
-│  │  ├─ 20250828112721_add_simple_chat_messages
-│  │  │  └─ migration.sql
-│  │  └─ migration_lock.toml
-│  ├─ schema.prisma
-│  └─ seed.js
-├─ public
-│  ├─ favicon.ico
-│  ├─ file.svg
-│  ├─ globe.svg
-│  ├─ next.svg
-│  ├─ vercel.svg
-│  └─ window.svg
-├─ README.md
-├─ src
-│  ├─ components
-│  │  ├─ Sidebar.jsx
-│  │  └─ ui
-│  │     ├─ ConfirmModal.jsx
-│  │     ├─ CustomButton.jsx
-│  │     ├─ CustomToast.jsx
-│  │     ├─ DataTable.jsx
-│  │     ├─ Error.jsx
-│  │     ├─ MultiSelect.jsx
-│  │     ├─ SingleSelecter.jsx
-│  │     └─ Skeleton.jsx
-│  ├─ generated
-│  ├─ hooks
-│  │  ├─ useAuth.js
-│  │  ├─ useTheme.js
-│  │  └─ wrapper.js
-│  ├─ lib
-│  │  ├─ auth.js
-│  │  ├─ db.js
-│  │  └─ useful.js
-│  ├─ middleware.js
-│  ├─ pages
-│  │  ├─ api
-│  │  │  ├─ addVehicle.js
-│  │  │  ├─ auth
-│  │  │  │  └─ [...nextauth].js
-│  │  │  ├─ brand.js
-│  │  │  ├─ company.js
-│  │  │  ├─ permission.js
-│  │  │  ├─ role.js
-│  │  │  ├─ user.js
-│  │  │  ├─ vehicle.js
-│  │  │  └─ vehicleStatus.js
-│  │  ├─ chat.jsx
-│  │  ├─ company.jsx
-│  │  ├─ dashboard.jsx
-│  │  ├─ index.jsx
-│  │  ├─ role.jsx
-│  │  ├─ user.jsx
-│  │  ├─ vehicle.jsx
-│  │  ├─ _app.jsx
-│  │  └─ _document.jsx
-│  ├─ styles
-│  │  └─ globals.css
-│  └─ utils
-│     └─ reactSelectStyles.js
-└─ uploads
 
-```
-```
-Exposaas
-├─ .prettierrc
-├─ clean-redis.js
-├─ eslint.config.mjs
-├─ extra
-│  ├─ PrismaClient
-│  │  └─ prismaClient.mjs
-│  ├─ queues
-│  │  ├─ pdfInvoice.mjs
-│  │  └─ vehicle.mjs
-│  ├─ webSocket
-│  │  └─ ws.mjs
-│  └─ workers
-│     ├─ geminiProcess.mjs
-│     ├─ invoice.mjs
-│     └─ vehicle.mjs
-├─ inspect-redis.js
-├─ memory-monitor.js
-├─ next.config.js
-├─ package-lock.json
-├─ package.json
-├─ postcss.config.mjs
-├─ prisma
-│  ├─ migrations
-│  │  ├─ 20250810070258_initial_schema
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810070403_add_company_details
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810093108_dd
-│  │  │  └─ migration.sql
-│  │  ├─ 20250815163921_update_for_detlet
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820124624_add_vehicle_model
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820145741_add_brand_table
-│  │  │  └─ migration.sql
-│  │  ├─ 20250822044739_add_vehicle_status
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
-│  │  │  └─ migration.sql
-│  │  ├─ 20250828112721_add_simple_chat_messages
-│  │  │  └─ migration.sql
-│  │  ├─ 20250902104102_add_vehicle_documents
-│  │  │  └─ migration.sql
-│  │  ├─ 20250903153750_rename_docurl_to_url
-│  │  │  └─ migration.sql
-│  │  ├─ 20250907064548_add_companyid_to_role_with_default
-│  │  │  └─ migration.sql
-│  │  ├─ 20250907065329_update_role_companyid_to_nullable
-│  │  │  └─ migration.sql
-│  │  ├─ 20250912124615_add_amount_to_vehicle_payments
-│  │  │  └─ migration.sql
-│  │  ├─ 20250912153749_add_customer_table
-│  │  │  └─ migration.sql
-│  │  ├─ 20250912160300_add_customer_id_to_vehicle
-│  │  │  └─ migration.sql
-│  │  ├─ 20250914051918_add_customer_user_relation
-│  │  │  └─ migration.sql
-│  │  ├─ 20250916033927_add_company_chassis_unique
-│  │  │  └─ migration.sql
-│  │  ├─ 20251007155347_add_payment_confirmation
-│  │  │  └─ migration.sql
-│  │  ├─ 20251014071707_add_table_invoice_job
-│  │  │  └─ migration.sql
-│  │  ├─ 20251014084227_updatepayemnt_confirm
-│  │  │  └─ migration.sql
-│  │  ├─ 20251014090736_updateinvoicejos
-│  │  │  └─ migration.sql
-│  │  └─ migration_lock.toml
-│  ├─ schema.prisma
-│  └─ seed.js
-├─ public
-│  ├─ favicon.ico
-│  ├─ file.svg
-│  ├─ globe.svg
-│  ├─ next.svg
-│  ├─ vercel.svg
-│  └─ window.svg
-├─ README.md
-├─ src
-│  ├─ components
-│  │  ├─ EditVehicle.jsx
-│  │  ├─ InvoiceDataViewer.jsx
-│  │  ├─ Payments.jsx
-│  │  ├─ Sidebar.jsx
-│  │  └─ ui
-│  │     ├─ ConfirmModal.jsx
-│  │     ├─ CustomButton.jsx
-│  │     ├─ CustomToast.jsx
-│  │     ├─ DataTable.jsx
-│  │     ├─ Error.jsx
-│  │     ├─ FilePreviewer.jsx
-│  │     ├─ Loader.jsx
-│  │     ├─ MultiSelect.jsx
-│  │     ├─ PermissionSelector.jsx
-│  │     ├─ reactSelectStyles.js
-│  │     ├─ SingleSelecter.jsx
-│  │     └─ Skeleton.jsx
-│  ├─ generated
-│  ├─ hooks
-│  │  ├─ useAuth.js
-│  │  ├─ useTheme.js
-│  │  └─ wrapper.js
-│  ├─ lib
-│  │  ├─ auth.js
-│  │  ├─ blob.mjs
-│  │  ├─ db.js
-│  │  └─ useful.js
-│  ├─ middleware.js
-│  ├─ pages
-│  │  ├─ api
-│  │  │  ├─ addInvoice.js
-│  │  │  ├─ addVehicle.js
-│  │  │  ├─ auth
-│  │  │  │  └─ [...nextauth].js
-│  │  │  ├─ brand.js
-│  │  │  ├─ company.js
-│  │  │  ├─ customer.js
-│  │  │  ├─ InvoiceJobs.js
-│  │  │  ├─ paymentConfirmation.js
-│  │  │  ├─ permission.js
-│  │  │  ├─ role.js
-│  │  │  ├─ status.js
-│  │  │  ├─ user.js
-│  │  │  ├─ vehicle.js
-│  │  │  ├─ vehiclePayments.js
-│  │  │  └─ vehicleStatus.js
-│  │  ├─ chat.jsx
-│  │  ├─ company.jsx
-│  │  ├─ customer.jsx
-│  │  ├─ dashboard.jsx
-│  │  ├─ index.jsx
-│  │  ├─ InvoiceJobs.jsx
-│  │  ├─ payment-confirmation.jsx
-│  │  ├─ role.jsx
-│  │  ├─ status.jsx
-│  │  ├─ user.jsx
-│  │  ├─ vehicle.jsx
-│  │  ├─ _app.jsx
-│  │  └─ _document.jsx
-│  └─ styles
-│     └─ globals.css
-└─ test-azure.js
+## Database Backup
 
+```bash
+pg_dump -h <host> -U <user> -d exposaas > backup_$(date +%Y%m%d).sql
 ```
-```
-Exposaas
-├─ .dockerignore
-├─ .prettierrc
-├─ clean-redis.js
-├─ docker-compose.yml
-├─ Dockerfile
-├─ eslint.config.mjs
-├─ extra
-│  ├─ PrismaClient
-│  │  └─ prismaClient.mjs
-│  ├─ queues
-│  │  ├─ notification.mjs
-│  │  ├─ pdfInvoice.mjs
-│  │  ├─ pgBoss.mjs
-│  │  └─ vehicle.mjs
-│  ├─ services
-│  │  └─ notificationService.mjs
-│  ├─ webSocket
-│  │  └─ ws.mjs
-│  └─ workers
-│     ├─ geminiProcess.mjs
-│     ├─ invoice.mjs
-│     └─ vehicle.mjs
-├─ inspect-redis.js
-├─ memory-monitor.js
-├─ next.config.js
-├─ package-lock.json
-├─ package.json
-├─ postcss.config.mjs
-├─ prisma
-│  ├─ migrations
-│  │  ├─ 20250810070258_initial_schema
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810070403_add_company_details
-│  │  │  └─ migration.sql
-│  │  ├─ 20250810093108_dd
-│  │  │  └─ migration.sql
-│  │  ├─ 20250815163921_update_for_detlet
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820124624_add_vehicle_model
-│  │  │  └─ migration.sql
-│  │  ├─ 20250820145741_add_brand_table
-│  │  │  └─ migration.sql
-│  │  ├─ 20250822044739_add_vehicle_status
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825154241_add_lot_number_and_auction_to_vehicle
-│  │  │  └─ migration.sql
-│  │  ├─ 20250825172149_add_lot_number_and_auction_to_vehicle_withoptional
-│  │  │  └─ migration.sql
-│  │  ├─ 20250828112721_add_simple_chat_messages
-│  │  │  └─ migration.sql
-│  │  ├─ 20250902104102_add_vehicle_documents
-│  │  │  └─ migration.sql
-│  │  ├─ 20250903153750_rename_docurl_to_url
-│  │  │  └─ migration.sql
-│  │  ├─ 20250907064548_add_companyid_to_role_with_default
-│  │  │  └─ migration.sql
-│  │  ├─ 20250907065329_update_role_companyid_to_nullable
-│  │  │  └─ migration.sql
-│  │  ├─ 20250912124615_add_amount_to_vehicle_payments
-│  │  │  └─ migration.sql
-│  │  ├─ 20250912153749_add_customer_table
-│  │  │  └─ migration.sql
-│  │  ├─ 20250912160300_add_customer_id_to_vehicle
-│  │  │  └─ migration.sql
-│  │  ├─ 20250914051918_add_customer_user_relation
-│  │  │  └─ migration.sql
-│  │  ├─ 20250916033927_add_company_chassis_unique
-│  │  │  └─ migration.sql
-│  │  ├─ 20251007155347_add_payment_confirmation
-│  │  │  └─ migration.sql
-│  │  ├─ 20251014071707_add_table_invoice_job
-│  │  │  └─ migration.sql
-│  │  ├─ 20251014084227_updatepayemnt_confirm
-│  │  │  └─ migration.sql
-│  │  ├─ 20251014090736_updateinvoicejos
-│  │  │  └─ migration.sql
-│  │  ├─ 20251017160324_add_notifications
-│  │  │  └─ migration.sql
-│  │  └─ migration_lock.toml
-│  ├─ schema.prisma
-│  └─ seed.js
-├─ public
-│  ├─ favicon.ico
-│  ├─ file.svg
-│  ├─ globe.svg
-│  ├─ next.svg
-│  ├─ vercel.svg
-│  └─ window.svg
-├─ README.md
-├─ src
-│  ├─ components
-│  │  ├─ EditVehicle.jsx
-│  │  ├─ InvoiceDataViewer.jsx
-│  │  ├─ Payments.jsx
-│  │  ├─ Sidebar.jsx
-│  │  ├─ SidebarNotifications.jsx
-│  │  └─ ui
-│  │     ├─ ConfirmModal.jsx
-│  │     ├─ CustomButton.jsx
-│  │     ├─ CustomToast.jsx
-│  │     ├─ DataTable.jsx
-│  │     ├─ Error.jsx
-│  │     ├─ FilePreviewer.jsx
-│  │     ├─ Loader.jsx
-│  │     ├─ MultiSelect.jsx
-│  │     ├─ PermissionSelector.jsx
-│  │     ├─ reactSelectStyles.js
-│  │     ├─ SingleSelecter.jsx
-│  │     └─ Skeleton.jsx
-│  ├─ generated
-│  ├─ hooks
-│  │  ├─ useAuth.js
-│  │  ├─ useTheme.js
-│  │  └─ wrapper.js
-│  ├─ lib
-│  │  ├─ auth.js
-│  │  ├─ blob.mjs
-│  │  ├─ db.js
-│  │  ├─ useful.js
-│  │  └─ wsClient.js
-│  ├─ middleware.js
-│  ├─ pages
-│  │  ├─ api
-│  │  │  ├─ addInvoice.js
-│  │  │  ├─ addVehicle.js
-│  │  │  ├─ auth
-│  │  │  │  └─ [...nextauth].js
-│  │  │  ├─ brand.js
-│  │  │  ├─ company.js
-│  │  │  ├─ customer.js
-│  │  │  ├─ InvoiceJobs.js
-│  │  │  ├─ notifications.js
-│  │  │  ├─ paymentConfirmation.js
-│  │  │  ├─ permission.js
-│  │  │  ├─ role.js
-│  │  │  ├─ status.js
-│  │  │  ├─ user.js
-│  │  │  ├─ vehicle.js
-│  │  │  ├─ vehiclePayments.js
-│  │  │  └─ vehicleStatus.js
-│  │  ├─ chat.jsx
-│  │  ├─ company.jsx
-│  │  ├─ customer.jsx
-│  │  ├─ dashboard.jsx
-│  │  ├─ index.jsx
-│  │  ├─ InvoiceJobs.jsx
-│  │  ├─ payment-confirmation.jsx
-│  │  ├─ role.jsx
-│  │  ├─ status.jsx
-│  │  ├─ user.jsx
-│  │  ├─ vehicle.jsx
-│  │  ├─ _app.jsx
-│  │  └─ _document.jsx
-│  └─ styles
-│     └─ globals.css
-└─ test-azure.js
 
-```
+## Tech Stack
+
+- **Next.js 15** - Full-stack framework (pages + API routes)
+- **Prisma** - ORM with PostgreSQL
+- **pg-boss** - PostgreSQL-based job queue
+- **Azure Blob Storage** - PDF file storage
+- **Google Gemini AI** - Invoice data extraction
+- **WebSocket** - Real-time job status updates
