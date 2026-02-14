@@ -72,6 +72,41 @@ npx prisma studio  # View data
 
 ---
 
+## Next: Unified Document Upload (PDF Auto-Classification)
+
+**Why:** Currently only invoices can be uploaded. Exporters also handle 輸出抹消（export cancellation certs）, 車検証（inspection certs）, 一時抹消（temporary cancellation certs）. Instead of separate upload flows, one drop zone that auto-classifies.
+
+**Architecture:**
+```
+PDF → Azure Blob → pg-boss job
+  ↓
+【Gemini #1 — Classification (light, page 1 only)】
+  "What type of document is this?"
+  → "invoice" | "export_cert" | "inspection_cert" | "temp_cancel" | "unknown"
+  ↓
+【Gemini #2 — Extraction (type-specific schema + prompt)】
+  ├→ invoice         → existing pipeline (schema.mjs + promptBuilder.mjs)
+  ├→ export_cert     → extract chassis_number + date → link to Vehicle + update status
+  ├→ inspection_cert → extract vehicle info → link to Vehicle + store as VehicleDocument
+  ├→ temp_cancel     → extract chassis_number + date → link to Vehicle + update status
+  └→ unknown         → flag for user to classify manually
+```
+
+**Key design decisions:**
+- Gemini #1 (classification) is cheap: 1 page, simple JSON response
+- Gemini #2 (extraction) reuses existing `promptBuilder.mjs` — one schema per doc type
+- Documents stored in `VehicleDocument` table (already exists: vehicleId + URL)
+- Classification step added to `invoicePage.mjs` worker (or new worker)
+- Each doc type gets its own schema in `extra/ai/` (e.g., `schemaExportCert.mjs`)
+
+**Existing infrastructure that supports this:**
+- `VehicleDocument` model (prisma) — vehicleId + Url
+- Azure Blob upload (already in `addInvoice.js`)
+- `schema.mjs` + `promptBuilder.mjs` pattern — just define new schemas per doc type
+- `FilePreviewer` component — already renders PDFs
+
+---
+
 ## ✅ Completed: Vehicle Charges
 
 Charge columns added directly to Vehicle table (no separate table — matches Excel mental model).
@@ -130,6 +165,9 @@ A: Future phase. VehicleCharge = acquisition costs (what you paid). CustomerChar
 
 **Q: What's the next workflow after invoice extraction?**
 A: Payment deadline tracking. Auto-calculate payment due dates based on auction rules (e.g., "USS Gumma → Next Monday").
+
+**Q: Why not have separate upload pages for each document type?**
+A: Unified drop zone is simpler for users. Gemini classifies the PDF type automatically (invoice vs export cert vs inspection cert), then routes to the correct extraction pipeline. Two Gemini calls: #1 classification (cheap), #2 extraction (type-specific).
 
 **Q: How does the AI Learning Loop improve over time?**
 A: Users review extractions → corrections saved as diff → golden records marked → optimizer uses Gemini to rewrite prompts based on error patterns → new prompt version activated → better extraction next time.
