@@ -21,6 +21,9 @@ import {
   ChevronDown,
   ChevronRight,
   ReceiptText,
+  BarChart3,
+  FlaskConical,
+  Sparkles,
 } from "lucide-react";
 import { isAllowed } from "../hooks/wrapper";
 
@@ -153,6 +156,30 @@ const getAllSidebarSections = () => [
         label: "Invoice Jobs",
         icon: <ReceiptText size={20} />,
         href: "/InvoiceJobs",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
+        id: "ai-accuracy",
+        label: "AI Accuracy",
+        icon: <BarChart3 size={20} />,
+        href: "/accuracy",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
+        id: "evaluation",
+        label: "Evaluation",
+        icon: <FlaskConical size={20} />,
+        href: "/evaluation",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
+        id: "prompts",
+        label: "Prompts",
+        icon: <Sparkles size={20} />,
+        href: "/prompts",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
       },
