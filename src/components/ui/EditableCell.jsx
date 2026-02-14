@@ -269,6 +269,7 @@ export default function EditableCell({
           onChange={(newVal) => handleSave(newVal)}
           onBlur={() => handleSave()}
           onCancel={revert}
+          isClearable={isClearable}
         />
       </td>
     );

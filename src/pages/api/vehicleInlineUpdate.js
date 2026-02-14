@@ -53,9 +53,11 @@ function parseValue(value, config) {
         if (config.required) throw new Error("This field is required");
         return null;
       }
+      // If value is a number (existing ID), use it directly
       const parsed = parseInt(value);
-      if (isNaN(parsed)) throw new Error("Invalid ID value");
-      return parsed;
+      if (!isNaN(parsed)) return parsed;
+      // If value is a string (new name from Creatable combobox), flag for auto-create
+      return { __newName: String(value).trim() };
     }
     case "datetime": {
       if (isEmpty) return null;
@@ -114,11 +116,39 @@ export default async function handler(req, res) {
       if (existing) return res.status(409).json({ error: "Chassis number already exists" });
     }
 
+    // Handle relation fields: auto-create if new name provided
     if (config.type === "relation" && parsedValue !== null) {
-      const modelMap = { brand: "brand", customer: "customer" };
-      const modelName = modelMap[config.model];
-      const exists = await prisma[modelName].findUnique({ where: { id: parsedValue } });
-      if (!exists) return res.status(400).json({ error: `${config.model} not found` });
+      if (parsedValue.__newName) {
+        const name = parsedValue.__newName;
+        if (!name) return res.status(400).json({ error: "Name cannot be empty" });
+
+        if (config.model === "brand") {
+          // Find or create brand by name (global — Brand has no companyId)
+          let brand = await prisma.brand.findFirst({
+            where: { name: { equals: name, mode: "insensitive" } },
+          });
+          if (!brand) {
+            brand = await prisma.brand.create({ data: { name } });
+          }
+          parsedValue = brand.id;
+        } else if (config.model === "customer") {
+          // Find or create customer by name (company-scoped)
+          let customer = await prisma.customer.findFirst({
+            where: { name: { equals: name, mode: "insensitive" }, companyId: vehicle.companyId },
+          });
+          if (!customer) {
+            customer = await prisma.customer.create({
+              data: { name, companyId: vehicle.companyId, uniqueId: `auto-${Date.now()}` },
+            });
+          }
+          parsedValue = customer.id;
+        }
+      } else {
+        const modelMap = { brand: "brand", customer: "customer" };
+        const modelName = modelMap[config.model];
+        const exists = await prisma[modelName].findUnique({ where: { id: parsedValue } });
+        if (!exists) return res.status(400).json({ error: `${config.model} not found` });
+      }
     }
 
     // Build update data

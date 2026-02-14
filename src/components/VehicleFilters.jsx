@@ -184,13 +184,11 @@ export default function VehicleFilters({
     const column = FILTERABLE_COLUMNS.find(c => c.prismaPath === field);
     if (!column) return null;
 
-    if (column.filterType === "dropdown") {
-      if (column.optionsKey === "brandOptions") {
-        return brandOptions.map(o => ({ value: o.label, label: o.label }));
-      }
-      if (column.optionsKey === "customerOptions") {
-        return customerOptions.map(o => ({ value: o.label, label: o.label }));
-      }
+    if (column.optionsKey === "brandOptions") {
+      return brandOptions.map(o => ({ value: o.label, label: o.label }));
+    }
+    if (column.optionsKey === "customerOptions") {
+      return customerOptions.map(o => ({ value: o.label, label: o.label }));
     }
     if (column.filterType === "combobox" && column.optionsKey) {
       return (suggestions[column.optionsKey] || []).map(v => ({ value: v, label: v }));

@@ -65,11 +65,13 @@ const VehicleRow = React.memo(function VehicleRow({
 
         // ── Editable columns (EditableCell) ───────────────────
         const options =
-          col.type === "dropdown"
+          col.type === "combobox" && col.isRelation
             ? dropdownOptions[col.optionsKey]
             : col.type === "combobox"
               ? comboOpts(col.optionsKey)
-              : undefined;
+              : col.type === "dropdown"
+                ? dropdownOptions[col.optionsKey]
+                : undefined;
 
         return (
           <EditableCell

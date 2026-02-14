@@ -8,12 +8,13 @@ import {
   SHARED_SELECT_PROPS,
 } from "./inlineCellSelectUtils";
 
-export default function InlineCellCombobox({ options, currentValue, onChange, onBlur, onCancel }) {
+export default function InlineCellCombobox({ options, currentValue, onChange, onBlur, onCancel, isClearable = true }) {
   const selectRef = useRef(null);
   useAutoFocusSelect(selectRef);
 
-  const selected = currentValue
-    ? { value: currentValue, label: currentValue }
+  // Resolve selected: find by value (supports both ID-based and string-based options)
+  const selected = currentValue != null
+    ? options.find(o => o.value === currentValue) || { value: currentValue, label: currentValue }
     : null;
 
   return (
@@ -25,9 +26,9 @@ export default function InlineCellCombobox({ options, currentValue, onChange, on
       onBlur={onBlur}
       onKeyDown={handleEscapeKey(onCancel)}
       styles={compactStyles}
-      isClearable
+      isClearable={isClearable}
       placeholder="Type or select..."
-      formatCreateLabel={(input) => `Use: ${input}`}
+      formatCreateLabel={(input) => `Add: ${input}`}
       formatOptionLabel={(option) => formatOptionLabelWithColor(option, { isCreatable: true })}
       {...SHARED_SELECT_PROPS}
     />
