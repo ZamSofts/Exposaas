@@ -27,7 +27,11 @@
 
 **Key Directories:**
 - `src/pages/` - Next.js pages & API routes
-- `extra/workers/` - Background jobs (Gemini extraction)
+- `src/config/` - Shared constants (aiConstants.js)
+- `src/components/` - React components (InvoiceDataViewer, SaveResultModal, etc.)
+- `extra/workers/` - Background jobs (Gemini extraction, CSV import)
+- `extra/ai/` - AI extraction pipeline (schema, promptBuilder, optimizer, few-shot)
+- `extra/utils/` - Shared utilities (computeDiff, chargeMapping, promptEvaluator, fewShotExamples)
 - `prisma/` - Database schema
 
 ## HOW: Working on This Project
@@ -60,51 +64,83 @@ npx prisma studio  # View data
 
 ---
 
-## Current Focus: Vehicle Charges Feature
+## Current Focus: Payment Deadline Tracking
 
-**Why this feature:** AI extracts charge data (bid amounts, fees, taxes) from invoices, but we're not storing it with vehicles yet.
+**Why this feature:** After extracting invoice data and creating vehicles with charges, exporters need to know when each payment is due. Different auctions have different payment rules (e.g., "USS Gumma → Next Monday").
 
-**Approach: Add charge columns directly to Vehicle table**
-- Simpler than separate table (no joins needed)
-- Matches Excel mental model (wide table, scroll left-right)
-- All auctions use same ~10 fee types
-- CSV import maps directly to columns
+**Approach:** TBD — auto-calculate payment due dates based on auction-specific rules.
 
-**New columns:** `bidAmount`, `bidTax`, `auctionFee`, `recyclingFee`, `transportFee`, `otherFees`, `taxProration`, `totalCost`, `sourceInvoiceJobId`
+---
 
-**Data entry methods:**
-1. PDF Invoice → AI extracts → Review → Save → Vehicles created with charges
-2. CSV Upload → Parse columns → Vehicles created/updated with charges
+## ✅ Completed: Vehicle Charges
 
-**Files to modify:**
-- `prisma/schema.prisma` - Add charge columns to Vehicle
-- `src/pages/api/vehicle.js` - Include charges in GET/PUT/POST
-- `extra/workers/vehicle.mjs` - Parse charge columns from CSV
-- `src/pages/vehicle.jsx` - Display charge columns (wide table)
-- `src/components/InvoiceDataViewer.jsx` - Add "Create Vehicles" modal
+Charge columns added directly to Vehicle table (no separate table — matches Excel mental model).
 
-**Next step:** See `PLAN_VEHICLE_CHARGES.md` for implementation checklist
+- **DB:** `bidAmount`, `auctionFee`, `recyclingFee`, `transportFee`, `insuranceFee`, `otherFees`, `taxSum`, `totalCost`, `sourceInvoiceJobId` on Vehicle
+- **API:** `src/pages/api/vehicle.js` — GET/PUT/POST include all charge fields, auto-calculates taxSum/totalCost
+- **CSV:** `extra/workers/vehicle.mjs` — parses charge columns from CSV with alias support
+- **UI:** `src/pages/vehicle.jsx` — wide table with all charge columns, currency formatting
+- **Invoice → Vehicle:** `src/pages/api/createVehiclesFromInvoice.js` — creates/updates vehicles from reviewed invoice data
+- **Charge mapping:** `extra/utils/chargeMapping.mjs` — shared constants (CHARGE_TYPE_MAP, TAX_RATE, tax-exempt logic)
+
+---
+
+## ✅ Completed: AI Learning Loop (HITL)
+
+Gemini extraction accuracy improves over time through user corrections (DSPy-inspired).
+
+**Pipeline:**
+```
+PDF → schema (rules) + prompt (instructions) + few-shot (examples)
+    → promptBuilder (combines all) → Gemini → Extract
+    → User Review → diff recorded → golden data marked
+    → optimizer analyzes errors → generates better prompt → repeat
+```
+
+**Key files:**
+| File | Role |
+|------|------|
+| `extra/ai/schema.mjs` | Field definitions & constraints (Signature) |
+| `extra/ai/promptBuilder.mjs` | Combines schema + instructions + few-shot + output format into prompt |
+| `extra/ai/optimizer.mjs` | Meta-prompting: Gemini rewrites extraction prompts based on error patterns |
+| `extra/utils/fewShotExamples.mjs` | Selects best training examples (5-tier priority by auction + golden status) |
+| `extra/utils/computeDiff.mjs` | Shared diff logic: `computeDetailedDiff()` for UI, `computeScoredDiff()` for evaluation |
+| `extra/utils/promptEvaluator.mjs` | Evaluates prompt versions against golden dataset |
+| `extra/utils/promptGenerator.mjs` | Generates prompt variations (emphasize_charges, strict_chassis, negative_examples, simplified) |
+| `src/config/aiConstants.js` | Shared thresholds: HIGH=0.85, MID=0.60, MIN_RECORDS=5 |
+| `src/components/SaveResultModal.jsx` | Post-save diff display + golden marking button |
+
+**UI Pages:**
+- `/InvoiceJobs` → Invoice Review (InvoiceDataViewer) — review AI extraction, edit, save, mark golden
+- `/accuracy` — Accuracy dashboard with charts (by field, by auction, trends)
+- `/prompts` — Prompt version management (create, activate, compare, optimize)
+- `/evaluation` — Golden dataset management for A/B testing prompts
+
+**Important patterns:**
+- `promptBuilder` is NOT an LLM — just string concatenation of 4 sections
+- Confidence colors: Green (≥85%), Amber (60-84%), Red (<60%) — defined in `aiConstants.js`
+- All thresholds centralized in `src/config/aiConstants.js` — don't hardcode 0.85/0.6/etc.
 
 ---
 
 ## FAQ
 
-**Q: What about CustomerCharge table for billing?**  
+**Q: What about CustomerCharge table for billing?**
 A: Future phase. VehicleCharge = acquisition costs (what you paid). CustomerCharge = customer billing (what they pay). Different use cases.
 
-**Q: What's the next workflow after invoice extraction?**  
-A: Payment deadline tracking. Auto-calculate payment due dates based on auction rules (e.g., "USS Gumma → Next Monday"). See `strategy.md` for full roadmap.
+**Q: What's the next workflow after invoice extraction?**
+A: Payment deadline tracking. Auto-calculate payment due dates based on auction rules (e.g., "USS Gumma → Next Monday").
+
+**Q: How does the AI Learning Loop improve over time?**
+A: Users review extractions → corrections saved as diff → golden records marked → optimizer uses Gemini to rewrite prompts based on error patterns → new prompt version activated → better extraction next time.
 
 ---
 
 ## Progressive Disclosure
 
 **Read these when working on specific areas:**
-- `PLAN_VEHICLE_CHARGES.md` - Implementation checklist
+- `PLAN_VEHICLE_CHARGES.md` - Vehicle charges implementation checklist (completed)
 - `README.md` - Project setup & architecture details
-- `.gemini/antigravity/brain/.../implementation_plan.md` - Detailed technical specs
-- `.gemini/antigravity/brain/.../strategy.md` - Business vision (10-200 workflows, market strategy)
-
-
-
-
+- `extra/ai/schema.mjs` - Field extraction rules and constraints
+- `extra/ai/promptBuilder.mjs` - How the extraction prompt is assembled
+- `extra/ai/optimizer.mjs` - How prompt optimization works (DSPy-inspired meta-prompting)
