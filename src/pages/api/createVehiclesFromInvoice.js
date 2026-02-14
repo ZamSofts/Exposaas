@@ -1,5 +1,5 @@
 import { prisma, getSession } from "@/lib/useful";
-import { CHARGE_TYPE_MAP, TAX_BASE_COLUMNS, TAX_RATE, ALL_CHARGE_COLUMNS } from "../../../extra/utils/chargeMapping.mjs";
+import { CHARGE_TYPE_MAP, calculateTaxFromChargeMap } from "../../../extra/utils/chargeMapping.mjs";
 
 /**
  * POST /api/createVehiclesFromInvoice
@@ -52,10 +52,11 @@ const parseCharges = (charges) => {
     }
   }
 
-  // Calculate taxSum and totalCost using shared constants
+  // Calculate taxSum and totalCost using shared logic
   if (Object.keys(result).length > 0) {
-    result.taxSum = TAX_BASE_COLUMNS.reduce((sum, col) => sum + (result[col] || 0), 0) * TAX_RATE;
-    result.totalCost = ALL_CHARGE_COLUMNS.reduce((sum, col) => sum + (result[col] || 0), 0) + result.taxSum;
+    const { taxSum, totalCost } = calculateTaxFromChargeMap(result);
+    result.taxSum = taxSum;
+    result.totalCost = totalCost;
   }
 
   return result;
@@ -144,7 +145,7 @@ export default async function handler(req, res) {
   const customerMap = new Map();
   if (customerNames.size > 0) {
     const existingCustomers = await prisma.customer.findMany({
-      where: { companyId: session.companyId, name: { in: [...customerNames], mode: "insensitive" } },
+      where: { companyId: session.companyId, name: { in: [...customerNames] } },
       select: { id: true, name: true },
     });
     for (const c of existingCustomers) customerMap.set(c.name.toLowerCase(), c.id);

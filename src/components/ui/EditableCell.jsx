@@ -181,7 +181,7 @@ export default function EditableCell({
           onBlur={() => handleSave()}
           onKeyDown={handleKeyDown}
           disabled={isSaving}
-          className={`w-20 px-1.5 py-1 text-sm tabular-nums bg-transparent border border-transparent rounded
+          className={`w-full px-1.5 py-1 text-sm tabular-nums bg-transparent border border-transparent rounded
             text-[var(--foreground)] text-right
             hover:border-[var(--border)] focus:border-[var(--primary)] focus:bg-[var(--input)]
             focus:outline-none transition-colors

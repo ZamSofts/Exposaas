@@ -9,6 +9,9 @@ export const CHARGE_TYPE_MAP = {
   other_fee: "otherFees",
   other_fees: "otherFees",
   listing_fee: "otherFees",
+  storage_fee: "otherFees",
+  admin_fee: "otherFees",
+  discount: "otherFees",
 
   // Human-readable CSV headers (after csv-parser normalization: lowercase, spaces→underscores)
   winning_price: "bidAmount",
@@ -72,6 +75,18 @@ export function calculateTaxAndTotal(currentCharges, updatedField, updatedValue)
   return { taxSum, totalCost };
 }
 
+/**
+ * Calculate taxSum and totalCost from a flat charge map (DB column names).
+ * Shared by createVehiclesFromInvoice, parseChargeFieldsFromFlat, etc.
+ * @param {Object} chargeMap — e.g. { bidAmount: 250000, auctionFee: 15000 }
+ * @returns {{ taxSum: number, totalCost: number }}
+ */
+export function calculateTaxFromChargeMap(chargeMap) {
+  const taxSum = TAX_BASE_COLUMNS.reduce((sum, col) => sum + (chargeMap[col] || 0), 0) * TAX_RATE;
+  const totalCost = ALL_CHARGE_COLUMNS.reduce((sum, col) => sum + (chargeMap[col] || 0), 0) + taxSum;
+  return { taxSum, totalCost };
+}
+
 export function parseChargeFieldsFromFlat(row) {
   const charges = {};
 
@@ -94,12 +109,9 @@ export function parseChargeFieldsFromFlat(row) {
   }
 
   // Always calculate — null/empty = 0
-  charges.taxSum = TAX_BASE_COLUMNS.reduce(
-    (sum, col) => sum + (charges[col] || 0), 0
-  ) * TAX_RATE;
-  charges.totalCost = ALL_CHARGE_COLUMNS.reduce(
-    (sum, col) => sum + (charges[col] || 0), 0
-  ) + charges.taxSum;
+  const { taxSum, totalCost } = calculateTaxFromChargeMap(charges);
+  charges.taxSum = taxSum;
+  charges.totalCost = totalCost;
 
   return charges;
 }
