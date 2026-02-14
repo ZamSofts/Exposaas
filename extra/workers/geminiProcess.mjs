@@ -58,124 +58,7 @@ async function callGeminiWithRetry(model, content, pageNumber = 0) {
   throw lastError;
 }
 
-const PROMPT = `
-You are an expert at parsing invoices from PDFs, supporting both Japanese and English languages, and adaptable to any invoice type (e.g., automotive auctions, retail, services, utilities). Analyze this PDF document and extract line items (e.g., products, services, vehicles) with their associated charges, plus global metadata focused on the customer perspective (e.g., what the buyer needs to know about purchases, costs, and payments). Automatically detect the primary language of the document (Japanese or English) and adapt your parsing accordingly—use Japanese terms for JP docs (prioritize keywords like '請求書', '落札料', 'リサイクル預託金', '自賠責相当額', '出品料', '成約料') and English equivalents for EN docs, but always map to the standardized English charge types and output in clear English. Focus on unique, non-duplicative key elements from the customer's view—ignore headers, footers, subtotals, or redundant totals unless they tie directly to items, vehicles, costs, or payment status. For automotive auctions (detect via terms like '計算書', '落札', 'オークション'), extract per vehicle (rows/entries) and customer-relevant globals (totals, purchase summary). STRICTLY AVOID extracting or including: company names (e.g., '有限会社 ワールドオートトレーディング'), internal codes (e.g., '0011028'), addresses, phone/fax/tel numbers, bank details (e.g., bank_name, branch_name, account_type, account_number, account_holder), detailed internal balances (e.g., previous_balance, this_transaction_payment_amount, current_balance_payment_amount, settled_amount, taxable_amount_10_percent, consumption_tax_10_percent, total_price_excluding_tax, total_consumption_tax), or any non-customer-facing metadata. Skip all such details entirely—no inclusion in output.
-
-CRITICAL INSTRUCTIONS:
-Language Detection:
-- Scan the document for keywords: If terms like '請求書', '消費税', 'オークション', '落札価格', '自賠責相当額', '出品料', '成約料' dominate, treat as Japanese. If 'Invoice', 'VAT', 'Tax', or 'Total' dominate, treat as English. Handle mixed-language docs by prioritizing context (e.g., fee labels). For other languages, fall back to English patterns but note 'detected_language' as 'Other'.
-- For non-Latin scripts, transliterate or recognize patterns (e.g., ¥ for JPY, $ for USD, € for EUR).
-
-Item Identification:
-- Carefully examine rows/fields labeled 'Item No.', 'Description', 'Product', 'Service', 'Chassis No.', 'VIN', '車台番号', '内容' (model), '出品No' (auction/listing number), or similar in each table/section.
-- Identifiers may be codes like DD51T-127679, SKUs, serial numbers, or descriptions (e.g., 'HIACE VAN DX' or 'Honda Fit GP5'). For auctions: Extract auction date (開催日), year (年式), customer (客), vehicle price (車両代). Use the most unique identifier available; if none, use a descriptive summary.
-- Scan all tables, text areas, and footers thoroughly; no item should be missed. Ignore non-line-item entries (e.g., headers, subtotals). For auctions: Count purchases (e.g., '落札 2台').
-
-Chassis Number Extraction (CRITICAL):
-- A chassis number is the FULL vehicle identifier: model code + serial number (e.g., "DA63T 482049", "WBAWA52020P301052").
-- In Japanese auction invoices, each vehicle cell often has TWO LINES:
-    Line 1: Vehicle description in Japanese (e.g., キャリイトラック 4WD KC パワステ) ← IGNORE this line
-    Line 2: Chassis code and serial (e.g., DA63T    482049) ← THIS is the chassis_number
-- Extract the COMPLETE second line as the chassis_number — model code AND serial number together. Output it exactly as printed (spaces are fine).
-- Each vehicle row MUST have a UNIQUE chassis_number. If two rows share the same model code (e.g., both DA63T), they WILL have different serial numbers — make sure you extract the full serial for each row.
-- NEVER return just the model code without the serial (e.g., "DA63T" alone is WRONG — it must be "DA63T 482049").
-- Full VINs with no space are also valid (e.g., "WBAWA52020P301052") — output as-is.
-
-Global Metadata Extraction (Customer-Focused; Essential for Auctions):
-- Document Summary: Date/time (e.g., '2025/06/09 – 17:28:45'), page number, invoice type (e.g., 'Proper Invoice (適格請求書)'), registration number (e.g., 'T3010001057135')—only if relevant to billing clarity.
-- Auction Name: Extract the standard auction house name from logos, headers, or text. Use the well-known abbreviation/brand name and location — do NOT translate Japanese suffixes like 会場 (venue/hall). Examples: 'USS-R名古屋会場' → 'USS-R Nagoya', 'HAA神戸' → 'HAA Kobe', 'USS東京' → 'USS Tokyo', 'JU広島' → 'JU Hiroshima', 'TAA関東' → 'TAA Kanto'. Keep the auction brand (USS, HAA, TAA, JU, etc.) as-is and only romanize the location name.
-- Financial Globals: Previous balance (前回繰越金額, empty=0), this transaction total (今回御取引金額) with breakdown (claim amount, tax, other charges), total due (今回御取引合計), paid amount (精算済額), remaining balance (残高)—highlight if fully paid (0 JPY). Do not include detailed sub-breakdowns like taxable_amount_10_percent or consumption_tax_10_percent.
-- Customer Perspective: Purchases count, total cost, paid status, simplified summary (e.g., 'Two Honda Fit GP5 vehicles purchased for 358,620 JPY total, paid in full. Includes bids, fees, insurance, and recycling.').
-
-Charge Type Recognition:
-Extract fees and map them to these standardized types with amounts. Recognize variations in both languages and invoice types, including automotive auction specifics:
-- Base Price/Subtotal/Bid: '入札金額/落札価格/車両本体価格/商品価格/Vehicle Winning Bid Amount/車両代' or 'Unit Price/Subtotal/Item Price/Service Fee/Hammer Price/Bid Amount' → 'bid_amount' or 'subtotal'
-- Auction/Commission/Transaction Fee: 'オークション手数料/手数料/落札料/成約料' or 'Auction Fee/Commission/Buyer's Premium/Processing Fee/Contract Fee/Transaction Fee' → 'auction_fee' or 'commission_fee'
-- Listing Fee: '出品料' or 'Listing Fee' → 'listing_fee'
-- DO NOT extract tax amounts (bid_tax, auction_tax, consumption tax, etc.) — taxes are auto-calculated by the system. Skip all tax line items entirely.
-- Shipping/Transport: '輸送費/送料/陸送費' or 'Shipping/Delivery/Freight/Transport' → 'shipping_fee'
-- Storage/Warehouse: '保管料' or 'Storage Fee/Warehouse Charge' → 'storage_fee'
-- Documentation/Admin: '書類代/管理手数料' or 'Documentation Fee/Admin Fee/Paperwork/Handling' → 'admin_fee'
-- Insurance: '自賠責相当額/Mandatory insurance equivalent' or 'Insurance Fee' → 'insurance_fee'
-- Recycling/Deposit: 'リサイクル預託金/Recycling deposit fee' or 'Deposit/Recycling Fee' → 'recycling_fee'
-- Discount/Adjustment: '割引' or 'Discount/Adjustment/Credit' → 'discount' (negative amounts if applicable)
-- Other/Misc: 'その他/雑費' or 'Other/Miscellaneous/Additional/Utility' → 'other_fee'
-- Ignore grand totals, payments, or non-item-specific fees unless tied to a line item. Handle blank fees by skipping them (e.g., listing_fee=0 → omit).
-- Always convert amounts to integers: Remove commas, currency symbols (¥, $, €, etc.), spaces, or decimals (round if needed). For stacked/multi-line cells showing base + tax (e.g., '250,000 / 25,000'), extract ONLY the top/base value and ignore the tax value. Detect quantities if present and multiply if needed (e.g., unit price * qty = subtotal).
-
-# ====== EXTRACTION RULES — DO NOT IGNORE ======
-• Capture every numeric value exactly as it appears. Never drop numbers.
-• Map values to ONLY these types (NO tax types):
-    vehicle_price / bid_amount
-    auction_fee
-    recycling_fee
-    shipping_fee
-    insurance_fee
-    other_fee
-• If multiple distinct values appear under a category → store them as an array.
-  Example: "vehicle_price": [124000, 12400]
-• If only one value appears → store as a single integer.
-• Always extract both primary and secondary stacked table values
-  (top + bottom) and classify where possible.
-• Never infer or delete low-value numbers (e.g., 1,380, 12,400).
-  Keep ALL amounts.
-• Preserve invoice totals exactly.
-• You MUST ALWAYS extract the following fee fields, even if they are missing → return null:
-• bid_amount, auction_fee, insurance_fee.
-• NEVER extract tax fields (bid_tax, auction_tax, transport_tax, etc.) — taxes are auto-calculated.
-
-• These fee fields are MANDATORY and must appear in the final JSON every time, without exception.
-
-• JSON must remain complete, structured, and valid. Do not include raw_values or uncategorized arrays—focus only on mapped charges.
-# ====== END EXTENSION ======
-
-Table/Structure Analysis:
-- Identify invoice sections: Each row/entry usually represents one item/line. Look for tables with columns like Item#, Description, Qty, Price, Fees, or auction-specific (開催日, 年式, 内容, 出品No, 客, 車両代, リサイクル料, 請求, 落札料).
-- Handle varied formats: Tabular (e.g., USS/TAA JP auctions, Manheim EN), free-form text (e.g., service invoices), or scanned/handwritten. Use OCR for small/unclear text.
-- Parse stacked amounts in cells: Extract all numbers, map top to main fee, bottom to tax/related.
-- Match charges precisely to the item in the same row/section. If ambiguous, infer from proximity/context. No duplicates: Report vehicle price once per item.
-
-Data Matching:
-- For each item, collect only its associated charges. Flag unmatched charges as 'unassigned' under a dummy item if needed, but prioritize line-item links. For auctions: Group vehicles into an array with shared fields (auction date, year, model, customer).
-STRICT: Output ONLY in the exact required JSON structure and keys. Do not add extra fields, explanations, summaries, text, or formatting. Return ONLY the specified JSON format, nothing else.
-
-REQUIRED OUTPUT FORMAT:
-Strictly return only Model translated into English from Japanese. For Auction_name, use the standard brand name + romanized location (e.g., 'USS-R Nagoya', 'HAA Kobe') — do NOT translate 会場/会社 suffixes;
-If any category (e.g., bid_amount) returns two numeric values (e.g., stacked cells showing base + tax), extract ONLY the first/base value. Ignore the tax value — taxes are auto-calculated.
-Return ONLY a valid JSON object, page-wise for the PDF:
-Return only page_1/page_2 fields listed (Auction_name,Chassis_number, lot_number, Model, auction_date, year, quantity, charges[]); ignore all unrelated data.
-{
-  "page_1": [
-        "auction":"HAA Kobe" or "USS-R Nagoya" or "USS Tokyo" or "JU Hiroshima",
-        "auction_date": "2025/07/15",
-        "chassis_number": "DA63T 482049" or "DD51T 145148" or "ZVW51 6097706" or "A8FD25 70021" or "WBAWA52020P301052" or "LRW3F7FS0SC596822",
-        "lot_number": "7122" or "60238",
-        "brand": "Toyota" or "Hiace(English translated)" or "BMW(Any brand)" or "Corolla(or car name)",
-        "charges": [
-        { "type": "bid_amount", "amount": 250000 },
-        { "type": "auction_fee", "amount": 15000 },
-        { "type": "insurance_fee", "amount": 23000 },
-        { "type": "recycling_fee", "amount": 13220 }
-      ]
-    }
-  ],
-
-  "page_2": [
-    ...
-  ]
-}
-Strictly Do NOT include quantity or year — IGNORE THESE COMPLETELY. DO include auction_date (format: "YYYY/MM/DD").
-Strictly Do NOT include any field whose value is null—omit the field entirely from the output.
-If no items found, return {"detected_language": "Unknown", "invoice_type": "N/A", "pages": {}} with empty arrays; empty optional sections if not applicable.
-Focus on line-item data; ignore headers/footers unless they contain per-item info.
-Pay special attention to multi-row headers, merged cells, rotated text, or multi-page items.
-Do not include grand totals or unrelated fees.
-Ensure no item-charge pair is missed.
-Analyze systematically: Extract all combinations.
-Return a COMPLETE, VALID JSON object. No trailing commas; end with '}'.
-`
-
-export async function processPageWithGemini(pageUrl, pageNumber) {
+export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
   try {
     let stream;
     try {
@@ -208,6 +91,49 @@ export async function processPageWithGemini(pageUrl, pageNumber) {
 
     const base64Data = pdfBuffer.toString("base64");
 
+    // Determine instructions: custom > active PromptVersion > default (from schema)
+    let instructions = null;
+    if (options.promptContent) {
+      // Custom prompt passed directly (e.g., during evaluation)
+      instructions = options.promptContent;
+    } else if (options.companyId) {
+      // Try to load active PromptVersion for this company
+      try {
+        const { prisma } = await import("../PrismaClient/prismaClient.mjs");
+        const activeVersion = await prisma.promptVersion.findFirst({
+          where: { companyId: Number(options.companyId), status: "active" },
+          select: { content: true },
+        });
+        if (activeVersion?.content) {
+          instructions = activeVersion.content;
+        }
+      } catch (err) {
+        console.warn(`[gemini] Failed to load active PromptVersion for company ${options.companyId}:`, err?.message || err);
+      }
+    }
+
+    // Build dynamic prompt with few-shot examples from confirmed data
+    let examples = options.fewShotExamples || [];
+    if (examples.length === 0 && options.companyId) {
+      try {
+        const { fetchFewShotExamples } = await import("../utils/fewShotExamples.mjs");
+        examples = await fetchFewShotExamples(options.companyId, {
+          auctionName: options.auctionName || null,
+        });
+      } catch (err) {
+        console.warn(`[gemini] Few-shot fetch failed for company ${options.companyId}:`, err?.message || err);
+      }
+    }
+
+    // Build prompt via promptBuilder (single path — schema + instructions + few-shot)
+    const { buildPrompt } = await import("../ai/promptBuilder.mjs");
+    const { EXTRACTION_SCHEMA } = await import("../ai/schema.mjs");
+    const dynamicPrompt = buildPrompt({
+      schema: EXTRACTION_SCHEMA,
+      fewShotExamples: examples,
+      instructions,  // null → buildPrompt uses buildDefaultInstructions(schema)
+    });
+
     const result = await callGeminiWithRetry(model, [
       {
         inlineData: {
@@ -215,7 +141,7 @@ export async function processPageWithGemini(pageUrl, pageNumber) {
           data: base64Data,
         },
       },
-      PROMPT,
+      dynamicPrompt,
     ], pageNumber);
 
     // Extract text from response
@@ -260,15 +186,14 @@ export async function processPageWithGemini(pageUrl, pageNumber) {
       return [];
     }
 
-    const vehicles = parsed["page_1"] || parsed["page_2"] || [];
-
     if (Array.isArray(parsed)) {
       return parsed;
     }
 
+    const vehicles = parsed["page_1"] || parsed["page_2"] || parsed["items"] || [];
     return vehicles;
 
   } catch (error) {
-    throw new Error(error);
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }

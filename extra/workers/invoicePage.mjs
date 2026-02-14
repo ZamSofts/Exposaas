@@ -25,7 +25,7 @@ let boss;
         });
 
         // Process with Gemini (returns unwrapped vehicle array)
-        const vehicles = await processPageWithGemini(pageUrl, pageNumber);
+        const vehicles = await processPageWithGemini(pageUrl, pageNumber, { companyId });
 
         // Determine status based on result
         const status = vehicles.length > 0 ? 'completed' : 'empty';
