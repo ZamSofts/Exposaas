@@ -1,10 +1,18 @@
 import { prisma, getSession } from "@/lib/useful";
+import { computeDetailedDiff } from "../../../extra/utils/computeDiff.mjs";
 
+/**
+ * Payment Confirmation API handler.
+ *
+ * PUT  — Save a reviewed page: creates PaymentConfirmation, auto-creates vehicles & payments,
+ *         computes diff against original Gemini extraction, marks InvoiceJob as evaluated.
+ * PATCH — Toggle isGolden flag on an existing PaymentConfirmation record.
+ */
 export default async function handler(req, res) {
   const session = await getSession(req, res);
   try {
     if (req.method === "PUT") {
-      const { Page, Json, isCorrect, CompanyID, DocumentURL, invoiceJobId } = req.body;
+      const { Page, Json, CompanyID, DocumentURL, invoiceJobId } = req.body;
 
       if (!Json || typeof Json !== "object") return res.status(400).json({ error: "Missing or invalid Json payload for page" });
 
@@ -25,7 +33,6 @@ export default async function handler(req, res) {
         (charges || []).map(c => ({
           type: c.type,
           amount: c.amount === "" || c.amount == null ? null : isNaN(Number(c.amount)) ? c.amount : Number(c.amount),
-          isConfirm: c.isConfirm == null ? false : Boolean(c.isConfirm),
         }));
 
       const normalizedPage = pageArr.map(item => ({
@@ -39,15 +46,36 @@ export default async function handler(req, res) {
 
       const storeJson = { [pageKey]: normalizedPage };
 
-      const findWhere = { companyId, Page: pageNum };
-      if (DocumentURL) findWhere.DocumentURL = DocumentURL;
+      // Auto-compute isCorrect + diffSummary by comparing original Gemini output vs user-corrected data
+      let autoIsCorrect = "corrected";
+      let diffSummary = null;
+      if (invoiceJobId) {
+        try {
+          const originalJob = await prisma.invoiceJobs.findUnique({
+            where: { id: invoiceJobId },
+            select: { Json: true },
+          });
+          if (originalJob?.Json) {
+            const result = computeDetailedDiff(originalJob.Json, storeJson);
+            autoIsCorrect = result.isCorrect;
+            diffSummary = result.diffSummary;
+          }
+        } catch (diffErr) {
+          console.warn("Could not compute diff:", diffErr?.message);
+        }
+      }
+
+      // Extract auction house from first vehicle for denormalized column
+      const auctionHouse = normalizedPage[0]?.auction?.trim() || null;
 
       const saved = await prisma.paymentConfirmation.create({
         data: {
           DocumentURL: DocumentURL || null,
           Page: pageNum,
           Json: storeJson,
-          isCorrect: isCorrect || "",
+          isCorrect: autoIsCorrect,
+          diffSummary,
+          auctionHouse,
           companyId,
           invoiceJobId: invoiceJobId || null,
         },
@@ -136,7 +164,6 @@ export default async function handler(req, res) {
                 chassisNumber,
                 companyId: Number(companyId),
                 brandId,
-                statusId: 1,
                 lotNumber,
                 auction,
                 remarks: `Auto-added from payment confirmation`,
@@ -162,10 +189,32 @@ export default async function handler(req, res) {
           console.error("Failed to process charge for chassis", ch && ch.chassis_number, err && err.message ? err.message : err);
         }
       }
-      res.status(201).json({
+      return res.status(201).json({
         message: "Page saved and payments added to vehicle payments successfully",
+        paymentConfirmationId: saved.id,
+        isCorrect: autoIsCorrect,
+        diffSummary,
       });
     }
+    // PATCH: toggle isGolden
+    if (req.method === "PATCH") {
+      const { id, isGolden } = req.body;
+      if (!id) return res.status(400).json({ error: "Missing record id" });
+
+      const record = await prisma.paymentConfirmation.findFirst({
+        where: { id: Number(id), companyId: session.companyId },
+      });
+      if (!record) return res.status(404).json({ error: "Record not found" });
+
+      const updated = await prisma.paymentConfirmation.update({
+        where: { id: record.id },
+        data: { isGolden: isGolden != null ? Boolean(isGolden) : !record.isGolden },
+      });
+
+      return res.status(200).json({ id: updated.id, isGolden: updated.isGolden });
+    }
+
+    return res.status(405).json({ error: "Method not allowed" });
   } catch (err) {
     return res.status(500).json({ error: "Internal server error" });
   }

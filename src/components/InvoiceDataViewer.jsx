@@ -1,8 +1,10 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useAuth,API,useConfirm, Error, CustomSelect, CustomButton,DataTable, Loader, Toast, FilePreviewer } from "@/hooks/wrapper";
-import { ArrowLeft, FileUp, ExternalLink, RefreshCw, Trash2, Car, Check, AlertTriangle, FileText } from "lucide-react";
+import { useAuth, API, useConfirm, Error, CustomSelect, CustomButton, DataTable, Loader, Toast, FilePreviewer } from "@/hooks/wrapper";
+import { ArrowLeft, FileUp, ExternalLink, RefreshCw, Trash2, Car, Check, AlertTriangle, FileText, ChevronDown, ChevronRight, ListChecks, PenLine } from "lucide-react";
+import { ACCURACY_THRESHOLDS, MIN_RECORDS_FOR_AUTO_MODE, CONFIDENCE_COLORS, getConfidenceLevel, getAccuracyColor as getConfidenceColor, getConfidenceBorder } from "@/config/aiConstants";
+import SaveResultModal from "@/components/SaveResultModal";
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const router = useRouter();
@@ -34,7 +36,6 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const [selectedChassis, setSelectedChassis] = useState(null);
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
-  const [feedback, setFeedback] = useState("yes");
   const [editable, setEditable] = useState([]);
   const [hasChanges, setHasChanges] = useState(false);
 
@@ -47,6 +48,14 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const [showCreateVehiclesModal, setShowCreateVehiclesModal] = useState(false);
   const [createVehiclesLoading, setCreateVehiclesLoading] = useState(false);
   const [vehiclesToCreate, setVehiclesToCreate] = useState([]);
+
+  // Save result state (diff display + golden marking)
+  const [saveResult, setSaveResult] = useState(null);
+
+  // Adaptive Review UI state
+  const [reviewMode, setReviewMode] = useState("detail"); // "summary" | "detail"
+  const [auctionAccuracy, setAuctionAccuracy] = useState(null); // { accuracy, count, auction }
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   // Initialize editable data on mount
   useEffect(() => {
@@ -73,6 +82,37 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       setHasChanges(false);
     }
   }, [vehicles]);
+
+  // Fetch auction accuracy on mount to determine review mode
+  useEffect(() => {
+    if (editable.length === 0) return;
+    const auctionName = editable[0]?.auction?.trim();
+    if (!auctionName) return;
+
+    (async () => {
+      try {
+        const stats = await API("GET", "accuracyStats?period=3650d");
+        if (stats?.byAuction) {
+          const match = stats.byAuction.find(a => a.auction === auctionName);
+          if (match) {
+            setAuctionAccuracy({ accuracy: match.accuracy, count: match.count, auction: match.auction });
+            // Auto-switch to summary if high accuracy and enough data
+            if (match.accuracy >= ACCURACY_THRESHOLDS.HIGH && match.count >= MIN_RECORDS_FOR_AUTO_MODE) {
+              setReviewMode("summary");
+              // Auto-expand low-confidence rows
+              const lowConfRows = new Set();
+              editable.forEach((v, i) => {
+                if (v.confidence != null && v.confidence < ACCURACY_THRESHOLDS.MID) lowConfRows.add(i);
+              });
+              setExpandedRows(lowConfRows);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch auction accuracy:", err);
+      }
+    })();
+  }, [editable.length > 0 && editable[0]?.auction]);
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
@@ -108,18 +148,15 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       });
     });
     setHasChanges(true);
-    // Update selectedChassis if it's the current one
+    // Update selectedChassis if it's the current one — use functional update to avoid stale closure
     setSelectedChassis(prev => {
       if (prev && prev.chassis_number === chassisNum) {
-        const updated = editable.find(p => p.chassis_number === chassisNum);
-        if (updated) {
-          return {
-            ...updated,
-            charges: updated.charges.map((c, i) =>
-              i === idx ? { ...c, [field]: field === "amount" ? String(value) : value } : c
-            ),
-          };
-        }
+        return {
+          ...prev,
+          charges: prev.charges.map((c, i) =>
+            i === idx ? { ...c, [field]: field === "amount" ? String(value) : value } : c
+          ),
+        };
       }
       return prev;
     });
@@ -190,6 +227,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
     }
   };
 
+  /** Save the current page's reviewed data via PUT /api/paymentConfirmation.
+   *  On success, stores the diff result for the SaveResultModal and prepares vehicle creation. */
   const saveCurrentPage = async () => {
     const pageNum = data?.pageNumber || 1;
     const chassisCount = editable.length;
@@ -224,7 +263,6 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
     const body = {
       Page: pageNum,
       Json: pageJson,
-      isCorrect: feedback,
       CompanyID: data?.companyId || null,
       DocumentURL: data?.blobUrl || null,
       invoiceJobId: data?.id || null,
@@ -241,8 +279,15 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       }
 
       showToast(res.message || "Review saved successfully", "success");
-      setFeedback("yes");
       setHasChanges(false);
+
+      // Store save result for diff display + golden marking
+      setSaveResult({
+        paymentConfirmationId: res.paymentConfirmationId,
+        isCorrect: res.isCorrect,
+        diffSummary: res.diffSummary,
+        isGolden: false,
+      });
 
       // Show create vehicles modal
       prepareVehiclesForCreation();
@@ -254,6 +299,21 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
     }
   };
 
+  /** Mark the saved PaymentConfirmation as golden training data via PATCH /api/paymentConfirmation. */
+  const markAsGolden = async () => {
+    if (!saveResult?.paymentConfirmationId) return;
+    const res = await API("PATCH", "paymentConfirmation", {
+      id: saveResult.paymentConfirmationId,
+      isGolden: true,
+    });
+    if (res.error) {
+      showToast(res.error, "error");
+    } else {
+      setSaveResult(prev => ({ ...prev, isGolden: true }));
+      showToast("ゴールデンデータに指定しました", "success");
+    }
+  };
+
   const prepareVehiclesForCreation = () => {
     const allVehicles = [];
     for (const item of editable) {
@@ -262,6 +322,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
           chassis_number: item.chassis_number,
           brand: item.brand || "",
           auction: item.auction || "",
+          auction_date: item.auction_date || "",
           lot_number: item.lot_number || "",
           charges: item.charges || [],
         });
@@ -308,6 +369,9 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       showToast(res.message, "success");
       setShowCreateVehiclesModal(false);
 
+      // If saveResult exists, show the diff/golden modal before navigating back
+      if (saveResult) return;
+
       setTimeout(() => {
         if (typeof onBack === "function") onBack();
       }, 500);
@@ -321,7 +385,25 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
 
   const handleSkipCreateVehicles = () => {
     setShowCreateVehiclesModal(false);
+
+    // If saveResult exists, show the diff/golden modal before navigating back
+    if (saveResult) return;
+
     if (typeof onBack === "function") onBack();
+  };
+
+  const toggleRowExpand = (idx) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const switchToDetailForChassis = (item) => {
+    setReviewMode("detail");
+    setSelectedChassis(item);
   };
 
   const displayError = error ? (typeof error === "string" ? error : error && error.message ? error.message : String(error)) : "";
@@ -444,11 +526,164 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
             {/* Right: parsed data */}
             <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6 flex flex-col shadow-sm max-h-[calc(100vh-160px)] md:max-h-[1000px] overflow-auto">
               <div className="mb-4">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-1">Extracted Data</h2>
-                <p className="text-sm text-[var(--secondary-foreground)]">{editable.length} vehicles on this page</p>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Extracted Data</h2>
+                  {/* Review mode toggle */}
+                  <div className="flex items-center gap-2">
+                    {auctionAccuracy && (
+                      <span className="text-xs px-2 py-1 rounded-full bg-[var(--secondary)] text-[var(--secondary-foreground)]">
+                        {auctionAccuracy.auction}: {Math.round(auctionAccuracy.accuracy * 100)}%
+                      </span>
+                    )}
+                    <div className="flex border border-[var(--border)] rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setReviewMode("summary")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                          reviewMode === "summary"
+                            ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                            : "bg-[var(--surface)] text-[var(--secondary-foreground)] hover:bg-[var(--secondary)]"
+                        }`}
+                        title="Summary view — quick confirm"
+                      >
+                        <ListChecks size={14} />
+                        Summary
+                      </button>
+                      <button
+                        onClick={() => setReviewMode("detail")}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${
+                          reviewMode === "detail"
+                            ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                            : "bg-[var(--surface)] text-[var(--secondary-foreground)] hover:bg-[var(--secondary)]"
+                        }`}
+                        title="Detail view — full editing"
+                      >
+                        <PenLine size={14} />
+                        Detail
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-[var(--secondary-foreground)]">{editable.length} vehicles on this page</p>
+                  {editable.some(v => v.confidence != null) && (
+                    <div className="flex items-center gap-3 text-xs text-[var(--secondary-foreground)]">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: CONFIDENCE_COLORS.high.color }} /> High</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: CONFIDENCE_COLORS.mid.color }} /> Review</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ backgroundColor: CONFIDENCE_COLORS.low.color }} /> Low</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex-1 overflow-auto px-0 py-3">
+                {reviewMode === "summary" ? (
+                  /* ===== SUMMARY MODE ===== */
+                  <div>
+                    <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-[var(--secondary)] sticky top-0">
+                          <tr>
+                            <th className="w-8 py-3 px-2"></th>
+                            <th className="text-left py-3 px-3 font-semibold text-[var(--foreground)]">Chassis</th>
+                            <th className="text-left py-3 px-3 font-semibold text-[var(--foreground)]">Brand</th>
+                            <th className="text-left py-3 px-3 font-semibold text-[var(--foreground)]">Lot</th>
+                            <th className="text-left py-3 px-3 font-semibold text-[var(--foreground)]">Date</th>
+                            <th className="text-right py-3 px-3 font-semibold text-[var(--foreground)]">Total</th>
+                            <th className="w-16 py-3 px-2"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {editable.map((item, idx) => {
+                            const isExpanded = expandedRows.has(idx);
+                            const total = calculateVehicleTotalCost(item.charges);
+                            const confLevel = getConfidenceLevel(item.confidence);
+                            const isLowConf = item.confidence != null && item.confidence < ACCURACY_THRESHOLDS.MID;
+                            return (
+                              <React.Fragment key={item.chassis_number || idx}>
+                                <tr
+                                  className={`border-t border-[var(--border)] cursor-pointer transition-colors ${
+                                    isLowConf ? "bg-amber-50/50 dark:bg-amber-900/10" : "hover:bg-[var(--secondary)]/30"
+                                  }`}
+                                  onClick={() => toggleRowExpand(idx)}
+                                >
+                                  <td className="py-3 px-2 text-center">
+                                    {isExpanded ? <ChevronDown size={14} className="text-[var(--secondary-foreground)]" /> : <ChevronRight size={14} className="text-[var(--secondary-foreground)]" />}
+                                  </td>
+                                  <td className="py-3 px-3">
+                                    <div className="flex items-center gap-2">
+                                      {item.confidence != null && (
+                                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getConfidenceColor(item.confidence) }} />
+                                      )}
+                                      <span className="font-medium text-[var(--foreground)]">{item.chassis_number}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3 text-[var(--foreground)]">{item.brand || "-"}</td>
+                                  <td className="py-3 px-3 text-[var(--foreground)]">{item.lot_number || "-"}</td>
+                                  <td className="py-3 px-3 text-[var(--foreground)]">{item.auction_date || "-"}</td>
+                                  <td className="py-3 px-3 text-right font-bold text-[var(--primary)]">{formatCurrency(total)}</td>
+                                  <td className="py-3 px-2">
+                                    <button
+                                      onClick={e => { e.stopPropagation(); switchToDetailForChassis(item); }}
+                                      className="px-2 py-1 text-xs text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded transition-colors"
+                                      title="Edit this vehicle in detail view"
+                                    >
+                                      <PenLine size={14} />
+                                    </button>
+                                  </td>
+                                </tr>
+                                {/* Expanded charge breakdown */}
+                                {isExpanded && (
+                                  <tr>
+                                    <td colSpan="7" className="px-6 py-3 bg-[var(--background)]/50">
+                                      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+                                        {(item.charges || []).filter(c => c.amount != null && c.amount !== "" && c.amount !== "0").map((c, ci) => (
+                                          <div key={ci} className="flex items-center justify-between py-1 border-b border-[var(--border)]/30">
+                                            <span className="text-[var(--secondary-foreground)]">{c.type || "Unknown"}</span>
+                                            <span className="font-medium text-[var(--foreground)] flex items-center gap-1">
+                                              {formatCurrency(c.amount)}
+                                              {c.confidence != null && (
+                                                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: getConfidenceColor(c.confidence) }} />
+                                              )}
+                                            </span>
+                                          </div>
+                                        ))}
+                                        {(!item.charges || item.charges.length === 0) && (
+                                          <span className="text-[var(--muted-foreground)] col-span-2">No charges</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Summary mode footer */}
+                    <div className="mt-4 p-3 md:p-4 bg-[var(--background)] rounded-lg border border-[var(--border)] sticky bottom-0 bg-opacity-90 backdrop-blur-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-[var(--secondary-foreground)]">
+                          {editable.length} vehicle{editable.length !== 1 ? "s" : ""} •
+                          Total: <span className="font-bold text-[var(--foreground)]">{formatCurrency(editable.reduce((sum, v) => sum + calculateVehicleTotalCost(v.charges), 0))}</span>
+                        </div>
+                        <button
+                          onClick={saveCurrentPage}
+                          disabled={isLoading || editable.length === 0}
+                          className={`flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-md transition-opacity duration-200 ${
+                            isLoading ? "opacity-50 cursor-not-allowed" : ""
+                          } disabled:opacity-60 disabled:cursor-not-allowed`}
+                        >
+                          <Check size={16} />
+                          {isLoading ? "Saving..." : "Confirm All"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ===== DETAIL MODE (existing UI) ===== */
+                  <>
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-3">
                     <div className="text-sm font-medium text-[var(--foreground)]">Chassis Numbers</div>
@@ -474,7 +709,12 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                                 : "bg-[var(--background)] text-[var(--secondary-foreground)] border-[var(--border)] hover:bg-[var(--secondary)] hover:border-[var(--primary)]/30 hover:shadow-sm"
                             }`}
                           >
-                            <span>{item.chassis_number}</span>
+                            <span className="flex items-center gap-1.5">
+                              {item.confidence != null && (
+                                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: getConfidenceColor(item.confidence) }} />
+                              )}
+                              {item.chassis_number}
+                            </span>
                           </button>
                         );
                       })}
@@ -499,7 +739,14 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                 {selectedChassis ? (
                   <div className="bg-[var(--background)] p-4 md:p-6 rounded border flex flex-col">
                     <div className="flex items-center justify-between">
-                      <div className="font-medium">{selectedChassis.chassis_number}</div>
+                      <div className="font-medium flex items-center gap-2">
+                        {selectedChassis.chassis_number}
+                        {selectedChassis.confidence != null && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ backgroundColor: CONFIDENCE_COLORS[getConfidenceLevel(selectedChassis.confidence)]?.bg, color: getConfidenceColor(selectedChassis.confidence) }}>
+                            {Math.round(selectedChassis.confidence * 100)}%
+                          </span>
+                        )}
+                      </div>
                       <div className="text-sm text-[var(--secondary-foreground)]">Edit charges</div>
                     </div>
 
@@ -510,6 +757,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                           value={selectedChassis.chassis_number || ""}
                           onChange={e => handleFieldChange(selectedChassis.chassis_number, "chassis_number", e.target.value)}
                           className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                          style={getConfidenceBorder(selectedChassis.confidence)}
+                          title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
                         />
                       </div>
                       <div>
@@ -518,6 +767,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                           value={selectedChassis.brand || ""}
                           onChange={e => handleFieldChange(selectedChassis.chassis_number, "brand", e.target.value)}
                           className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                          style={getConfidenceBorder(selectedChassis.confidence)}
+                          title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
                         />
                       </div>
                       <div>
@@ -526,6 +777,8 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                           value={selectedChassis.lot_number || ""}
                           onChange={e => handleFieldChange(selectedChassis.chassis_number, "lot_number", e.target.value)}
                           className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                          style={getConfidenceBorder(selectedChassis.confidence)}
+                          title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
                         />
                       </div>
                       <div>
@@ -534,6 +787,19 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                           value={selectedChassis.auction || ""}
                           onChange={e => handleFieldChange(selectedChassis.chassis_number, "auction", e.target.value)}
                           className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                          style={getConfidenceBorder(selectedChassis.confidence)}
+                          title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[var(--secondary-foreground)]">Auction Date</label>
+                        <input
+                          value={selectedChassis.auction_date || ""}
+                          onChange={e => handleFieldChange(selectedChassis.chassis_number, "auction_date", e.target.value)}
+                          className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                          style={getConfidenceBorder(selectedChassis.confidence)}
+                          title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
+                          placeholder="YYYY/MM/DD"
                         />
                       </div>
                     </div>
@@ -563,7 +829,9 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                                   value={c.amount ?? ""}
                                   onChange={e => handleChargeChange(selectedChassis.chassis_number, i, "amount", e.target.value)}
                                   className="w-full px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
+                                  style={getConfidenceBorder(c.confidence)}
                                   placeholder="0.00"
+                                  title={c.confidence != null ? `AI confidence: ${Math.round(c.confidence * 100)}%` : undefined}
                                 />
                               </td>
                               <td className="py-3 px-2">
@@ -599,39 +867,23 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                     </div>
 
                     <div className="mt-2 p-3 md:p-4 bg-[var(--background)] rounded-lg border border-[var(--border)] sticky bottom-0 bg-opacity-90 backdrop-blur-sm">
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="text-sm font-medium">Was this data correct?</div>
-                            <div className="flex items-center gap-3">
-                              <label className="flex items-center gap-1 text-sm">
-                                <input type="radio" name="page-review" checked={feedback === "yes"} onChange={() => setFeedback("yes")} />
-                                <span className="text-[var(--success)] ml-1">Yes</span>
-                              </label>
-                              <label className="flex items-center gap-1 text-sm">
-                                <input type="radio" name="page-review" checked={feedback === "no"} onChange={() => setFeedback("no")} />
-                                <span className="text-[var(--warning)] ml-1">No</span>
-                              </label>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={saveCurrentPage}
-                              disabled={isLoading || editable.length === 0}
-                              className={`px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-md transition-opacity duration-200 ${
-                                isLoading ? "opacity-50 cursor-not-allowed" : ""
-                              } disabled:opacity-60 disabled:cursor-not-allowed`}
-                            >
-                              {isLoading ? "Saving..." : "Save & Continue"}
-                            </button>
-                          </div>
-                        </div>
+                      <div className="flex items-center justify-end">
+                        <button
+                          onClick={saveCurrentPage}
+                          disabled={isLoading || editable.length === 0}
+                          className={`px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-md transition-opacity duration-200 ${
+                            isLoading ? "opacity-50 cursor-not-allowed" : ""
+                          } disabled:opacity-60 disabled:cursor-not-allowed`}
+                        >
+                          {isLoading ? "Saving..." : "Save & Continue"}
+                        </button>
                       </div>
                     </div>
                   </div>
                 ) : (
                   <div className="text-sm text-[var(--secondary-foreground)]">Select a chassis to see and edit charges.</div>
+                )}
+                  </>
                 )}
               </div>
             </div>
@@ -639,6 +891,18 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         )}
         <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
       </div>
+
+      {/* Save Result Panel: Diff Display + Golden Marking */}
+      {saveResult && !showCreateVehiclesModal && (
+        <SaveResultModal
+          saveResult={saveResult}
+          onClose={() => {
+            setSaveResult(null);
+            if (typeof onBack === "function") onBack();
+          }}
+          onMarkGolden={markAsGolden}
+        />
+      )}
 
       {/* Create Vehicles Modal */}
       {showCreateVehiclesModal && (
@@ -663,6 +927,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                     <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Chassis Number</th>
                     <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Brand</th>
                     <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Auction</th>
+                    <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Auction Date</th>
                     <th className="text-left py-3 px-4 font-semibold text-[var(--foreground)]">Lot #</th>
                     <th className="text-right py-3 px-4 font-semibold text-[var(--foreground)]">Total Cost</th>
                   </tr>
@@ -678,6 +943,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                       </td>
                       <td className="py-3 px-4 text-[var(--foreground)]">{v.brand || "-"}</td>
                       <td className="py-3 px-4 text-[var(--foreground)]">{v.auction || "-"}</td>
+                      <td className="py-3 px-4 text-[var(--foreground)]">{v.auction_date || "-"}</td>
                       <td className="py-3 px-4 text-[var(--foreground)]">{v.lot_number || "-"}</td>
                       <td className="py-3 px-4 text-right font-bold text-[var(--primary)]">{formatCurrency(calculateVehicleTotalCost(v.charges))}</td>
                     </tr>

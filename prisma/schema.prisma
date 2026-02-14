@@ -20,6 +20,7 @@ model Company {
   InvoiceJobs   InvoiceJobs[]
   notifications Notification[]
   customers Customer[]
+  promptVersions PromptVersion[]
 }
 
 model Customer {
@@ -191,13 +192,17 @@ model PaymentConfirmation {
   DocumentURL String?  
   Page        Int      
   Json        Json     
-  isCorrect   String   
+  isCorrect   String
+  diffSummary  Json?
+  auctionHouse String?
+  isGolden     Boolean  @default(false)
   invoiceJobId Int?
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
 
   @@index([companyId])
+  @@index([companyId, auctionHouse])
 }
 
 model InvoiceJobs {
@@ -248,6 +253,27 @@ enum NotificationCategory {
   success
   warning
   error
+}
+
+model PromptVersion {
+  id           Int       @id @default(autoincrement())
+  version      String
+  content      String    @db.Text
+  parentId     Int?
+  strategy     String?
+  status       String    @default("draft") // draft, evaluating, evaluated, active, archived
+  score        Float?
+  scoreDetails Json?
+  companyId    Int
+  createdAt    DateTime  @default(now())
+  evaluatedAt  DateTime?
+
+  company  Company        @relation(fields: [companyId], references: [id])
+  parent   PromptVersion? @relation("PromptDeriv", fields: [parentId], references: [id])
+  children PromptVersion[] @relation("PromptDeriv")
+
+  @@index([companyId])
+  @@index([companyId, status])
 }
 
 enum CompanyStatus {
