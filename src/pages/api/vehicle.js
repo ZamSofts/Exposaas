@@ -143,18 +143,23 @@ const ALLOWED_FILTER_FIELDS = new Set([
   "etd", "documentStatus", "memo",
   "bidAmount", "auctionFee", "insuranceFee", "recyclingFee",
   "transportFee", "otherFees", "taxSum", "totalCost",
+  "length", "width", "height", "m3",
   "titleTransferDeadline",
 ]);
 
 const DECIMAL_FIELDS = new Set([
   "bidAmount", "auctionFee", "insuranceFee", "recyclingFee",
   "transportFee", "otherFees", "taxSum", "totalCost",
+  "m3",
 ]);
+
+const INTEGER_FIELDS = new Set(["length", "width", "height"]);
 
 const DATE_FIELDS = new Set(["titleTransferDeadline"]);
 
 function getFieldDataType(field) {
   if (DECIMAL_FIELDS.has(field)) return "number";
+  if (INTEGER_FIELDS.has(field)) return "number";
   if (DATE_FIELDS.has(field)) return "date";
   return "string";
 }
@@ -317,7 +322,7 @@ const getIncludeRelations = (includeDocuments = true) => {
     sourceInvoiceJob: { select: { id: true, DocumentURL: true } },
   };
   if (includeDocuments) {
-    base.documents = { select: { id: true, Url: true, createdAt: true } };
+    base.documents = { select: { id: true, Url: true, docType: true, createdAt: true } };
   }
   return base;
 };
@@ -349,7 +354,7 @@ const parseVehicleFields = body => {
     fields.sourceInvoiceJobId = parseInt(body.sourceInvoiceJobId);
   }
 
-  // Metadata/logistics fields
+  // Metadata/logistics fields (string values)
   const metadataKeys = [
     "auctionDate", "session", "transportCompany", "deliverTo",
     "numberPlate", "containerNumber", "etd", "documentStatus", "memo",
@@ -358,6 +363,18 @@ const parseVehicleFields = body => {
     if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
       fields[key] = body[key];
     }
+  }
+
+  // Size fields (integer: length/width/height, decimal: m3)
+  for (const key of ["length", "width", "height"]) {
+    if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+      const parsed = parseInt(body[key]);
+      if (!isNaN(parsed)) fields[key] = parsed;
+    }
+  }
+  if (body.m3 !== undefined && body.m3 !== null && body.m3 !== "") {
+    const parsed = parseFloat(body.m3);
+    if (!isNaN(parsed)) fields.m3 = parsed;
   }
 
   // titleTransferDeadline (DateTime)

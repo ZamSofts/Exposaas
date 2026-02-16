@@ -125,14 +125,22 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
       }
     }
 
-    // Build prompt via promptBuilder (single path — schema + instructions + few-shot)
-    const { buildPrompt } = await import("../ai/promptBuilder.mjs");
-    const { EXTRACTION_SCHEMA } = await import("../ai/schema.mjs");
-    const dynamicPrompt = buildPrompt({
-      schema: EXTRACTION_SCHEMA,
-      fewShotExamples: examples,
-      instructions,  // null → buildPrompt uses buildDefaultInstructions(schema)
-    });
+    // Build prompt: use customPrompt if provided (for document classification/extraction),
+    // otherwise use the standard invoice promptBuilder pipeline
+    let dynamicPrompt;
+    if (options.customPrompt) {
+      // Custom prompt passed directly (e.g., document classification, cert extraction)
+      dynamicPrompt = options.customPrompt;
+    } else {
+      // Standard invoice extraction: schema + instructions + few-shot
+      const { buildPrompt } = await import("../ai/promptBuilder.mjs");
+      const { EXTRACTION_SCHEMA } = await import("../ai/schema.mjs");
+      dynamicPrompt = buildPrompt({
+        schema: EXTRACTION_SCHEMA,
+        fewShotExamples: examples,
+        instructions,  // null → buildPrompt uses buildDefaultInstructions(schema)
+      });
+    }
 
     const result = await callGeminiWithRetry(model, [
       {
@@ -183,7 +191,12 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
     }
 
     if (!parsed) {
-      return [];
+      return options.rawJsonResponse ? null : [];
+    }
+
+    // If caller wants raw JSON (e.g., classification or document extraction), return as-is
+    if (options.rawJsonResponse) {
+      return parsed;
     }
 
     if (Array.isArray(parsed)) {

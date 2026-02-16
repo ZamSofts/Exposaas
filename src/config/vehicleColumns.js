@@ -65,6 +65,12 @@ export const VEHICLE_COLUMNS = [
     type: "static",
   },
   {
+    id: "docs",
+    label: "Docs",
+    width: 90,
+    type: "static",
+  },
+  {
     id: "bidAmount",
     label: "Bid ¥",
     width: 120,
@@ -119,6 +125,34 @@ export const VEHICLE_COLUMNS = [
     width: 120,
     type: "readonly-currency-primary",
     field: "totalCost",
+  },
+  {
+    id: "length",
+    label: "L (cm)",
+    width: 80,
+    type: "number",
+    field: "length",
+  },
+  {
+    id: "width",
+    label: "W (cm)",
+    width: 80,
+    type: "number",
+    field: "width",
+  },
+  {
+    id: "height",
+    label: "H (cm)",
+    width: 80,
+    type: "number",
+    field: "height",
+  },
+  {
+    id: "m3",
+    label: "M3",
+    width: 80,
+    type: "number",
+    field: "m3",
   },
   {
     id: "customer",

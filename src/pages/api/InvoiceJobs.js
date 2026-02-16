@@ -22,15 +22,41 @@ export default async function handler(req, res) {
 
       // single item
       if (id) {
+        // When includeCorrections is requested, ensure isEvaluated is always fetched
+        const effectiveSelect = selectFields && req.query.includeCorrections === "1"
+          ? { ...selectFields, isEvaluated: true }
+          : selectFields;
+
         const item = await prisma.invoiceJobs.findUnique({
           where: { id },
-          ...(selectFields ? { select: selectFields } : {})
+          ...(effectiveSelect ? { select: effectiveSelect } : {})
         });
+
+        // Optionally include the latest user-corrected data from PaymentConfirmation
+        if (req.query.includeCorrections === "1" && item?.isEvaluated) {
+          const latestCorrection = await prisma.paymentConfirmation.findFirst({
+            where: { invoiceJobId: id },
+            orderBy: { createdAt: "desc" },
+            select: { id: true, Json: true, createdAt: true },
+          });
+          if (latestCorrection) {
+            return res.status(200).json({
+              ...item,
+              _correctedJson: latestCorrection.Json,
+              _correctionId: latestCorrection.id,
+            });
+          }
+        }
+
         return res.status(200).json(item);
       }
 
       const where = { ...userFilter };
       if (DocumentURL) where.DocumentURL = String(DocumentURL);
+
+      // Filter by docType (e.g., ?docType=invoice or ?docType=export_cert)
+      const docType = req.query.docType;
+      if (docType) where.docType = String(docType);
 
       const trimmed = search;
       let searchFilter = {};

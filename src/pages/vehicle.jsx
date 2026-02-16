@@ -2,9 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Head from "next/head";
 import { useAuth, useConfirm, API, Error, DataTable, isAllowed, Toast, Loader, EditVehicle, FilePreviewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import { Plus, FileUp, Search, Filter } from "lucide-react";
-import useFileUpload from "@/hooks/useFileUpload";
-import FileUploadModal from "@/components/ui/FileUploadModal";
+import { Plus, Search, Filter } from "lucide-react";
 import VehicleRow from "@/components/VehicleRow";
 import VehicleFilters from "@/components/VehicleFilters";
 import { VEHICLE_COLUMNS } from "@/config/vehicleColumns";
@@ -20,11 +18,7 @@ export default function VehiclesPage() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
-  const [invoiceFileModal, setInvoiceFileModal] = useState(false);
-  const [csvFileModal, setCsvFileModal] = useState(false);
-
   const [edit, setEdit] = useState(null);
-  const [currentView, setCurrentView] = useState("list");
   const [documentPreview, setDocumentPreview] = useState(null);
 
   // Dropdown / combobox options for inline editing
@@ -34,9 +28,6 @@ export default function VehiclesPage() {
 
   // Memoize dropdown options object so VehicleRow memo isn't broken
   const dropdownOpts = useMemo(() => ({ brandOptions, customerOptions }), [brandOptions, customerOptions]);
-
-  // Modal refs for click outside
-  const csvModalRef = useRef(null);
 
   // Pagination and search states
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,19 +61,6 @@ export default function VehiclesPage() {
     return () => clearTimeout(filterTimeoutRef.current);
   }, [currentPage, perPage, search, sortBy, sortOrder, filters, conjunction]);
 
-  // Handle click outside modal to close
-  useEffect(() => {
-    const handleClickOutside = event => {
-      if (csvModalRef.current && !csvModalRef.current.contains(event.target)) {
-        resetForm();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
-
   const showToast = useCallback((message, type = "success") => {
     setToast({ id: Date.now(), message, type });
   }, []);
@@ -104,21 +82,6 @@ export default function VehiclesPage() {
     }
   };
 
-  const csvUpload = useFileUpload({
-    endpoint: "addVehicle",
-    method: "POST",
-    validExtensions: ["csv"],
-    validMimeTypes: ["text/csv", "application/vnd.ms-excel"],
-    fileLabel: "CSV",
-  });
-  const invoiceUpload = useFileUpload({
-    endpoint: "addInvoice",
-    method: "PUT",
-    validExtensions: ["pdf"],
-    validMimeTypes: ["application/pdf"],
-    fileLabel: "Invoice",
-  });
-  
   const handleInlineSave = useCallback(
     (vehicleId, updatedVehicle) => {
       setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, ...updatedVehicle } : v)));
@@ -199,18 +162,6 @@ export default function VehiclesPage() {
     setPerPage(perPageValue);
   };
 
-  const handleUploadSuccess = (response, modalCloser) => {
-    showToast(response.message, "success");
-    modalCloser(false);
-    setError("");
-    loadData();
-  };
-
-  const handleUploadError = msg => {
-    setError(msg);
-    showToast(msg, "error");
-  };
-
   const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete Vehicle",
@@ -238,22 +189,16 @@ export default function VehiclesPage() {
   const resetForm = () => {
     setError("");
     setEdit(null);
-    csvUpload.reset();
-    invoiceUpload.reset();
-    setCsvFileModal(false);
     setCustomLoader(false);
-    setInvoiceFileModal(false);
   };
 
   // View management functions
   const handleAddVehicle = () => {
     setEdit(0); // 0 for new vehicle
-    setCurrentView("form");
   };
 
   const handleEditVehicle = useCallback(vehicleId => {
     setEdit(vehicleId);
-    setCurrentView("form");
   }, []);
 
   const handleBackToList = () => {
@@ -276,31 +221,6 @@ export default function VehiclesPage() {
       </Head>
       <Sidebar>
         <div className="p-2 bg-[var(--background)] min-h-screen">
-          {/* Upload Modals */}
-          <FileUploadModal
-            isOpen={csvFileModal}
-            label="Upload CSV File"
-            accept=".csv"
-            file={csvUpload.file}
-            progress={csvUpload.progress}
-            error={csvUpload.error || error}
-            onFileChange={csvUpload.validate}
-            onUpload={() => csvUpload.upload({ onSuccess: r => handleUploadSuccess(r, setCsvFileModal), onError: handleUploadError })}
-            onCancel={resetForm}
-            modalRef={csvModalRef}
-          />
-          <FileUploadModal
-            isOpen={invoiceFileModal}
-            label="Upload Invoice File"
-            accept=".pdf"
-            file={invoiceUpload.file}
-            progress={invoiceUpload.progress}
-            error={invoiceUpload.error || error}
-            onFileChange={invoiceUpload.validate}
-            onUpload={() => invoiceUpload.upload({ onSuccess: r => handleUploadSuccess(r, setInvoiceFileModal), onError: handleUploadError })}
-            onCancel={resetForm}
-          />
-
           <Error message={error} />
           {customLoader && <Loader />}
 
@@ -333,26 +253,6 @@ export default function VehiclesPage() {
                 <Filter className="w-3.5 h-3.5" />
                 Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
               </button>
-              {isAllowed(["add:csv"], session) && (
-                <>
-                  <button
-                    onClick={() => setInvoiceFileModal(true)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium
-                               bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)]
-                               rounded hover:bg-[var(--border)] transition-colors"
-                  >
-                    <FileUp className="w-3.5 h-3.5" /> Invoice
-                  </button>
-                  <button
-                    onClick={() => setCsvFileModal(true)}
-                    className="flex items-center gap-1 px-2 py-1 text-xs font-medium
-                               bg-[var(--secondary)] text-[var(--foreground)] border border-[var(--border)]
-                               rounded hover:bg-[var(--border)] transition-colors"
-                  >
-                    <FileUp className="w-3.5 h-3.5" /> CSV
-                  </button>
-                </>
-              )}
               {isAllowed(["add:vehicle"], session) && (
                 <button
                   onClick={handleAddVehicle}

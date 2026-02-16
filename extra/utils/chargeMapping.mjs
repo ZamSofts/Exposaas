@@ -53,6 +53,12 @@ export const METADATA_CSV_MAP = {
   document: "documentStatus",
   document_status: "documentStatus",
   memo: "memo",
+
+  // Size fields
+  length: "length",
+  width: "width",
+  height: "height",
+  m3: "m3",
 };
 
 export function calculateTaxAndTotal(currentCharges, updatedField, updatedValue) {
@@ -106,6 +112,9 @@ export function parseChargeFieldsFromFlat(row) {
   return charges;
 }
 
+const INTEGER_CSV_FIELDS = new Set(["length", "width", "height"]);
+const DECIMAL_CSV_FIELDS = new Set(["m3"]);
+
 export function parseMetadataFromCSV(row) {
   const metadata = {};
 
@@ -117,8 +126,14 @@ export function parseMetadataFromCSV(row) {
         if (!isNaN(d.getTime())) {
           metadata[dbCol] = d;
         }
+      } else if (INTEGER_CSV_FIELDS.has(dbCol)) {
+        const parsed = parseInt(value);
+        if (!isNaN(parsed)) metadata[dbCol] = parsed;
+      } else if (DECIMAL_CSV_FIELDS.has(dbCol)) {
+        const parsed = parseFloat(value);
+        if (!isNaN(parsed)) metadata[dbCol] = parsed;
       } else {
-        metadata[dbCol] = value.trim();
+        metadata[dbCol] = String(value).trim();
       }
     }
   }

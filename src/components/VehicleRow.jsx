@@ -1,5 +1,5 @@
 import React from "react";
-import { Edit, Trash2, FileText } from "lucide-react";
+import { Edit, Trash2, FileText, ShieldCheck, ClipboardCheck, FileX } from "lucide-react";
 import EditableCell from "@/components/ui/EditableCell";
 import { VEHICLE_COLUMNS, formatCurrency } from "@/config/vehicleColumns";
 import { isAllowed } from "@/hooks/wrapper";
@@ -120,6 +120,42 @@ function renderStaticCell(col, v, ctx) {
       ) : (
         <span className="text-sm text-[var(--secondary-foreground)]">-</span>
       );
+    case "docs": {
+      const certDocs = (v.documents || []).filter(d => d.docType && d.docType !== "invoice");
+      if (certDocs.length === 0) {
+        return <span className="text-sm text-[var(--secondary-foreground)]">-</span>;
+      }
+      const docTypeConfig = {
+        export_cert:     { icon: ShieldCheck,    color: "#10b981", title: "輸出抹消" },
+        inspection_cert: { icon: ClipboardCheck, color: "#f59e0b", title: "車検証" },
+        temp_cancel:     { icon: FileX,          color: "#8b5cf6", title: "一時抹消" },
+      };
+      return (
+        <div className="flex items-center gap-0.5">
+          {certDocs.map((doc) => {
+            const cfg = docTypeConfig[doc.docType] || { icon: FileText, color: "#6b7280", title: doc.docType };
+            const Icon = cfg.icon;
+            return (
+              <button
+                key={doc.id}
+                onClick={() =>
+                  ctx.setDocumentPreview({
+                    url: doc.Url,
+                    fileName: `${doc.docType}_${doc.Url.split("/").pop()}`,
+                  })
+                }
+                className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded hover:opacity-80 transition-colors"
+                style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
+                title={cfg.title}
+                aria-label={`Preview ${cfg.title} for vehicle ${v.id}`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+              </button>
+            );
+          })}
+        </div>
+      );
+    }
     case "createdAt":
       return (
         <span className="text-sm text-[var(--secondary-foreground)]">

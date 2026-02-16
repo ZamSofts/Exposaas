@@ -11,6 +11,12 @@ const FIELD_CONFIG = {
   transportFee: { type: "decimal", isCharge: true },
   otherFees:    { type: "decimal", isCharge: true },
 
+  // Size fields
+  length:  { type: "integer" },
+  width:   { type: "integer" },
+  height:  { type: "integer" },
+  m3:      { type: "decimal" },
+
   // String fields
   chassisNumber:    { type: "string", unique: true },
   lotNumber:        { type: "string" },
@@ -42,6 +48,12 @@ function parseValue(value, config) {
       if (isEmpty) return null;
       const parsed = parseFloat(value);
       if (isNaN(parsed)) throw new Error("Invalid numeric value");
+      return parsed;
+    }
+    case "integer": {
+      if (isEmpty) return null;
+      const parsed = parseInt(value);
+      if (isNaN(parsed)) throw new Error("Invalid integer value");
       return parsed;
     }
     case "string": {

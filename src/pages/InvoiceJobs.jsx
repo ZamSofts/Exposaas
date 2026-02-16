@@ -1,9 +1,18 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useAuth } from "@/hooks/useAuth";
-import { Error, API,DataTable, InvoiceDataViewer } from "@/hooks/wrapper";
+import { Error, API, DataTable, InvoiceDataViewer } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
-import { ReceiptText, CheckCircle2, Clock, AlertCircle, FileText, Car, Inbox, RefreshCw } from "lucide-react";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { ReceiptText, FileText, Car, RefreshCw } from "lucide-react";
+import {
+  getVehicleCount,
+  getPageInfo,
+  fetchCorrectedJson,
+  buildViewerData,
+  getReviewButtonLabel,
+  isReviewDisabled,
+} from "@/lib/invoiceJobUtils";
 
 export default function InvoiceJobsPage() {
   const { session } = useAuth();
@@ -20,9 +29,10 @@ export default function InvoiceJobsPage() {
 
   const [selected, setSelected] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [retrying, setRetrying] = useState(null);
 
   useEffect(() => {
-     loadData();
+    loadData();
   }, [currentPage, perPage, sortBy, sortOrder]);
 
   const loadData = async () => {
@@ -61,63 +71,13 @@ export default function InvoiceJobsPage() {
     setPerPage(perPageValue);
   };
 
-  const openViewer = row => {
-    // Pass row data for single-page view
-    const data = {
-      ...(row.Json && typeof row.Json === "object" ? row.Json : {}),
-      blobUrl: row.DocumentURL || null,
-      companyId: row.companyId,
-      id: row.id,
-      createdAt: row.createdAt,
-      status: row.status,
-      pageNumber: row.pageNumber,
-      originalTotalPages: row.originalTotalPages,
-    };
-    setSelected(data);
+  const openViewer = async (row) => {
+    let corrected = null;
+    if (row.isEvaluated) {
+      corrected = await fetchCorrectedJson(row.id);
+    }
+    setSelected(buildViewerData(row, corrected));
     setViewerOpen(true);
-  };
-
-  // Helper to get vehicle count from Json
-  const getVehicleCount = (json) => {
-    if (!json) return 0;
-    // New format: { items: [...] }
-    if (Array.isArray(json.items)) return json.items.length;
-    // Legacy format: { page_1: [...], page_2: [...] }
-    let count = 0;
-    for (const key of Object.keys(json)) {
-      if (key.startsWith('page_') && Array.isArray(json[key])) {
-        count += json[key].length;
-      }
-    }
-    return count;
-  };
-
-  // Helper to get status badge
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'completed':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs"><CheckCircle2 className="w-3 h-3" /> Completed</span>;
-      case 'processing':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs"><Clock className="w-3 h-3" /> Processing</span>;
-      case 'failed':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs"><AlertCircle className="w-3 h-3" /> Failed</span>;
-      case 'empty':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs"><Inbox className="w-3 h-3" /> Empty</span>;
-      default:
-        return <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-500/20 text-gray-400 rounded text-xs"><Clock className="w-3 h-3" /> Pending</span>;
-    }
-  };
-
-  // Helper to get page info
-  const getPageInfo = (row) => {
-    if (row.pageNumber && row.originalTotalPages) {
-      return `Page ${row.pageNumber} of ${row.originalTotalPages}`;
-    }
-    // Legacy job (before per-page architecture)
-    if (row.totalPages) {
-      return `${row.totalPages} pages (legacy)`;
-    }
-    return "Single";
   };
 
   const handleBackToList = () => {
@@ -126,8 +86,6 @@ export default function InvoiceJobsPage() {
     loadData();
   };
 
-  const [retrying, setRetrying] = useState(null);
-
   const handleRetry = async (jobId) => {
     setRetrying(jobId);
     try {
@@ -135,7 +93,6 @@ export default function InvoiceJobsPage() {
       if (res.error) {
         setError(res.error);
       } else {
-        // Reload data to show updated status
         loadData();
       }
     } catch (err) {
@@ -158,8 +115,6 @@ export default function InvoiceJobsPage() {
 
       <Sidebar>
         <div className="p-8 bg-[var(--background)] min-h-screen relative">
-
-
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
@@ -169,7 +124,9 @@ export default function InvoiceJobsPage() {
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">Invoice Jobs</h1>
               </div>
             </div>
-            <p className="text-[var(--secondary-foreground)]">List of processed invoice extraction jobs. Each page is a separate job.</p>
+            <p className="text-[var(--secondary-foreground)]">
+              List of processed invoice extraction jobs. Each page is a separate job.
+            </p>
           </div>
 
           <Error message={error} />
@@ -198,12 +155,14 @@ export default function InvoiceJobsPage() {
             </thead>
 
             <tbody>
-              {rows.map(row => {
+              {rows.map((row) => {
                 const vehicleCount = getVehicleCount(row.Json);
                 return (
                   <tr key={row.id} className="hover:bg-[var(--input)] transition-colors duration-200">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">#{row.id.toString().padStart(3, "0")}</div>
+                      <div className="text-sm font-medium text-[var(--foreground)]">
+                        #{row.id.toString().padStart(3, "0")}
+                      </div>
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -214,7 +173,7 @@ export default function InvoiceJobsPage() {
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(row.status)}
+                      <StatusBadge status={row.status} />
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -225,27 +184,29 @@ export default function InvoiceJobsPage() {
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-[var(--secondary-foreground)]">{window.goodDateTime(row.createdAt)}</div>
+                      <div className="text-sm text-[var(--secondary-foreground)]">
+                        {window.goodDateTime(row.createdAt)}
+                      </div>
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        {row.status === 'failed' ? (
+                        {row.status === "failed" ? (
                           <button
                             onClick={() => handleRetry(row.id)}
                             disabled={retrying === row.id}
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded text-sm transition-colors"
                           >
-                            <RefreshCw className={`w-3.5 h-3.5 ${retrying === row.id ? 'animate-spin' : ''}`} />
+                            <RefreshCw className={`w-3.5 h-3.5 ${retrying === row.id ? "animate-spin" : ""}`} />
                             {retrying === row.id ? "Retrying..." : "Retry"}
                           </button>
                         ) : (
                           <button
                             onClick={() => openViewer(row)}
-                            disabled={row.status === 'processing' || row.status === 'pending'}
+                            disabled={isReviewDisabled(row)}
                             className={row.isEvaluated ? "applied" : "apply-button"}
                           >
-                            {row.isEvaluated ? "Evaluated" : row.status === 'processing' ? "Processing..." : row.status === 'pending' ? "Pending..." : vehicleCount === 0 ? "Empty" : "Review"}
+                            {getReviewButtonLabel(row, vehicleCount)}
                           </button>
                         )}
                       </div>
