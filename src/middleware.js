@@ -33,9 +33,6 @@ const PERMISSIONS = {
     PUT: "add:customer",
     DELETE: "delete:customer",
   },
-  "/api/addVehicle": {
-    POST: "add:csv"
-  },
 };
 
 // Routes that don't require authentication
