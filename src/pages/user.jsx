@@ -167,7 +167,7 @@ export default function Userss() {
   const deleteIt = async id => {
     const confirmed = await confirm({
       title: "Delete User",
-      message: "Are you sure you want to delete this user? This action will permanently delete the user account and all associated chat messages. This cannot be undone.",
+      message: "Are you sure you want to delete this user? This action will permanently delete the user account. This cannot be undone.",
       confirmText: "Delete",
       type: "danger",
     });

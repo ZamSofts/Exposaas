@@ -222,7 +222,6 @@ export default async function handler(req, res) {
 
       await prisma.$transaction([
         prisma.userRole.deleteMany({ where: { userId } }),
-        prisma.chatMessage.deleteMany({ where: { userId } }),
         prisma.customer.deleteMany({ where: { userId } }),
         prisma.user.delete({ where: { id: userId } }),
       ]);

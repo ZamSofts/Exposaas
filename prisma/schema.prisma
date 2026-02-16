@@ -18,7 +18,6 @@ model Company {
   roles     Role[]
   paymentConfirmations PaymentConfirmation[]
   InvoiceJobs   InvoiceJobs[]
-  notifications Notification[]
   customers Customer[]
   promptVersions PromptVersion[]
 }
@@ -46,11 +45,9 @@ model User {
   password     String
   companyId    Int
   createdAt    DateTime      @default(now())
-  chatMessages ChatMessage[]
   company      Company       @relation(fields: [companyId], references: [id])
   roles        UserRole[]
   customer     Customer?
-  notifications Notification[]
 
   @@index([companyId])
 }
@@ -129,6 +126,12 @@ model Vehicle {
   documentStatus         String?
   memo                   String?
 
+  // Size dimensions (from certificates: export_cert, inspection_cert, temp_cancel)
+  length    Int?              // cm
+  width     Int?              // cm
+  height    Int?              // cm
+  m3        Decimal?  @db.Decimal(8, 2)  // cubic meters (L×W×H ÷ 1,000,000)
+
   // Relations
   brand         Brand         @relation(fields: [brandId], references: [id])
   company       Company       @relation(fields: [companyId], references: [id])
@@ -148,6 +151,7 @@ model VehicleDocument {
   id        Int      @id @default(autoincrement())
   vehicleId Int
   Url       String
+  docType   String?  // invoice, export_cert, inspection_cert, temp_cancel
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
@@ -176,16 +180,6 @@ model Brand {
   vehicles Vehicle[]
 }
 
-model ChatMessage {
-  id        Int      @id @default(autoincrement())
-  message   String
-  userId    Int
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id])
-
-  @@index([userId])
-}
-
 
 model PaymentConfirmation {
   id          Int      @id @default(autoincrement())
@@ -203,6 +197,7 @@ model PaymentConfirmation {
 
   @@index([companyId])
   @@index([companyId, auctionHouse])
+  @@index([invoiceJobId])
 }
 
 model InvoiceJobs {
@@ -211,8 +206,9 @@ model InvoiceJobs {
   Json        Json?    // Extraction result for this page
   companyId   Int
   isEvaluated Boolean   @default(false)
-  status      String   @default("pending")  // pending, processing, completed, failed, empty
+  status      String   @default("pending")  // pending, processing, completed, failed, empty, needs_classification
   totalPages  Int?     // Total page count in PDF (legacy, kept for backwards compat)
+  docType     String   @default("invoice")  // invoice, export_cert, inspection_cert, temp_cancel, unknown
 
   // Per-page job fields (new architecture)
   pageNumber          Int?      // Which page this is (1, 2, 3...) - null for legacy jobs
@@ -224,36 +220,10 @@ model InvoiceJobs {
   vehicles    Vehicle[]  // Vehicles created from this invoice
 
   @@index([companyId])
+  @@index([companyId, docType])
   @@index([parentDocumentUrl])  // For grouping pages from same PDF
 }
 
-model Notification {
-  id          Int      @id @default(autoincrement())
-  title       String
-  message     String
-  category    NotificationCategory @default(info)
-  userId      Int
-  companyId   Int
-  isRead      Boolean  @default(false)
-  actions     Json?    
-  metadata    Json?   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([companyId])
-  @@index([createdAt])
-}
-
-enum NotificationCategory {
-  info
-  success
-  warning
-  error
-}
 
 model PromptVersion {
   id           Int       @id @default(autoincrement())
