@@ -4,12 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import SidebarNotifications from "./SidebarNotifications";
-
 import {
-  LayoutDashboard,
   Truck,
-  MessageCircle,
   Users,
   Moon,
   Sun,
@@ -24,6 +20,7 @@ import {
   BarChart3,
   FlaskConical,
   Sparkles,
+  FolderOpen,
 } from "lucide-react";
 import { isAllowed } from "../hooks/wrapper";
 
@@ -94,13 +91,6 @@ const getAllSidebarSections = () => [
     title: "MAIN NAVIGATION",
     items: [
       {
-        id: "dashboard",
-        label: "Dashboard",
-        icon: <LayoutDashboard size={20} />,
-        href: "/dashboard",
-        excludeRoles: ["Customer"], // Hide from customer
-      },
-      {
         id: "companies",
         label: "Manage Companies",
         icon: <Building2 size={20} />,
@@ -113,13 +103,6 @@ const getAllSidebarSections = () => [
       //   icon: <Truck size={20} />,
       //   href: "/shipping",
       // },
-      {
-        id: "chat",
-        label: "General Chat",
-        icon: <MessageCircle size={20} />,
-        href: "/chat",
-        excludeRoles: ["Sadmin", "Customer"], // Hide from Sadmin and customer
-      },
       {
         id: "user",
         label: "User Management",
@@ -156,6 +139,14 @@ const getAllSidebarSections = () => [
         label: "Invoice Jobs",
         icon: <ReceiptText size={20} />,
         href: "/InvoiceJobs",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
+        id: "documents",
+        label: "Documents",
+        icon: <FolderOpen size={20} />,
+        href: "/documents",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
       },
@@ -301,13 +292,6 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             <p className="text-sm font-semibold text-[var(--foreground)] truncate">{session?.name || session?.username || "User"}</p>
             <p className="text-xs text-[var(--muted-foreground)] truncate">{session?.company || ""}</p>
           </div>
-          {/* Notification Bell */}
-          {session?.role?.toLowerCase?.() !== "sadmin" && !isCollapsed && (
-            <div className="flex-shrink-0">
-              <SidebarNotifications isCollapsed={isCollapsed} />
-            </div>
-          )}
-
         </div>
         
       </div>

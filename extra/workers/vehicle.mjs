@@ -2,7 +2,6 @@ import { initQueue } from "../queues/vehicle.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
-import NotificationService from "../services/notificationService.mjs";
 import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.mjs";
 
 let boss;
@@ -22,21 +21,6 @@ let boss;
       if (!filePath) {
         const err = new Error("Missing filePath in job data");
         console.error("❌", err.message, "job=", job && job.id);
-        if (userId && companyId) {
-          try {
-            await NotificationService.createAndSend({
-              userId,
-              companyId,
-              title: "Vehicle CSV Processing Failed",
-              message: `Missing filePath in job data: ${err.message}`,
-              category: "error",
-              metadata: { documentUrl: filePath || 'Unknown', error: err.message }
-            });
-          } catch (notifyErr) {
-            console.error("❌ Failed to send failure notification:", notifyErr);
-          }
-        }
-       
         throw err;
       }
 
@@ -188,44 +172,9 @@ let boss;
                   count += ops.length;
                 }
               }
-              if (userId && companyId) {
-                try {
-                  await NotificationService.createAndSend({
-                    userId,
-                    companyId,
-                    title: "Vehicle CSV Processed Successfully",
-                    message: `Processed ${count} vehicle(s) from the uploaded CSV.${newCustomerCount > 0 ? ` ${newCustomerCount} new customer(s) created.` : ''}`,
-                    category: "success",
-                    actions: [
-                      { label: "View Vehicles", url: "/vehicle" }
-                    ],
-                    metadata: { processed: count, documentUrl: filePath }
-                  });
-                } catch (notifyErr) {
-                  console.error("❌ Failed to send success notification:", notifyErr);
-                }
-              } else {
-                console.warn("⚠️ No userId or companyId provided, cannot send notification");
-              }
-
               resolve({ processed: count });
             } catch (error) {
               console.log({ error: "Database insert/update failed" });
-              if (userId && companyId) {
-                try {
-                  await NotificationService.createAndSend({
-                    userId,
-                    companyId,
-                    title: "Vehicle CSV Processing Failed",
-                    message: `Failed to process vehicle CSV: ${error && error.message ? error.message : String(error)}`,
-                    category: "error",
-                    metadata: { documentUrl: filePath, error: error && error.message ? error.message : String(error) }
-                  });
-                } catch (notifyErr) {
-                  console.error("❌ Failed to send failure notification:", notifyErr);
-                }
-              }
-
               reject(error);
             } finally {
               try {

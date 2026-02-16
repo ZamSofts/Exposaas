@@ -3,8 +3,6 @@ import { ensureQueue } from "../queues/pgBoss.mjs";
 import { splitAndUploadPages } from "../utils/pdfSplitter.mjs";
 import { downloadFile } from "../../src/lib/blob.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import NotificationService from "../services/notificationService.mjs";
-
 async function streamToBuffer(stream) {
   const chunks = [];
   for await (const chunk of stream) {
@@ -34,21 +32,7 @@ let boss;
       console.log("📄 Processing job:", job && job.id, filePath, "for user:", userId);
 
       if (!filePath) {
-        const err = new Error("Missing file path/url on job data");
-        if (userId && companyId) {
-          try {
-            await NotificationService.sendInvoiceFailedNotification(
-              userId,
-              companyId,
-              filePath || 'Unknown',
-              err.message
-            );
-          } catch (notifyErr) {
-            console.error("❌ Failed to send failure notification:", notifyErr);
-          }
-        }
-
-        throw err;
+        throw new Error("Missing file path/url on job data");
       }
 
       try {
@@ -85,18 +69,6 @@ let boss;
 
         }
       } catch (err) {
-        if (userId && companyId) {
-          try {
-            await NotificationService.sendInvoiceFailedNotification(
-              userId,
-              companyId,
-              filePath,
-              err.message || 'Unknown error occurred during processing'
-            );
-          } catch (notifyErr) {
-            console.error("❌ Failed to send failure notification:", notifyErr);
-          }
-        }
 
         if (err && err.meta) console.error("Prisma meta:", err.meta);
 

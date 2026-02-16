@@ -195,26 +195,6 @@ body {
   display: none;  /* Safari and Chrome */
 }
 
-/* Custom scrollbar for chat areas */
-.chat-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.chat-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chat-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--secondary);
-  border-radius: 6px;
-  transition: all 0.3s ease;
-}
-
-.chat-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
-  width: 8px;
-}
-
 /* Firefox scrollbar styling */
 * {
   scrollbar-width: thin;
@@ -235,10 +215,6 @@ body {
   scrollbar-width: none;
 }
 
-.chat-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: var(--secondary) transparent;
-}
 @keyframes show-modal {
   0% {
     transform: scale(0);

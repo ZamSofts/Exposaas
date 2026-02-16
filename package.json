@@ -3,11 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"NEXT,WORKER,WS,INVOICE,PAGE\" -c \"blue,green,yellow,magenta,cyan\" \"next dev\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\"",
+    "dev": "concurrently -n \"NEXT,WORKER,INVOICE,PAGE,CLASSIFY,DOCEXT\" -c \"blue,green,magenta,cyan,white,gray\" \"next dev\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\" \"node -r dotenv/config extra/workers/classifyDocument.mjs\" \"node -r dotenv/config extra/workers/documentExtract.mjs\"",
     "worker": "node -r dotenv/config extra/workers/vehicle.mjs",
-    "ws": "node -r dotenv/config extra/webSocket/ws.mjs",
     "build": "next build",
-    "start": "concurrently --restart-tries 3 --restart-after 5000 -n \"NEXT,WORKER,WS,INVOICE,PAGE\" -c \"blue,green,yellow,magenta,cyan\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/webSocket/ws.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\"",
+    "start": "concurrently --restart-tries 3 --restart-after 5000 -n \"NEXT,WORKER,INVOICE,PAGE,CLASSIFY,DOCEXT\" -c \"blue,green,magenta,cyan,white,gray\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\" \"node -r dotenv/config extra/workers/classifyDocument.mjs\" \"node -r dotenv/config extra/workers/documentExtract.mjs\"",
     "lint": "next lint",
     "postinstall": "prisma generate"
   },
@@ -31,8 +30,7 @@
     "react-dom": "19.1.0",
     "react-select": "^5.10.2",
     "recharts": "^3.7.0",
-    "uuid": "^11.1.0",
-    "ws": "^8.18.3"
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

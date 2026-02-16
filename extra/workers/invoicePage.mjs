@@ -1,8 +1,6 @@
 import { ensureQueue } from "../queues/pgBoss.mjs";
 import { processPageWithGemini } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import NotificationService from "../services/notificationService.mjs";
-
 let boss;
 
 (async () => {
@@ -39,25 +37,6 @@ let boss;
           }
         });
 
-        // Send notification for this job
-        if (userId) {
-          try {
-            const invoiceJob = await prisma.invoiceJobs.findUnique({
-              where: { id: invoiceJobId }
-            });
-
-            if (vehicles.length > 0) {
-              await NotificationService.sendInvoiceProcessedNotification(
-                userId,
-                companyId,
-                invoiceJob
-              );
-            }
-            // Don't send notification for empty pages
-          } catch (notifyErr) {
-            console.error("❌ Failed to send notification:", notifyErr);
-          }
-        }
 
       } catch (err) {
         console.error(`❌ InvoiceJob #${invoiceJobId} (page ${pageNumber}) failed:`, err.message);
@@ -70,20 +49,6 @@ let boss;
             Json: { error: err.message }
           }
         });
-
-        // Send failure notification
-        if (userId) {
-          try {
-            await NotificationService.sendInvoiceFailedNotification(
-              userId,
-              companyId,
-              `Page ${pageNumber}`,
-              err.message
-            );
-          } catch (notifyErr) {
-            console.error("❌ Failed to send failure notification:", notifyErr);
-          }
-        }
 
         // Don't re-throw - we've recorded the failure
       }

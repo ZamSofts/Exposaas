@@ -21,7 +21,7 @@ export default function LoginPage() {
     // Check if user is already authenticated
     getSession().then(session => {
       if (session) {
-        session.user.role.toLowerCase() === "customer" ? router.push("/vehicle") : router.push("/dashboard");
+        session.user.role.toLowerCase() === "customer" ? router.push("/vehicle") : router.push("/vehicle");
       } else {
         setIsCheckingSession(false);
       }
@@ -50,7 +50,7 @@ export default function LoginPage() {
       } else if (result?.ok) {
         getSession().then(session => {
           if (session) {
-            session?.user?.role?.toLowerCase() === "customer"  ? router.push("/vehicle") : router.push("/dashboard");
+            session?.user?.role?.toLowerCase() === "customer"  ? router.push("/vehicle") : router.push("/vehicle");
           }
         });
       }
