@@ -24,14 +24,14 @@ AI-powered invoice data extraction for Japanese car exporters. Upload auction in
 
 3. **Set up database:**
    ```bash
-   npx prisma migrate dev
+   npx prisma db push
    ```
 
 4. **Start development server:**
    ```bash
    npm run dev
    ```
-   This starts Next.js + all workers + WebSocket server concurrently.
+   This starts Next.js + 5 background workers concurrently.
 
 5. Open [http://localhost:3000](http://localhost:3000)
 
@@ -44,7 +44,6 @@ AI-powered invoice data extraction for Japanese car exporters. Upload auction in
    #   - DATABASE_URL → production PostgreSQL
    #   - GEMINI_API_KEY → production key
    #   - AZURE_* → production storage
-   #   - NEXT_PUBLIC_WS_URL → ws://<server-ip>:5000
    #   - NEXTAUTH_SECRET → generate with: openssl rand -base64 32
    ```
 
@@ -85,5 +84,4 @@ pg_dump -h <host> -U <user> -d exposaas > backup_$(date +%Y%m%d).sql
 - **Prisma** - ORM with PostgreSQL
 - **pg-boss** - PostgreSQL-based job queue
 - **Azure Blob Storage** - PDF file storage
-- **Google Gemini AI** - Invoice data extraction
-- **WebSocket** - Real-time job status updates
+- **Google Gemini AI** - Invoice data extraction & document classification

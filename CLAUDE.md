@@ -27,30 +27,35 @@
 
 **Key Directories:**
 - `src/pages/` - Next.js pages & API routes
-- `src/config/` - Shared constants (aiConstants.js)
-- `src/components/` - React components (InvoiceDataViewer, SaveResultModal, etc.)
-- `extra/workers/` - Background jobs (Gemini extraction, CSV import)
-- `extra/ai/` - AI extraction pipeline (schema, promptBuilder, optimizer, few-shot)
-- `extra/utils/` - Shared utilities (computeDiff, chargeMapping, promptEvaluator, fewShotExamples)
+- `src/config/` - Shared constants (aiConstants.js, vehicleColumns.js)
+- `src/components/` - React components (InvoiceDataViewer, DocumentViewer, EditVehicle, etc.)
+- `src/hooks/` - Custom hooks (useAuth, useTheme, useFileUpload, wrapper.js barrel)
+- `src/lib/` - Server utilities (useful.js, blob.mjs, auth.js, db.js)
+- `extra/workers/` - Background jobs (5 workers: vehicle, invoice, invoicePage, classifyDocument, documentExtract)
+- `extra/ai/` - AI extraction pipeline (schema, promptBuilder, optimizer, classificationSchema, documentSchemas)
+- `extra/utils/` - Shared utilities (computeDiff, chargeMapping, pdfSplitter, fewShotExamples, promptEvaluator, promptGenerator)
+- `extra/queues/` - pg-boss queue initializers (pgBoss, pdfInvoice, vehicle)
 - `prisma/` - Database schema
 
 ## HOW: Working on This Project
 
 **Development:**
 ```bash
-npm run dev  # Starts Next.js + workers + WebSocket
+npm run dev  # Starts Next.js + 5 workers (vehicle, invoice, invoicePage, classifyDocument, documentExtract)
 ```
 
 **Database changes:**
 ```bash
-npx prisma migrate dev --name <name>
-npx prisma studio  # View data
+npx prisma db push         # Sync schema to DB (dev)
+npx prisma generate        # Regenerate Prisma client
+npx prisma studio          # View data
 ```
 
 **Testing AI extraction:**
-1. Upload test PDF at `/InvoiceJobs`
-2. Check extraction in Invoice Review page
-3. Verify data structure matches schema
+1. Upload test PDF at `/documents`
+2. Check classification + extraction in Documents page
+3. For invoices: review in InvoiceDataViewer, create vehicles
+4. For certs: review in DocumentViewer, link to vehicles
 
 **Bash Guidelines:**
 - Avoid commands that cause output buffering issues
@@ -64,6 +69,88 @@ npx prisma studio  # View data
 
 ---
 
+## Full Feature List (19 features)
+
+### Core Business Features
+
+**1. AI Invoice Extraction Pipeline (Gemini)**
+PDF → page split → per-page Gemini 2.5 Flash extraction. Dynamic prompt (schema constraints + PromptVersion instructions + few-shot examples). Rate limit retry with exponential backoff.
+- Workers: `invoice.mjs` → `invoicePage.mjs` → `geminiProcess.mjs`
+- AI: `schema.mjs`, `promptBuilder.mjs`
+- Queue: `pdfInvoice.mjs` → "gemini-extract" → "gemini-extract-page"
+
+**2. Unified Document Classification & Extraction**
+Two-stage pipeline: Classification (page 1 only, cheap) → type-specific extraction. 5 types: invoice, export_cert, inspection_cert, temp_cancel, unknown. Auto-links to vehicles by chassis number.
+- Workers: `classifyDocument.mjs`, `documentExtract.mjs`
+- AI: `classificationSchema.mjs`, `documentSchemas.mjs`
+- UI: `documents.jsx` (upload), `DocumentViewer.jsx` (cert review + vehicle linking)
+- API: `addDocument.js` (unified upload), `linkDocumentToVehicle.js`
+
+**3. Invoice Review (Human-in-the-Loop)**
+Split PDF viewer + extracted data table. Summary/detail review modes. Confidence colors (green ≥85%, amber ≥60%, red <60%). Save with diff recording. Create vehicles from reviewed data. Mark records as golden.
+- UI: `InvoiceDataViewer.jsx`, `SaveResultModal.jsx`, `InvoiceJobs.jsx`
+- API: `paymentConfirmation.js`, `createVehiclesFromInvoice.js`
+
+**4. AI Learning Loop (DSPy-Inspired)**
+User corrections → diff → accuracy dashboard → few-shot selection (5-tier priority) → prompt variation generation (4 strategies) → Gemini meta-prompting optimization → golden dataset evaluation → best prompt activation.
+- AI: `optimizer.mjs`
+- Utils: `fewShotExamples.mjs`, `computeDiff.mjs`, `promptEvaluator.mjs`, `promptGenerator.mjs`
+- UI: `/accuracy`, `/prompts`, `/evaluation`
+- Config: `aiConstants.js` (thresholds: HIGH=0.85, MID=0.60)
+
+**5. Vehicle Management (Spreadsheet UI)**
+31-column spreadsheet with inline editing (number, text, date, dropdown, combobox). Row virtualization (tanstack/react-virtual). Brand/Customer comboboxes support auto-creation. Full CRUD via modal (EditVehicle) or inline.
+- UI: `vehicle.jsx`, `VehicleRow.jsx`, `EditVehicle.jsx` (5 tabs: Basic/Charges/Logistics/Documents/Payments)
+- Config: `vehicleColumns.js` (31 columns, filter operators)
+- API: `vehicle.js`, `vehicleInlineUpdate.js`, `vehicleSuggestions.js`
+
+**6. Lark Base-Style Filtering**
+Multi-condition filter panel with AND/OR conjunction. Operators vary by field type. Server-side `buildFilterWhere` converts filter JSON to Prisma where clauses.
+- UI: `VehicleFilters.jsx`
+- Config: `vehicleColumns.js` (FILTER_OPERATORS, FILTERABLE_COLUMNS)
+
+**7. Vehicle Charges & Tax Calculation**
+6 charge columns (bidAmount, auctionFee, insuranceFee, recyclingFee, transportFee, otherFees). Tax = 10% on all except recyclingFee (tax-exempt). Shared calculation across inline update, vehicle creation, and CSV import.
+- Utils: `chargeMapping.mjs` (CHARGE_TYPE_MAP, TAX_RATE, calculateTaxAndTotal)
+
+**8. CSV Vehicle Import**
+Upload CSV via `addDocument` API → pg-boss "vehicle" queue. csv-parser, batch-upsert (50/tx), brand/customer auto-create with race condition protection.
+- Worker: `vehicle.mjs`
+- Utils: `chargeMapping.mjs` (METADATA_CSV_MAP, parseChargeFieldsFromFlat, parseMetadataFromCSV)
+
+**9. Vehicle Payments**
+Per-vehicle payment CRUD with file attachment (PDF/JPG/PNG/DOC/DOCX, max 5MB). Accessible via EditVehicle → Payments tab.
+- UI: `Payments.jsx` (inside EditVehicle)
+- API: `vehiclePayments.js`
+
+### Management Features
+
+**10. Authentication & Authorization**
+NextAuth credentials provider, JWT 30-day sessions. API middleware enforces per-endpoint permission checks. Sadmin bypass.
+- Files: `auth.js`, `middleware.js`, `useAuth.js`, `index.jsx` (login → `/vehicle` redirect)
+
+**11. Multi-Tenant Company Management**
+Company CRUD (Sadmin only). All data scoped by companyId.
+- UI: `company.jsx` | API: `company.js`
+
+**12. User & Role Management (RBAC)**
+16 seeded permissions (CRUD × 4 entities). Roles can be global or company-scoped. PermissionSelector with grouped checkboxes.
+- UI: `user.jsx`, `role.jsx` | API: `user.js`, `role.js`, `permission.js`
+
+**13. Customer Management**
+Company-scoped CRUD. Optional user account creation (username/password).
+- UI: `customer.jsx` | API: `customer.js`
+
+### Infrastructure
+
+**14. File Storage (Azure Blob)** — `blob.mjs`: putFile, putMultipleFiles, downloadFile, deleteFile
+**15. Background Job Queue (pg-boss)** — 5 queues: vehicle, gemini-extract, gemini-extract-page, classify-document, extract-document
+**16. Theme System** — Dark/light toggle, localStorage persistence, CSS variables
+**17. Reusable UI Components** — DataTable (virtualized), EditableCell, FilePreviewer, ConfirmModal, Toast, Skeleton, StatusBadge, etc. Barrel export via `wrapper.js`
+**18. Deployment** — Dockerfile (Node 22 Alpine), Docker Compose, concurrently with 5 workers + auto-restart
+
+---
+
 ## Current Focus: Payment Deadline Tracking
 
 **Why this feature:** After extracting invoice data and creating vehicles with charges, exporters need to know when each payment is due. Different auctions have different payment rules (e.g., "USS Gumma → Next Monday").
@@ -72,89 +159,15 @@ npx prisma studio  # View data
 
 ---
 
-## Next: Unified Document Upload (PDF Auto-Classification)
+## Important Patterns
 
-**Why:** Currently only invoices can be uploaded. Exporters also handle 輸出抹消（export cancellation certs）, 車検証（inspection certs）, 一時抹消（temporary cancellation certs）. Instead of separate upload flows, one drop zone that auto-classifies.
-
-**Architecture:**
-```
-PDF → Azure Blob → pg-boss job
-  ↓
-【Gemini #1 — Classification (light, page 1 only)】
-  "What type of document is this?"
-  → "invoice" | "export_cert" | "inspection_cert" | "temp_cancel" | "unknown"
-  ↓
-【Gemini #2 — Extraction (type-specific schema + prompt)】
-  ├→ invoice         → existing pipeline (schema.mjs + promptBuilder.mjs)
-  ├→ export_cert     → extract chassis_number + date → link to Vehicle + update status
-  ├→ inspection_cert → extract vehicle info → link to Vehicle + store as VehicleDocument
-  ├→ temp_cancel     → extract chassis_number + date → link to Vehicle + update status
-  └→ unknown         → flag for user to classify manually
-```
-
-**Key design decisions:**
-- Gemini #1 (classification) is cheap: 1 page, simple JSON response
-- Gemini #2 (extraction) reuses existing `promptBuilder.mjs` — one schema per doc type
-- Documents stored in `VehicleDocument` table (already exists: vehicleId + URL)
-- Classification step added to `invoicePage.mjs` worker (or new worker)
-- Each doc type gets its own schema in `extra/ai/` (e.g., `schemaExportCert.mjs`)
-
-**Existing infrastructure that supports this:**
-- `VehicleDocument` model (prisma) — vehicleId + Url
-- Azure Blob upload (already in `addInvoice.js`)
-- `schema.mjs` + `promptBuilder.mjs` pattern — just define new schemas per doc type
-- `FilePreviewer` component — already renders PDFs
-
----
-
-## ✅ Completed: Vehicle Charges
-
-Charge columns added directly to Vehicle table (no separate table — matches Excel mental model).
-
-- **DB:** `bidAmount`, `auctionFee`, `recyclingFee`, `transportFee`, `insuranceFee`, `otherFees`, `taxSum`, `totalCost`, `sourceInvoiceJobId` on Vehicle
-- **API:** `src/pages/api/vehicle.js` — GET/PUT/POST include all charge fields, auto-calculates taxSum/totalCost
-- **CSV:** `extra/workers/vehicle.mjs` — parses charge columns from CSV with alias support
-- **UI:** `src/pages/vehicle.jsx` — wide table with all charge columns, currency formatting
-- **Invoice → Vehicle:** `src/pages/api/createVehiclesFromInvoice.js` — creates/updates vehicles from reviewed invoice data
-- **Charge mapping:** `extra/utils/chargeMapping.mjs` — shared constants (CHARGE_TYPE_MAP, TAX_RATE, tax-exempt logic)
-
----
-
-## ✅ Completed: AI Learning Loop (HITL)
-
-Gemini extraction accuracy improves over time through user corrections (DSPy-inspired).
-
-**Pipeline:**
-```
-PDF → schema (rules) + prompt (instructions) + few-shot (examples)
-    → promptBuilder (combines all) → Gemini → Extract
-    → User Review → diff recorded → golden data marked
-    → optimizer analyzes errors → generates better prompt → repeat
-```
-
-**Key files:**
-| File | Role |
-|------|------|
-| `extra/ai/schema.mjs` | Field definitions & constraints (Signature) |
-| `extra/ai/promptBuilder.mjs` | Combines schema + instructions + few-shot + output format into prompt |
-| `extra/ai/optimizer.mjs` | Meta-prompting: Gemini rewrites extraction prompts based on error patterns |
-| `extra/utils/fewShotExamples.mjs` | Selects best training examples (5-tier priority by auction + golden status) |
-| `extra/utils/computeDiff.mjs` | Shared diff logic: `computeDetailedDiff()` for UI, `computeScoredDiff()` for evaluation |
-| `extra/utils/promptEvaluator.mjs` | Evaluates prompt versions against golden dataset |
-| `extra/utils/promptGenerator.mjs` | Generates prompt variations (emphasize_charges, strict_chassis, negative_examples, simplified) |
-| `src/config/aiConstants.js` | Shared thresholds: HIGH=0.85, MID=0.60, MIN_RECORDS=5 |
-| `src/components/SaveResultModal.jsx` | Post-save diff display + golden marking button |
-
-**UI Pages:**
-- `/InvoiceJobs` → Invoice Review (InvoiceDataViewer) — review AI extraction, edit, save, mark golden
-- `/accuracy` — Accuracy dashboard with charts (by field, by auction, trends)
-- `/prompts` — Prompt version management (create, activate, compare, optimize)
-- `/evaluation` — Golden dataset management for A/B testing prompts
-
-**Important patterns:**
-- `promptBuilder` is NOT an LLM — just string concatenation of 4 sections
-- Confidence colors: Green (≥85%), Amber (60-84%), Red (<60%) — defined in `aiConstants.js`
-- All thresholds centralized in `src/config/aiConstants.js` — don't hardcode 0.85/0.6/etc.
+- **Upload flow:** All uploads go through `addDocument.js` → classification → type-specific extraction
+- **Inline editing:** Users edit vehicles directly in the spreadsheet (vehicleInlineUpdate API). EditVehicle modal is mainly for new creation and document attachment
+- **promptBuilder** is NOT an LLM — just string concatenation of 4 sections
+- **Confidence colors:** Green (≥85%), Amber (60-84%), Red (<60%) — defined in `aiConstants.js`
+- **All thresholds** centralized in `src/config/aiConstants.js` — don't hardcode 0.85/0.6/etc.
+- **Costing sheet vs customer billing:** Vehicle table = acquisition costs (office use). Customer billing = separate, currently managed in Excel by staff (future feature)
+- **Certs don't create vehicles:** Only invoices create vehicles. Certs (車検証/一時抹消/輸出抹消) only link to existing vehicles. Accuracy is already good (government-standard format), no HITL needed for certs.
 
 ---
 
@@ -177,7 +190,7 @@ A: Users review extractions → corrections saved as diff → golden records mar
 ## Progressive Disclosure
 
 **Read these when working on specific areas:**
-- `PLAN_VEHICLE_CHARGES.md` - Vehicle charges implementation checklist (completed)
+- `docs/CASE_STUDIES.md` - Product strategy case studies (Toma, Abridge) — read when making product/feature decisions
 - `README.md` - Project setup & architecture details
 - `extra/ai/schema.mjs` - Field extraction rules and constraints
 - `extra/ai/promptBuilder.mjs` - How the extraction prompt is assembled
