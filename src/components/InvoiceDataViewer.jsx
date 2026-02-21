@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useAuth, API, useConfirm, Error, CustomSelect, CustomButton, DataTable, Loader, Toast, FilePreviewer } from "@/hooks/wrapper";
+import { useAuth, API, useConfirm, Error, CustomButton, DataTable, Loader, Toast } from "@/hooks/wrapper";
 import { ArrowLeft, FileUp, ExternalLink, RefreshCw, Trash2, Car, Check, AlertTriangle, FileText, ChevronDown, ChevronRight, ListChecks, PenLine } from "lucide-react";
 import { ACCURACY_THRESHOLDS, MIN_RECORDS_FOR_AUTO_MODE, CONFIDENCE_COLORS, getConfidenceLevel, getAccuracyColor as getConfidenceColor, getConfidenceBorder } from "@/config/aiConstants";
 import SaveResultModal from "@/components/SaveResultModal";

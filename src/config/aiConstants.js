@@ -50,14 +50,6 @@ export function getAccuracyColor(value) {
   return level ? CONFIDENCE_COLORS[level].color : "#ef4444";
 }
 
-/** Alias for dashboard use */
-export const getAccuracyLevel = (value) => {
-  const level = getConfidenceLevel(value);
-  if (level === "high") return "green";
-  if (level === "mid") return "amber";
-  return "red";
-};
-
 /**
  * Get border style for confidence-highlighted input fields.
  * @param {number|null} confidence

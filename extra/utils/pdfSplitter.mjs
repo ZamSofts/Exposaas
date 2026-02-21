@@ -30,8 +30,3 @@ export async function splitAndUploadPages(pdfBuffer, invoiceJobId) {
   }
   return pages;
 }
-
-export async function getPageCount(pdfBuffer) {
-  const pdfDoc = await PDFDocument.load(pdfBuffer);
-  return pdfDoc.getPageCount();
-}

@@ -36,7 +36,3 @@ export async function ensureQueue(queueName) {
 
   return b;
 }
-
-export async function getBoss() {
-  return await initBoss();
-}

@@ -43,9 +43,6 @@ export const DOCUMENT_TYPES = {
   },
 };
 
-/** All valid docType keys */
-export const DOC_TYPE_KEYS = Object.keys(DOCUMENT_TYPES);
-
 /** Minimum confidence to auto-classify (below this → "unknown") */
 export const CLASSIFICATION_CONFIDENCE_THRESHOLD = 0.7;
 

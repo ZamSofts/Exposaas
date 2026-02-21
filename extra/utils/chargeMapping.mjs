@@ -18,7 +18,7 @@ export const CHARGE_TYPE_MAP = {
   transportation: "transportFee",
 };
 
-export const ALL_CHARGE_COLUMNS = [
+const ALL_CHARGE_COLUMNS = [
   "bidAmount",
   "auctionFee",
   "insuranceFee",
@@ -27,7 +27,7 @@ export const ALL_CHARGE_COLUMNS = [
   "otherFees",
 ];
 
-export const TAX_BASE_COLUMNS = [
+const TAX_BASE_COLUMNS = [
   "bidAmount",
   "auctionFee",
   "insuranceFee",
@@ -35,9 +35,9 @@ export const TAX_BASE_COLUMNS = [
   "otherFees",
 ];
 
-export const TAX_RATE = 0.1;
+const TAX_RATE = 0.1;
 
-export const METADATA_CSV_MAP = {
+const METADATA_CSV_MAP = {
   // Programmatic keys
   auction_date: "auctionDate",
   date: "auctionDate",
