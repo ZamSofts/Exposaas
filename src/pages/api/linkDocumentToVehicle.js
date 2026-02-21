@@ -9,6 +9,7 @@
  */
 
 import { prisma, getSession } from "@/lib/useful";
+import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -107,6 +108,16 @@ export default async function handler(req, res) {
           linkedChassisNumber: vehicle.chassisNumber,
         },
       },
+    });
+
+    // Audit trail (fire-and-forget)
+    logVehicleAudit(prisma, {
+      vehicleId: vehicle.id,
+      action: "link_document",
+      actor: "user",
+      actorId: session.id,
+      source: "manual",
+      metadata: { invoiceJobId: invoiceJob.id, docType: invoiceJob.docType },
     });
 
     return res.status(200).json({

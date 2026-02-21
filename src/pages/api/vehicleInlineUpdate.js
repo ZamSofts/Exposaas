@@ -1,5 +1,6 @@
 import { prisma, getSession } from "@/lib/useful";
 import { calculateTaxAndTotal } from "../../../extra/utils/chargeMapping.mjs";
+import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
 
 // Field configuration: defines all inline-editable fields and their types
 const FIELD_CONFIG = {
@@ -163,8 +164,11 @@ export default async function handler(req, res) {
       }
     }
 
+    // Capture old value for audit trail
+    const oldValue = vehicle[field];
+
     // Build update data
-    const updateData = { [field]: parsedValue };
+    const updateData = { [field]: parsedValue, updatedById: session.id };
 
     // Recalculate tax/total only for charge fields
     if (config.isCharge) {
@@ -181,6 +185,18 @@ export default async function handler(req, res) {
         brand: { select: { name: true } },
         customer: { select: { id: true, name: true } },
       },
+    });
+
+    // Audit trail (fire-and-forget)
+    logVehicleAudit(prisma, {
+      vehicleId: Number(id),
+      action: "update",
+      actor: "user",
+      actorId: session.id,
+      field,
+      oldValue,
+      newValue: parsedValue,
+      source: "manual",
     });
 
     return res.json({ message: "Vehicle Updated successfully", vehicle: updated });

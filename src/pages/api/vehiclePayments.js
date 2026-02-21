@@ -1,6 +1,7 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile } from "@/lib/blob.mjs";
 import multer from "multer";
+import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -270,6 +271,16 @@ export default async function handler(req, res) {
         },
       });
 
+      // Audit trail (fire-and-forget)
+      logVehicleAudit(prisma, {
+        vehicleId: Number(vehicleId),
+        action: "payment_create",
+        actor: "user",
+        actorId: session.id,
+        source: "manual",
+        metadata: { paymentId: payment.id, name, amount: parsedAmount },
+      });
+
       const response = {
         message: "Payment created successfully",
         paymentId: payment.id,
@@ -352,6 +363,16 @@ export default async function handler(req, res) {
         },
       });
 
+      // Audit trail (fire-and-forget)
+      logVehicleAudit(prisma, {
+        vehicleId: Number(vehicleId),
+        action: "payment_update",
+        actor: "user",
+        actorId: session.id,
+        source: "manual",
+        metadata: { paymentId, name, amount: parsedAmount },
+      });
+
       // Clean up old file if a new one was uploaded or document was removed
       if (oldFileUrl && (fileUploaded || removeDocument === "true")) {
         try {
@@ -388,6 +409,16 @@ export default async function handler(req, res) {
       if (!payment) {
         return res.status(404).json({ error: "Payment not found" });
       }
+
+      // Audit trail BEFORE delete (fire-and-forget)
+      logVehicleAudit(prisma, {
+        vehicleId: payment.vehicleId,
+        action: "payment_delete",
+        actor: "user",
+        actorId: session.id,
+        source: "manual",
+        metadata: { paymentId: id, name: payment.name, amount: payment.amount },
+      });
 
       // Delete the payment from database
       await prisma.vehiclePayments.delete({ where: { id } });

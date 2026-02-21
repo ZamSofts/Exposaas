@@ -2,6 +2,7 @@ import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile, putMultipleFiles } from "@/lib/blob.mjs";
 import multer from "multer";
 import { parseChargeFieldsFromFlat } from "../../../extra/utils/chargeMapping.mjs";
+import { logVehicleAudit, logVehicleFieldChanges } from "../../../extra/utils/auditLog.mjs";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -474,8 +475,18 @@ export default async function handler(req, res) {
             brandId: Number(brandId),
             companyId: Number(companyId),
             customerId: customerId && customerId !== "" ? Number(customerId) : null,
+            createdById: session.id,
             ...chargeFields,
           },
+        });
+
+        // Audit trail (fire-and-forget)
+        logVehicleAudit(prisma, {
+          vehicleId: vehicle.id,
+          action: "create",
+          actor: "user",
+          actorId: session.id,
+          source: "manual",
         });
 
         // Handle document uploads
@@ -514,6 +525,9 @@ export default async function handler(req, res) {
 
         await validateVehicle({ chassisNumber, brandId, companyId, vehicleId });
 
+        // Fetch current vehicle state for audit diff
+        const oldVehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+
         // Parse charge fields from request
         const chargeFields = parseVehicleFields(req.body);
 
@@ -525,6 +539,7 @@ export default async function handler(req, res) {
           brandId: Number(brandId),
           companyId: Number(companyId),
           customerId: customerId && customerId !== "" ? Number(customerId) : null,
+          updatedById: session.id,
           ...chargeFields,
         };
 
@@ -536,6 +551,18 @@ export default async function handler(req, res) {
           where: { id: vehicleId },
           data: updateData,
         });
+
+        // Audit trail — log changed fields (fire-and-forget)
+        if (oldVehicle) {
+          const trackedFields = ["chassisNumber", "auction", "lotNumber", "remarks", "brandId", "customerId", "name",
+            "bidAmount", "auctionFee", "insuranceFee", "recyclingFee", "transportFee", "otherFees",
+            "auctionDate", "session", "transportCompany", "deliverTo", "numberPlate", "containerNumber", "etd", "documentStatus", "memo",
+            "length", "width", "height", "m3", "titleTransferDeadline"];
+          const changes = trackedFields
+            .filter(f => updateData[f] !== undefined)
+            .map(f => ({ field: f, oldValue: oldVehicle[f], newValue: updateData[f] }));
+          logVehicleFieldChanges(prisma, { vehicleId, actor: "user", actorId: session.id, source: "manual", changes });
+        }
 
         // Handle document deletions
         let documentsDeleted = 0;
@@ -594,11 +621,27 @@ export default async function handler(req, res) {
       case "DELETE": {
         if (!id) return res.status(400).json({ error: "Vehicle ID required" });
 
+        // Capture vehicle snapshot for audit trail BEFORE deletion
+        const vehicleToDelete = await prisma.vehicle.findUnique({ where: { id } });
+
         // First, get all documents associated with this vehicle BEFORE deletion
         const vehicleDocuments = await prisma.vehicleDocument.findMany({
           where: { vehicleId: id },
           select: { id: true, Url: true },
         });
+
+        // Log audit BEFORE delete (cascade will remove audit logs too, so log includes snapshot)
+        if (vehicleToDelete) {
+          const { createdAt, updatedAt, ...snapshot } = vehicleToDelete;
+          logVehicleAudit(prisma, {
+            vehicleId: id,
+            action: "delete",
+            actor: "user",
+            actorId: session.id,
+            source: "manual",
+            metadata: { snapshot },
+          });
+        }
 
         // Delete the vehicle (cascade will automatically delete documents from database)
         await prisma.vehicle.delete({ where: { id } });

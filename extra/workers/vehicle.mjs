@@ -3,6 +3,7 @@ import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
 import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.mjs";
+import { logVehicleAudit } from "../utils/auditLog.mjs";
 
 let boss;
 
@@ -149,6 +150,7 @@ let boss;
                         auction,
                         brandId,
                         companyId,
+                        updatedById: userId ? String(userId) : null,
                         ...(customerId ? { customerId } : {}),
                         ...charges,
                         ...metadata,
@@ -159,6 +161,7 @@ let boss;
                         chassisNumber,
                         brandId,
                         companyId,
+                        createdById: userId ? String(userId) : null,
                         ...(customerId ? { customerId } : {}),
                         ...charges,
                         ...metadata,
@@ -168,8 +171,20 @@ let boss;
                 }
 
                 if (ops.length > 0) {
-                  await prisma.$transaction(ops);
+                  const batchResults = await prisma.$transaction(ops);
                   count += ops.length;
+
+                  // Audit trail — log each upserted vehicle (fire-and-forget)
+                  for (const v of batchResults) {
+                    const wasCreated = v.createdAt?.getTime() === v.updatedAt?.getTime();
+                    logVehicleAudit(prisma, {
+                      vehicleId: v.id,
+                      action: wasCreated ? "create" : "update",
+                      actor: "csv_import",
+                      actorId: userId ? String(userId) : null,
+                      source: `csv:${filePath}`,
+                    });
+                  }
                 }
               }
               resolve({ processed: count });

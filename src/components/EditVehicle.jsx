@@ -3,7 +3,8 @@ import Head from "next/head";
 import { useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer, Toast, isValid, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import Payments from "@/components/Payments";
-import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files, DollarSign, Truck } from "lucide-react";
+import VehicleHistory from "@/components/VehicleHistory";
+import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files, DollarSign, Truck, History } from "lucide-react";
 
 // Format currency for display
 const formatCurrencyDisplay = value => {
@@ -412,7 +413,22 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
                 >
                   <CreditCard className="w-4 h-4" />
                   Payments
-                  {!vehicleId && <span className="text-xs">(Payments can’t be added during creation.)</span>}
+                  {!vehicleId && <span className="text-xs">(Payments can't be added during creation.)</span>}
+                </button>
+                <button
+                  onClick={() => vehicleId && setActiveTab("history")}
+                  disabled={!vehicleId}
+                  title={!vehicleId ? "Save vehicle first to view history" : "View change history"}
+                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium transition-colors ${
+                    !vehicleId
+                      ? "text-[var(--muted-foreground)] cursor-not-allowed opacity-50"
+                      : activeTab === "history"
+                        ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                        : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--input)]"
+                  }`}
+                >
+                  <History className="w-4 h-4" />
+                  History
                 </button>
               </nav>
             </div>
@@ -556,6 +572,8 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
               )}
 
               {activeTab === "payments" && vehicleId && <Payments vehicleId={vehicleId} />}
+
+              {activeTab === "history" && vehicleId && <VehicleHistory vehicleId={vehicleId} />}
 
               {activeTab === "payments" && !vehicleId && (
                 <div className="text-center py-8">

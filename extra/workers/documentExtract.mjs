@@ -21,6 +21,7 @@ import {
   buildDocumentExtractionPrompt,
 } from "../ai/documentSchemas.mjs";
 import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
+import { logVehicleAudit } from "../utils/auditLog.mjs";
 
 let boss;
 
@@ -161,6 +162,16 @@ let boss;
                     linkedChassisNumber: chassisNumber,
                   },
                 },
+              });
+
+              // Audit trail — AI auto-linked document (fire-and-forget)
+              logVehicleAudit(prisma, {
+                vehicleId: vehicle.id,
+                action: "link_document",
+                actor: "ai",
+                actorId: userId ? String(userId) : null,
+                source: `ai_auto_link:${invoiceJobId}`,
+                metadata: { docType, chassisNumber },
               });
 
               console.log(`✅ Auto-linked ${docType} document to vehicle #${vehicle.id}`);

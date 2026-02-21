@@ -1,5 +1,6 @@
 import { prisma, getSession } from "@/lib/useful";
 import { computeDetailedDiff } from "../../../extra/utils/computeDiff.mjs";
+import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
 
 /**
  * Payment Confirmation API handler.
@@ -76,6 +77,7 @@ export default async function handler(req, res) {
           isCorrect: autoIsCorrect,
           diffSummary,
           auctionHouse,
+          reviewedById: session.id,
           companyId,
           invoiceJobId: invoiceJobId || null,
         },
@@ -166,10 +168,20 @@ export default async function handler(req, res) {
                 brandId,
                 lotNumber,
                 auction,
+                createdById: session.id,
                 remarks: `Auto-added from payment confirmation`,
               },
             });
             vehicleMap.set(chassisNumber, vehicle);
+
+            // Audit trail for auto-created vehicle (fire-and-forget)
+            logVehicleAudit(prisma, {
+              vehicleId: vehicle.id,
+              action: "create",
+              actor: "user",
+              actorId: session.id,
+              source: invoiceJobId ? `invoiceJob:${invoiceJobId}` : "manual",
+            });
           }
 
           const amount = ch.amount == null || ch.amount === "" ? null : Number(ch.amount);

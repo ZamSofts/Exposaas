@@ -1,5 +1,6 @@
 import { prisma, getSession } from "@/lib/useful";
 import { CHARGE_TYPE_MAP, calculateTaxFromChargeMap } from "../../../extra/utils/chargeMapping.mjs";
+import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
 
 /**
  * POST /api/createVehiclesFromInvoice
@@ -213,6 +214,7 @@ export default async function handler(req, res) {
           lotNumber: vehicle.lot_number || undefined,
           brandId,
           sourceInvoiceJobId: invoiceJobId,
+          updatedById: session.id,
           ...(customerId ? { customerId } : {}),
           ...chargeData,
         },
@@ -224,6 +226,7 @@ export default async function handler(req, res) {
           brandId,
           companyId: session.companyId,
           sourceInvoiceJobId: invoiceJobId,
+          createdById: session.id,
           ...(customerId ? { customerId } : {}),
           ...chargeData,
         },
@@ -238,6 +241,15 @@ export default async function handler(req, res) {
         results.updated++;
         results.vehicles.push({ id: result.id, chassisNumber, action: "updated" });
       }
+
+      // Audit trail (fire-and-forget)
+      logVehicleAudit(prisma, {
+        vehicleId: result.id,
+        action: wasCreated ? "create" : "update",
+        actor: "user",
+        actorId: session.id,
+        source: `invoiceJob:${invoiceJobId}`,
+      });
     } catch (error) {
       console.error(`Error processing vehicle ${vehicle.chassis_number}:`, error);
       results.errors.push({

@@ -132,6 +132,10 @@ model Vehicle {
   height    Int?              // cm
   m3        Decimal?  @db.Decimal(8, 2)  // cubic meters (L×W×H ÷ 1,000,000)
 
+  // Audit trail
+  createdById   String?   // User ID who created this vehicle
+  updatedById   String?   // User ID who last updated this vehicle
+
   // Relations
   brand         Brand         @relation(fields: [brandId], references: [id])
   company       Company       @relation(fields: [companyId], references: [id])
@@ -139,6 +143,7 @@ model Vehicle {
   sourceInvoiceJob InvoiceJobs? @relation(fields: [sourceInvoiceJobId], references: [id])
   documents     VehicleDocument[]
   payments      VehiclePayments[]
+  auditLogs     VehicleAuditLog[]
 
   @@unique([companyId, chassisNumber])
   @@index([companyId])
@@ -192,6 +197,7 @@ model PaymentConfirmation {
   isGolden     Boolean  @default(false)
   embedding    Json?    // Gemini text-embedding vector for few-shot similarity search
   invoiceJobId Int?
+  reviewedById String?  // User ID who reviewed/saved this extraction
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
@@ -245,6 +251,25 @@ model PromptVersion {
 
   @@index([companyId])
   @@index([companyId, status])
+}
+
+model VehicleAuditLog {
+  id        Int      @id @default(autoincrement())
+  vehicleId Int?     // Nullable: set to null when vehicle is deleted (audit log survives)
+  action    String   // create, update, delete, link_document, payment_create, payment_update, payment_delete
+  actor     String   // user, ai, system, csv_import
+  actorId   String?  // User ID (string — NextAuth stores IDs as strings)
+  field     String?  // Field name (for update actions)
+  oldValue  String?  // Previous value (stringified)
+  newValue  String?  // New value (stringified)
+  source    String?  // manual, invoiceJob:{id}, csv:{url}, ai_auto_link:{id}
+  metadata  Json?    // Additional context
+  createdAt DateTime @default(now())
+
+  vehicle   Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
+  @@index([vehicleId, createdAt])
 }
 
 enum CompanyStatus {
