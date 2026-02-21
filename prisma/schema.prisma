@@ -183,13 +183,14 @@ model Brand {
 
 model PaymentConfirmation {
   id          Int      @id @default(autoincrement())
-  DocumentURL String?  
-  Page        Int      
-  Json        Json     
+  DocumentURL String?
+  Page        Int
+  Json        Json
   isCorrect   String
   diffSummary  Json?
   auctionHouse String?
   isGolden     Boolean  @default(false)
+  embedding    Json?    // Gemini text-embedding vector for few-shot similarity search
   invoiceJobId Int?
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id])

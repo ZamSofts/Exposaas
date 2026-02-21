@@ -206,10 +206,19 @@ export default async function handler(req, res) {
       });
       if (!record) return res.status(404).json({ error: "Record not found" });
 
+      const newGolden = isGolden != null ? Boolean(isGolden) : !record.isGolden;
+
       const updated = await prisma.paymentConfirmation.update({
         where: { id: record.id },
-        data: { isGolden: isGolden != null ? Boolean(isGolden) : !record.isGolden },
+        data: { isGolden: newGolden },
       });
+
+      // Auto-compute embedding when marked as golden (async, non-blocking)
+      if (newGolden) {
+        import("../../../extra/utils/embedding.mjs")
+          .then(({ embedRecord }) => embedRecord(updated.id))
+          .catch(err => console.warn("[paymentConfirmation] Embedding failed:", err?.message || err));
+      }
 
       return res.status(200).json({ id: updated.id, isGolden: updated.isGolden });
     }

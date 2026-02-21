@@ -10,7 +10,7 @@
 
 import { COMPARED_FIELDS } from "../ai/schema.mjs";
 
-const normChassis = (s) => (s || "").replace(/[\s-]+/g, "").toUpperCase();
+const normChassis = (s) => (s || "").toUpperCase();
 
 /**
  * Normalize a JSON blob into a flat array of vehicle objects.
