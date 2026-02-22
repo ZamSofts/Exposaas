@@ -2,10 +2,7 @@ import { useState, useEffect } from "react";
 import { API } from "@/hooks/wrapper";
 
 // Currency fields that should be formatted with ¥
-const CURRENCY_FIELDS = new Set([
-  "bidAmount", "auctionFee", "insuranceFee", "recyclingFee",
-  "transportFee", "otherFees", "taxSum", "totalCost",
-]);
+const CURRENCY_FIELDS = new Set(["bidAmount", "auctionFee", "insuranceFee", "recyclingFee", "transportFee", "otherFees", "taxSum", "totalCost"]);
 
 // Field display names
 const FIELD_LABELS = {
@@ -98,21 +95,37 @@ function ActionDescription({ log }) {
 
   if (action === "payment_create" && metadata) {
     const amount = metadata.amount != null ? `¥${Number(metadata.amount).toLocaleString()}` : "";
-    return <span>{actionLabel}: {metadata.name} {amount}</span>;
+    return (
+      <span>
+        {actionLabel}: {metadata.name} {amount}
+      </span>
+    );
   }
 
   if (action === "payment_delete" && metadata) {
     const amount = metadata.amount != null ? `¥${Number(metadata.amount).toLocaleString()}` : "";
-    return <span>{actionLabel}: {metadata.name} {amount}</span>;
+    return (
+      <span>
+        {actionLabel}: {metadata.name} {amount}
+      </span>
+    );
   }
 
   if (action === "payment_update" && metadata) {
-    return <span>{actionLabel}: {metadata.name}</span>;
+    return (
+      <span>
+        {actionLabel}: {metadata.name}
+      </span>
+    );
   }
 
   if (action === "link_document" && metadata) {
     const docLabel = metadata.docType || "";
-    return <span>{actionLabel} ({docLabel})</span>;
+    return (
+      <span>
+        {actionLabel} ({docLabel})
+      </span>
+    );
   }
 
   return <span>{actionLabel}</span>;
@@ -127,7 +140,7 @@ export default function VehicleHistory({ vehicleId }) {
     if (!vehicleId) return;
 
     setLoading(true);
-    API("GET", `/api/vehicleAuditLog?vehicleId=${vehicleId}&limit=100`)
+    API("GET", `/vehicleAuditLog?vehicleId=${vehicleId}&limit=100`)
       .then(data => {
         setLogs(data.logs || []);
         setTotal(data.total || 0);
@@ -140,11 +153,7 @@ export default function VehicleHistory({ vehicleId }) {
   }, [vehicleId]);
 
   if (loading) {
-    return (
-      <div className="py-8 text-center text-[var(--secondary-foreground)]">
-        読み込み中...
-      </div>
-    );
+    return <div className="py-8 text-center text-[var(--secondary-foreground)]">読み込み中...</div>;
   }
 
   if (logs.length === 0) {
@@ -160,17 +169,12 @@ export default function VehicleHistory({ vehicleId }) {
     <div>
       <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
         変更履歴
-        <span className="text-sm font-normal text-[var(--secondary-foreground)] ml-2">
-          ({total}件)
-        </span>
+        <span className="text-sm font-normal text-[var(--secondary-foreground)] ml-2">({total}件)</span>
       </h3>
 
       <div className="space-y-1">
         {logs.map(log => (
-          <div
-            key={log.id}
-            className="flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-[var(--input)] transition-colors"
-          >
+          <div key={log.id} className="flex items-start gap-3 px-3 py-2 rounded-lg hover:bg-[var(--input)] transition-colors">
             {/* Actor icon */}
             <span className="text-base mt-0.5 flex-shrink-0" title={log.actorLabel}>
               {ACTOR_ICONS[log.actor] || "❓"}
@@ -180,9 +184,7 @@ export default function VehicleHistory({ vehicleId }) {
             <div className="flex-1 min-w-0">
               <div className="text-sm text-[var(--foreground)]">
                 {/* Actor name */}
-                {log.actorName && (
-                  <span className="font-medium mr-1">{log.actorName}</span>
-                )}
+                {log.actorName && <span className="font-medium mr-1">{log.actorName}</span>}
                 {/* Action description */}
                 <ActionDescription log={log} />
               </div>
