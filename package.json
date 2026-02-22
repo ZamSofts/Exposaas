@@ -7,7 +7,7 @@
     "worker": "node -r dotenv/config extra/workers/vehicle.mjs",
     "build": "next build",
     "start": "concurrently --restart-tries 3 --restart-after 5000 -n \"NEXT,WORKER,INVOICE,PAGE,CLASSIFY,DOCEXT\" -c \"blue,green,magenta,cyan,white,gray\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\" \"node -r dotenv/config extra/workers/classifyDocument.mjs\" \"node -r dotenv/config extra/workers/documentExtract.mjs\"",
-    "lint": "next lint",
+    "lint": "next lint"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",
