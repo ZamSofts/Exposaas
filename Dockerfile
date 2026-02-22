@@ -1,17 +1,26 @@
-# Step 1: Use Node 22 because pg-boss requires it
-FROM node:22-alpine
+FROM node:20-bullseye
 
-# Step 2: Set working directory
 WORKDIR /app
 
-# Step 5: Copy the rest of the project
+# Copy only dependency files first (better caching & safety)
+COPY package*.json ./
+
+RUN npm ci
+
+# Copy the rest of the app
 COPY . .
 
-# Step 4: Install dependencies
-RUN npm install --legacy-peer-deps
 
-# Step 7: Expose port
-EXPOSE 3001
+# Generate Prisma client INSIDE container
+RUN npx prisma generate
 
-# Step 8: Run Prisma commands and start app
+
+# Build Next.js (REQUIRED for next start)
+RUN npm run build
+
+
+EXPOSE 3000
+
+
+
 CMD ["npm", "run", "start"]
