@@ -1,18 +1,15 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
-import { useAuth, Error, API, CustomSelect, CustomButton, FilePreviewer, Toast, isValid, Loader } from "@/hooks/wrapper";
+import { useAuth, Error, API, CustomButton, FilePreviewer, Toast, isValid, Loader } from "@/hooks/wrapper";
 import Sidebar from "@/components/Sidebar";
 import Payments from "@/components/Payments";
 import VehicleHistory from "@/components/VehicleHistory";
-import { Car, FileUp, ArrowLeft, Save, Plus, User, CreditCard, Files, DollarSign, Truck, History } from "lucide-react";
+import { Car, ArrowLeft, Save, User, CreditCard, Files, DollarSign, Truck, History } from "lucide-react";
+import VehicleBasicTab from "@/components/vehicle/VehicleBasicTab";
+import VehicleChargesTab from "@/components/vehicle/VehicleChargesTab";
+import VehicleLogisticsTab from "@/components/vehicle/VehicleLogisticsTab";
+import VehicleDocumentsTab from "@/components/vehicle/VehicleDocumentsTab";
 
-// Format currency for display
-const formatCurrencyDisplay = value => {
-  if (value === null || value === undefined || value === "") return "";
-  const num = parseFloat(value);
-  if (isNaN(num)) return "";
-  return `¥${num.toLocaleString()}`;
-};
 
 export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   const { session, status } = useAuth();
@@ -436,139 +433,43 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
             {/* Tab Content */}
             <div className="p-6">
               {activeTab === "basic" && (
-                <div>
-                  <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">Basic Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <label className="input-label">Vehicle Name</label>
-                      <input type="text" value={name} onChange={e => setName(e.target.value)} className="input-style" placeholder="Enter vehicle name..." />
-                    </div>
-                    <div>
-                      <label className="input-label">Brand *</label>
-                      <CustomSelect data={brand} selectedId={brandId} setSelectedId={setBrandId} />
-                    </div>
-                    <div>
-                      <label className="input-label">Chassis Number *</label>
-                      <input type="text" value={chassisNumber} onChange={e => setChassisNumber(e.target.value)} className="input-style" placeholder="Enter chassis number..." />
-                    </div>
-                    <div>
-                      <label className="input-label">Customer</label>
-                      <CustomSelect data={customers} selectedId={customerId} setSelectedId={setCustomerId} placeholder="Select customer" />
-                    </div>
-                    <div>
-                      <label className="input-label">Lot Number</label>
-                      <input type="text" value={lotNumber} onChange={e => setLotNumber(e.target.value)} className="input-style" placeholder="Enter lot number..." />
-                    </div>
-                    <div>
-                      <label className="input-label">Auction</label>
-                      <input type="text" value={auction} onChange={e => setAuction(e.target.value)} className="input-style" placeholder="Enter auction..." />
-                    </div>
-                    <div className="col-span-1 md:col-span-3">
-                      <label className="input-label">Remarks</label>
-                      <textarea value={remarks} onChange={e => setRemarks(e.target.value)} className="input-style" placeholder="Enter remarks..." rows={3} />
-                    </div>
-                  </div>
-                </div>
+                <VehicleBasicTab
+                  name={name} setName={setName}
+                  brandId={brandId} setBrandId={setBrandId} brand={brand}
+                  chassisNumber={chassisNumber} setChassisNumber={setChassisNumber}
+                  customerId={customerId} setCustomerId={setCustomerId} customers={customers}
+                  lotNumber={lotNumber} setLotNumber={setLotNumber}
+                  auction={auction} setAuction={setAuction}
+                  remarks={remarks} setRemarks={setRemarks}
+                />
               )}
 
               {activeTab === "charges" && (
-                <div>
-                  <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">Acquisition Charges</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <label className="input-label">Bid Amount</label>
-                      <input type="number" value={bidAmount} onChange={e => setBidAmount(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="input-label">Auction Fee</label>
-                      <input type="number" value={auctionFee} onChange={e => setAuctionFee(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="input-label">Insurance Fee</label>
-                      <input type="number" value={insuranceFee} onChange={e => setInsuranceFee(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="input-label">Recycling Fee</label>
-                      <input type="number" value={recyclingFee} onChange={e => setRecyclingFee(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="input-label">Transport Fee</label>
-                      <input type="number" value={transportFee} onChange={e => setTransportFee(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                    <div>
-                      <label className="input-label">Other Fees</label>
-                      <input type="number" value={otherFees} onChange={e => setOtherFees(e.target.value)} className="input-style" placeholder="0" />
-                    </div>
-                  </div>
-
-                  {/* Total Cost & Tax Sum Display */}
-                  <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-[var(--primary)]/10 rounded-lg border border-[var(--primary)]/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-medium text-[var(--foreground)]">Total Acquisition Cost</span>
-                        <span className="text-2xl font-bold text-[var(--primary)]">{formatCurrencyDisplay(calculateTotalCost())}</span>
-                      </div>
-                    </div>
-                    <div className="p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg font-medium text-[var(--foreground)]">Tax Sum</span>
-                        <span className="text-2xl font-bold text-yellow-600">{formatCurrencyDisplay(calculateTaxSum())}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-[var(--secondary-foreground)] mt-4">
-                    These charges represent the acquisition costs for this vehicle. Total cost and tax sum are calculated automatically.
-                  </p>
-                </div>
+                <VehicleChargesTab
+                  bidAmount={bidAmount} setBidAmount={setBidAmount}
+                  auctionFee={auctionFee} setAuctionFee={setAuctionFee}
+                  insuranceFee={insuranceFee} setInsuranceFee={setInsuranceFee}
+                  recyclingFee={recyclingFee} setRecyclingFee={setRecyclingFee}
+                  transportFee={transportFee} setTransportFee={setTransportFee}
+                  otherFees={otherFees} setOtherFees={setOtherFees}
+                  calculateTaxSum={calculateTaxSum}
+                  calculateTotalCost={calculateTotalCost}
+                />
               )}
 
               {activeTab === "logistics" && (
-                <div>
-                  <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">Logistics & Metadata</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                      <label className="input-label">Auction Date</label>
-                      <input type="date" value={auctionDate} onChange={e => setAuctionDate(e.target.value)} className="input-style" placeholder="e.g., 2025/06/09" />
-                    </div>
-                    <div>
-                      <label className="input-label">Session</label>
-                      <input type="text" value={sessionField} onChange={e => setSessionField(e.target.value)} className="input-style" placeholder="e.g., 885" />
-                    </div>
-                    <div>
-                      <label className="input-label">Transportation Company</label>
-                      <input type="text" value={transportCompany} onChange={e => setTransportCompany(e.target.value)} className="input-style" placeholder="Enter transport company..." />
-                    </div>
-                    <div>
-                      <label className="input-label">Deliver To</label>
-                      <input type="text" value={deliverTo} onChange={e => setDeliverTo(e.target.value)} className="input-style" placeholder="Delivery destination..." />
-                    </div>
-                    <div>
-                      <label className="input-label">Number Plate</label>
-                      <input type="text" value={numberPlate} onChange={e => setNumberPlate(e.target.value)} className="input-style" placeholder="Vehicle plate number..." />
-                    </div>
-                    <div>
-                      <label className="input-label">Title Transfer Deadline</label>
-                      <input type="date" value={titleTransferDeadline} onChange={e => setTitleTransferDeadline(e.target.value)} className="input-style" />
-                    </div>
-                    <div>
-                      <label className="input-label">Container Number</label>
-                      <input type="text" value={containerNumber} onChange={e => setContainerNumber(e.target.value)} className="input-style" placeholder="Shipping container #..." />
-                    </div>
-                    <div>
-                      <label className="input-label">ETD (Estimated Departure)</label>
-                      <input type="text" value={etd} onChange={e => setEtd(e.target.value)} className="input-style" placeholder="e.g., Feb 2025" />
-                    </div>
-                    <div>
-                      <label className="input-label">Document Status</label>
-                      <input type="text" value={documentStatus} onChange={e => setDocumentStatus(e.target.value)} className="input-style" placeholder="e.g., Received, Pending..." />
-                    </div>
-                    <div>
-                      <label className="input-label">Memo</label>
-                      <input type="text" value={memo} onChange={e => setMemo(e.target.value)} className="input-style" placeholder="Notes..." />
-                    </div>
-                  </div>
-                </div>
+                <VehicleLogisticsTab
+                  auctionDate={auctionDate} setAuctionDate={setAuctionDate}
+                  sessionField={sessionField} setSessionField={setSessionField}
+                  transportCompany={transportCompany} setTransportCompany={setTransportCompany}
+                  deliverTo={deliverTo} setDeliverTo={setDeliverTo}
+                  numberPlate={numberPlate} setNumberPlate={setNumberPlate}
+                  titleTransferDeadline={titleTransferDeadline} setTitleTransferDeadline={setTitleTransferDeadline}
+                  containerNumber={containerNumber} setContainerNumber={setContainerNumber}
+                  etd={etd} setEtd={setEtd}
+                  documentStatus={documentStatus} setDocumentStatus={setDocumentStatus}
+                  memo={memo} setMemo={setMemo}
+                />
               )}
 
               {activeTab === "payments" && vehicleId && <Payments vehicleId={vehicleId} />}
@@ -583,63 +484,12 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
               )}
 
               {activeTab === "documents" && (
-                <div>
-                  <h3 className="text-xl font-semibold text-[var(--foreground)] mb-6">Vehicle Documents</h3>
-                  <div className="vehicle-doc-style">
-                    {/* Add Document Tile */}
-                    <div className="relative">
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" multiple onChange={handleDocumentChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                      <div className="vehicle-doc-upload-button">
-                        <Plus className="w-6 h-6 text-[var(--secondary-foreground)] mb-1" />
-                        <span className="text-xs text-[var(--secondary-foreground)] text-center px-1">Add Documents</span>
-                      </div>
-                    </div>
-
-                    {/* Document Tiles */}
-                    {vehicleDocuments.map(docObj => (
-                      <div key={docObj.id} className="relative group">
-                        <div className="vehicle-doc-display">
-                          <div
-                            className="flex-1 flex flex-col items-center justify-center cursor-pointer hover:bg-[var(--secondary)]/30 rounded transition-colors"
-                            onClick={() =>
-                              setPreviewFile({
-                                url: docObj.isExisting ? docObj.docUrl : docObj.previewUrl,
-                                fileName: docObj.name,
-                              })
-                            }
-                          >
-                            {docObj.isExisting ? (
-                              docObj.type === "image" ? (
-                                <img src={docObj.docUrl} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
-                              ) : (
-                                <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
-                              )
-                            ) : docObj.type && docObj.type.includes("image") ? (
-                              <img src={docObj.previewUrl} alt={docObj.name} className="w-8 h-8 object-cover rounded mb-1" />
-                            ) : (
-                              <FileUp className="w-5 h-5 text-[var(--primary)] mb-1" />
-                            )}
-                            <div className="text-xs text-[var(--foreground)] text-center break-words leading-tight">
-                              {docObj.name && docObj.name.length > 15 ? docObj.name.substring(0, 12) + "..." : docObj.name || ""}
-                            </div>
-                            <div className="text-xs text-[var(--secondary-foreground)] mt-1">{docObj.isExisting ? "Existing" : `${(docObj.size / 1024).toFixed(1)} KB`}</div>
-                          </div>
-                          <button onClick={() => removeDocument(docObj.id)} className="vehicle-doc-remove-button">
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {vehicleDocuments.length > 0 && (
-                    <div className="mt-4 p-3 bg-[var(--input)] rounded-lg text-sm text-[var(--secondary-foreground)]">
-                      <span className="font-medium">{vehicleDocuments.length} document(s) selected</span>
-                      <span className="ml-2">({(vehicleDocuments.reduce((acc, doc) => acc + doc.size, 0) / 1024).toFixed(1)} KB total)</span>
-                    </div>
-                  )}
-                  <p className="text-xs text-[var(--secondary-foreground)] mt-3">Supported formats: PDF, JPG, PNG, DOC, DOCX (Max size per file: 5MB, Max files: 15)</p>
-                </div>
+                <VehicleDocumentsTab
+                  vehicleDocuments={vehicleDocuments}
+                  handleDocumentChange={handleDocumentChange}
+                  removeDocument={removeDocument}
+                  setPreviewFile={setPreviewFile}
+                />
               )}
             </div>
           </div>
