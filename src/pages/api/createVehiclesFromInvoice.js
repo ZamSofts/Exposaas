@@ -2,6 +2,7 @@ import { prisma, getSession } from "@/lib/useful";
 import { parseChargesFromArray } from "../../../extra/utils/chargeMapping";
 import { resolveBrands, resolveCustomers } from "../../../extra/utils/vehicleDomain";
 import { logVehicleAudit } from "../../../extra/utils/auditLog";
+import { findMergeCandidate, mergeVehicles } from "../../../extra/utils/vehicleMerge";
 
 /**
  * POST /api/createVehiclesFromInvoice
@@ -103,6 +104,62 @@ export default async function handler(req, res) {
       // Customer lookup
       const customerName = vehicle.customer?.trim() || null;
       const customerId = customerName ? (customerMap.get(customerName.toLowerCase()) || null) : null;
+
+      // ── Merge detection: check if a different vehicle matches by chassisKey+lot+auction ──
+      const mergeCandidate = await findMergeCandidate(prisma, {
+        companyId: session.companyId,
+        chassisNumber,
+        lotNumber: vehicle.lot_number || null,
+        auction: auctionName,
+      });
+
+      if (mergeCandidate && mergeCandidate.chassisNumber !== chassisNumber) {
+        try {
+          const mergeResult = await mergeVehicles(prisma, {
+            source: "invoice",
+            newData: {
+              chassisNumber,
+              lotNumber: vehicle.lot_number || null,
+              auction: auctionName,
+              auctionDate: vehicle.auction_date || null,
+              brandId,
+              customerId: customerId || null,
+              sourceInvoiceJobId: invoiceJobId,
+              ...chargeData,
+            },
+            existing: mergeCandidate,
+            actorId: session.id,
+            mergeSource: `invoiceJob:${invoiceJobId}`,
+          });
+
+          logVehicleAudit(prisma, {
+            vehicleId: mergeResult.survivorId,
+            action: "merge",
+            actor: "user",
+            actorId: session.id,
+            source: `invoiceJob:${invoiceJobId}`,
+            metadata: {
+              absorbedId: mergeResult.absorbedId,
+              absorbedChassis: mergeCandidate.chassisNumber,
+              chargeSource: mergeResult.chargeSource,
+              fieldsChanged: mergeResult.fieldsChanged,
+              relocationCounts: mergeResult.relocationCounts,
+            },
+          });
+
+          results.updated++;
+          results.vehicles.push({
+            id: mergeResult.survivorId,
+            chassisNumber: mergeResult.chassisNumberUsed,
+            action: "merged",
+            mergedFrom: mergeCandidate.chassisNumber,
+          });
+          continue;
+        } catch (mergeErr) {
+          console.error(`Merge failed for ${chassisNumber}, falling back to upsert:`, mergeErr);
+          // Fall through to normal upsert
+        }
+      }
 
       // Single upsert instead of findUnique + update/create
       const result = await prisma.vehicle.upsert({

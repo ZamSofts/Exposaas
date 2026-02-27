@@ -136,6 +136,11 @@ model Vehicle {
   createdById   String?   // User ID who created this vehicle
   updatedById   String?   // User ID who last updated this vehicle
 
+  // Merge tracking
+  mergedAt      DateTime?   // Non-null = this vehicle was merged (drives UI highlight)
+  mergedFromId  Int?        // ID of the absorbed vehicle (reference only, not FK)
+  mergedFields  Json?       // Snapshot: { chargeSource, fieldsChanged, absorbedChassisNumber, source }
+
   // Relations
   brand         Brand         @relation(fields: [brandId], references: [id])
   company       Company       @relation(fields: [companyId], references: [id])
@@ -147,6 +152,7 @@ model Vehicle {
 
   @@unique([companyId, chassisNumber])
   @@index([companyId])
+  @@index([companyId, lotNumber, auction])
   @@index([sourceInvoiceJobId])
   @@index([brandId])
   @@index([customerId])

@@ -5,6 +5,7 @@ import csv from "csv-parser";
 import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.ts";
 import { resolveBrands, resolveCustomers } from "../utils/vehicleDomain.ts";
 import { logVehicleAudit } from "../utils/auditLog.ts";
+import { findMergeCandidate, mergeVehicles } from "../utils/vehicleMerge.ts";
 
 let boss;
 
@@ -65,6 +66,55 @@ let boss;
 
                   const customerName = row["customer"]?.trim() || null;
                   const customerId = customerName ? (customerMap.get(customerName.toLowerCase()) || null) : null;
+
+                  // ── Merge detection: check if a different vehicle matches by chassisKey+lot+auction ──
+                  const mergeCandidate = await findMergeCandidate(prisma, {
+                    companyId: Number(companyId),
+                    chassisNumber,
+                    lotNumber,
+                    auction,
+                  });
+
+                  if (mergeCandidate && mergeCandidate.chassisNumber !== chassisNumber) {
+                    try {
+                      const mergeResult = await mergeVehicles(prisma, {
+                        source: "csv",
+                        newData: {
+                          chassisNumber,
+                          lotNumber,
+                          auction,
+                          brandId,
+                          customerId: customerId || null,
+                          ...charges,
+                          ...metadata,
+                        },
+                        existing: mergeCandidate,
+                        actorId: userId ? String(userId) : null,
+                        mergeSource: `csv:${filePath}`,
+                      });
+
+                      logVehicleAudit(prisma, {
+                        vehicleId: mergeResult.survivorId,
+                        action: "merge",
+                        actor: "csv_import",
+                        actorId: userId ? String(userId) : null,
+                        source: `csv:${filePath}`,
+                        metadata: {
+                          absorbedId: mergeResult.absorbedId,
+                          absorbedChassis: mergeCandidate.chassisNumber,
+                          chargeSource: mergeResult.chargeSource,
+                          fieldsChanged: mergeResult.fieldsChanged,
+                          relocationCounts: mergeResult.relocationCounts,
+                        },
+                      });
+
+                      count++;
+                      continue; // Skip adding to upsert batch
+                    } catch (mergeErr) {
+                      console.error(`[vehicle] Merge failed for ${chassisNumber}, falling back to upsert:`, mergeErr);
+                      // Fall through to normal upsert
+                    }
+                  }
 
                   ops.push(
                     prisma.vehicle.upsert({

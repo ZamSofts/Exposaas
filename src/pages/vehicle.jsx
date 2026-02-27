@@ -102,6 +102,7 @@ export default function VehiclesPage() {
   const [documentPreview, setDocumentPreview] = useState(null);
   const [searchInput, setSearchInput] = useState("");
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
+  const [mergeInfoVehicle, setMergeInfoVehicle] = useState(null);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["vehicles"] });
 
@@ -298,6 +299,7 @@ export default function VehiclesPage() {
                     onEdit={handleEditVehicle}
                     onDelete={deleteIt}
                     setDocumentPreview={setDocumentPreview}
+                    onShowMergeInfo={setMergeInfoVehicle}
                     session={session}
                   />
                 ))}
@@ -310,6 +312,90 @@ export default function VehiclesPage() {
 
       <ConfirmComponent />
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
+
+      {/* Merge Info Popup */}
+      {mergeInfoVehicle && (
+        <MergeInfoPopup vehicle={mergeInfoVehicle} onClose={() => setMergeInfoVehicle(null)} />
+      )}
     </>
+  );
+}
+
+// ── Merge Info Popup ──
+
+const MERGE_FIELD_LABELS = {
+  chassisNumber: "車台番号", lotNumber: "ロット番号", auction: "オークション",
+  auctionDate: "オークション日", brandId: "ブランド", customerId: "顧客",
+  name: "名前", remarks: "備考", bidAmount: "落札額", auctionFee: "オークション手数料",
+  insuranceFee: "保険料", recyclingFee: "リサイクル料", transportFee: "輸送費",
+  otherFees: "その他費用", taxSum: "消費税", totalCost: "合計",
+  session: "セッション", transportCompany: "輸送会社", deliverTo: "納車先",
+  numberPlate: "ナンバープレート", titleTransferDeadline: "名義変更期限",
+  containerNumber: "コンテナ番号", etd: "ETD", documentStatus: "書類状況",
+  memo: "メモ", length: "長さ", width: "幅", height: "高さ", m3: "m³",
+  sourceInvoiceJobId: "請求書ジョブ",
+};
+
+function MergeInfoPopup({ vehicle, onClose }) {
+  const merged = vehicle.mergedFields;
+  if (!merged) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/30" />
+      <div
+        className="relative bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl p-5 w-80 max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-sm font-semibold text-[var(--foreground)] mb-3">統合情報</h4>
+
+        <div className="text-xs space-y-2 text-[var(--secondary-foreground)]">
+          <div className="flex justify-between">
+            <span>統合日</span>
+            <span className="text-[var(--foreground)]">{new Date(vehicle.mergedAt).toLocaleDateString()}</span>
+          </div>
+          {vehicle.mergedFromId && (
+            <div className="flex justify-between">
+              <span>元車両ID</span>
+              <span className="text-[var(--foreground)]">#{vehicle.mergedFromId}</span>
+            </div>
+          )}
+          {merged.absorbedChassisNumber && (
+            <div className="flex justify-between">
+              <span>元車台番号</span>
+              <span className="text-[var(--foreground)] font-mono">{merged.absorbedChassisNumber}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span>費用ソース</span>
+            <span className="text-[var(--foreground)]">{merged.chargeSource === "invoice" ? "請求書" : "CSV"}</span>
+          </div>
+
+          {merged.fieldsChanged?.length > 0 && (
+            <div className="pt-2 border-t border-[var(--border)]">
+              <p className="mb-1 font-medium text-[var(--foreground)]">変更フィールド:</p>
+              <div className="flex flex-wrap gap-1">
+                {merged.fieldsChanged.map((f) => (
+                  <span key={f} className="px-1.5 py-0.5 bg-[var(--input)] rounded text-[10px]">
+                    {MERGE_FIELD_LABELS[f] || f}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 pt-2 border-t border-[var(--border)]">
+          <p className="text-xs text-amber-500 font-medium">費用を確認してください</p>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-[var(--secondary-foreground)] hover:text-[var(--foreground)] text-lg leading-none"
+        >
+          &times;
+        </button>
+      </div>
+    </div>
   );
 }

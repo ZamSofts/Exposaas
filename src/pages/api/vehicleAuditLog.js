@@ -18,6 +18,7 @@ const ACTION_LABELS = {
   payment_create: "支払いを作成",
   payment_update: "支払いを更新",
   payment_delete: "支払いを削除",
+  merge: "車両を統合",
 };
 
 // Actor labels for display
@@ -35,6 +36,7 @@ function formatSource(source) {
   if (source.startsWith("invoiceJob:")) return "請求書";
   if (source.startsWith("csv:")) return "CSV";
   if (source.startsWith("ai_auto_link:")) return "AI自動リンク";
+  if (source.startsWith("migration:")) return "データ移行";
   return source;
 }
 
