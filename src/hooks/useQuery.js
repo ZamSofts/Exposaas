@@ -37,6 +37,7 @@ export const queryKeys = {
   permissions: () => ["permissions"],
   companyOptions: () => ["companyOptions"],
   roleOptions: () => ["roleOptions"],
+  exportTemplates: (params) => ["exportTemplates", params],
 };
 
 // ── Internal: Debounce Hook ──

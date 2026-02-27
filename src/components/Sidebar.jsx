@@ -14,6 +14,7 @@ import {
   FlaskConical,
   Sparkles,
   FolderOpen,
+  FileSpreadsheet,
 } from "lucide-react";
 import { isAllowed } from "../hooks/wrapper";
 import SidebarNav from "@/components/sidebar/SidebarNav";
@@ -142,6 +143,14 @@ const getAllSidebarSections = () => [
         label: "Documents",
         icon: <FolderOpen size={20} />,
         href: "/documents",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+      },
+      {
+        id: "export-templates",
+        label: "Export Templates",
+        icon: <FileSpreadsheet size={20} />,
+        href: "/exportTemplates",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
       },

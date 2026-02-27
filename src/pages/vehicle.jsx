@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import { Plus, Search, Filter } from "lucide-react";
 import VehicleRow from "@/components/VehicleRow";
 import VehicleFilters from "@/components/VehicleFilters";
+import ExportDropdown from "@/components/export/ExportDropdown";
 import { VEHICLE_COLUMNS } from "@/config/vehicleColumns";
 
 export default function VehiclesPage() {
@@ -95,6 +96,16 @@ export default function VehiclesPage() {
     }
   );
 
+  // ── Export templates (cached) ──
+  const exportTemplates = useStaticOptions(
+    queryKeys.exportTemplates(),
+    "exportTemplate",
+    (data) => {
+      if (!data || data.error) return [];
+      return data.templates || [];
+    }
+  );
+
   // ── Local UI state ──
   const [error, setError] = useState("");
   const [customLoader, setCustomLoader] = useState(false);
@@ -103,6 +114,7 @@ export default function VehiclesPage() {
   const [searchInput, setSearchInput] = useState("");
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
   const [mergeInfoVehicle, setMergeInfoVehicle] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["vehicles"] });
 
@@ -149,6 +161,63 @@ export default function VehiclesPage() {
     setFilters(newFilters);
     setPage(1);
   }, [setPage]);
+
+  // ── Export handler ──
+  const handleExport = useCallback(async (templateId, exportFilename) => {
+    setIsExporting(true);
+    try {
+      const activeFilters = filters.filter(isFilterActive);
+      const payload = {
+        templateId,
+        filename: exportFilename || undefined,
+        search: searchInput.trim() || undefined,
+        sortBy,
+        sortOrder,
+      };
+      if (activeFilters.length > 0) {
+        payload.filters = {
+          conjunction,
+          conditions: activeFilters.map((f) => ({
+            field_name: f.field,
+            operator: f.operator,
+            value: f.value,
+          })),
+        };
+      }
+
+      const response = await fetch("/api/vehicleExport", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "Export failed");
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? decodeURIComponent(match[1]) : "export.xlsx";
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast("エクスポート完了", "success");
+    } catch (err) {
+      showToast(err.message || "エクスポートに失敗しました", "error");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [filters, conjunction, searchInput, sortBy, sortOrder, showToast]);
 
   // ── Delete vehicle ──
   const deleteIt = async (id) => {
@@ -236,6 +305,11 @@ export default function VehiclesPage() {
                 <Filter className="w-3.5 h-3.5" />
                 Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
               </button>
+              <ExportDropdown
+                templates={exportTemplates}
+                onExport={handleExport}
+                isExporting={isExporting}
+              />
               {isAllowed(["add:vehicle"], session) && (
                 <button
                   onClick={handleAddVehicle}
