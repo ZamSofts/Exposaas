@@ -8,22 +8,48 @@
  * never breaking the parent operation.
  */
 
+// Use a minimal interface instead of importing PrismaClient directly.
+// This avoids import path issues between src/ and extra/ while keeping type safety.
+interface AuditPrisma {
+  vehicleAuditLog: {
+    create: (args: { data: Record<string, any> }) => Promise<any>;
+    createMany: (args: { data: Record<string, any>[] }) => Promise<any>;
+  };
+}
+
+export interface VehicleAuditParams {
+  vehicleId: number;
+  action: "create" | "update" | "delete" | "link_document" | "payment_create" | "payment_update" | "payment_delete";
+  actor: "user" | "ai" | "system" | "csv_import";
+  actorId?: string | null;
+  field?: string | null;
+  oldValue?: any;
+  newValue?: any;
+  source?: string | null;
+  metadata?: Record<string, any> | null;
+}
+
+export interface FieldChange {
+  field: string;
+  oldValue: any;
+  newValue: any;
+}
+
+export interface VehicleFieldChangesParams {
+  vehicleId: number;
+  actor: string;
+  actorId?: string | null;
+  source?: string | null;
+  changes: FieldChange[];
+}
+
 /**
  * Log a single vehicle audit event.
- *
- * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance
- * @param {Object} params
- * @param {number} params.vehicleId
- * @param {string} params.action - "create"|"update"|"delete"|"link_document"|"payment_create"|"payment_update"|"payment_delete"
- * @param {string} params.actor - "user"|"ai"|"system"|"csv_import"
- * @param {string|null} [params.actorId] - User ID (string)
- * @param {string|null} [params.field] - Field name (for updates)
- * @param {*} [params.oldValue] - Previous value
- * @param {*} [params.newValue] - New value
- * @param {string|null} [params.source] - "manual"|"invoiceJob:{id}"|"csv:{url}"|"ai_auto_link:{id}"
- * @param {Object|null} [params.metadata] - Extra context
  */
-export async function logVehicleAudit(prisma, { vehicleId, action, actor, actorId, field, oldValue, newValue, source, metadata }) {
+export async function logVehicleAudit(
+  prisma: AuditPrisma,
+  { vehicleId, action, actor, actorId, field, oldValue, newValue, source, metadata }: VehicleAuditParams,
+): Promise<void> {
   try {
     await prisma.vehicleAuditLog.create({
       data: {
@@ -38,7 +64,7 @@ export async function logVehicleAudit(prisma, { vehicleId, action, actor, actorI
         metadata: metadata || undefined,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
     console.error("[audit] Failed to log:", err?.message || err);
   }
 }
@@ -46,16 +72,11 @@ export async function logVehicleAudit(prisma, { vehicleId, action, actor, actorI
 /**
  * Log multiple field changes for a vehicle in one batch.
  * Filters out unchanged fields automatically.
- *
- * @param {import("@prisma/client").PrismaClient} prisma
- * @param {Object} params
- * @param {number} params.vehicleId
- * @param {string} params.actor
- * @param {string|null} [params.actorId]
- * @param {string|null} [params.source]
- * @param {Array<{field: string, oldValue: *, newValue: *}>} params.changes
  */
-export async function logVehicleFieldChanges(prisma, { vehicleId, actor, actorId, source, changes }) {
+export async function logVehicleFieldChanges(
+  prisma: AuditPrisma,
+  { vehicleId, actor, actorId, source, changes }: VehicleFieldChangesParams,
+): Promise<void> {
   try {
     const data = changes
       .filter(c => String(c.oldValue ?? "") !== String(c.newValue ?? ""))
@@ -73,7 +94,7 @@ export async function logVehicleFieldChanges(prisma, { vehicleId, actor, actorId
     if (data.length > 0) {
       await prisma.vehicleAuditLog.createMany({ data });
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error("[audit] Failed to log batch:", err?.message || err);
   }
 }

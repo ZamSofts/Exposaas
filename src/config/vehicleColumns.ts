@@ -1,11 +1,57 @@
-export const formatCurrency = (value) => {
+// ── Types ──
+
+export type ColumnType =
+  | "static"
+  | "text"
+  | "number"
+  | "date"
+  | "combobox"
+  | "dropdown"
+  | "readonly-currency"
+  | "readonly-currency-primary"
+  | "actions";
+
+export type FilterType = "text" | "number" | "dropdown" | "combobox" | "date";
+
+export interface VehicleColumn {
+  id: string;
+  label: string;
+  width: number;
+  type: ColumnType;
+  field?: string;
+  displayValueFn?: (vehicle: Record<string, any>) => string | undefined;
+  optionsKey?: string;
+  isRelation?: boolean;
+  isClearable?: boolean;
+  requirePermission?: string[];
+}
+
+export interface FilterOperator {
+  value: string;
+  label: string;
+}
+
+export interface FilterableColumn {
+  id: string;
+  label: string;
+  field: string | undefined;
+  filterType: string;
+  optionsKey: string | null;
+  prismaPath: string | undefined;
+}
+
+// ── Functions ──
+
+export const formatCurrency = (value: number | string | null | undefined): string => {
   if (value === null || value === undefined) return "-";
-  const num = parseFloat(value);
+  const num = parseFloat(String(value));
   if (isNaN(num)) return "-";
   return `¥${num.toLocaleString()}`;
 };
 
-export const VEHICLE_COLUMNS = [
+// ── Column Definitions ──
+
+export const VEHICLE_COLUMNS: VehicleColumn[] = [
   {
     id: "id",
     label: "ID",
@@ -239,7 +285,9 @@ export const VEHICLE_COLUMNS = [
   },
 ];
 
-export const FILTER_OPERATORS = {
+// ── Filter Operators ──
+
+export const FILTER_OPERATORS: Record<FilterType, FilterOperator[]> = {
   text: [
     { value: "is", label: "Is" },
     { value: "isNot", label: "Is not" },
@@ -284,10 +332,12 @@ export const FILTER_OPERATORS = {
   ],
 };
 
-export const FILTERABLE_COLUMNS = VEHICLE_COLUMNS
+// ── Filterable Columns (derived) ──
+
+export const FILTERABLE_COLUMNS: FilterableColumn[] = VEHICLE_COLUMNS
   .filter(col => !["static", "actions"].includes(col.type))
   .map(col => {
-    let filterType = col.type;
+    let filterType: string = col.type;
     if (filterType === "readonly-currency" || filterType === "readonly-currency-primary") {
       filterType = "number";
     }
