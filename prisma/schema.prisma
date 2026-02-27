@@ -20,6 +20,7 @@ model Company {
   InvoiceJobs   InvoiceJobs[]
   customers Customer[]
   promptVersions PromptVersion[]
+  exportTemplates ExportTemplate[]
 }
 
 model Customer {
@@ -276,6 +277,24 @@ model VehicleAuditLog {
 
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
+}
+
+model ExportTemplate {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  companyId           Int
+  createdById         String?
+  columns             Json     // string[] — ordered vehicle column IDs
+  computedColumns     Json     @default("[]") // ComputedColumn[] — token-based formulas
+  footerRows          Json     @default("[]") // FooterRow[] — labels for blank amount rows
+  showContainerNumber Boolean  @default(true)
+  showDate            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  company             Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+  @@index([companyId])
 }
 
 enum CompanyStatus {
