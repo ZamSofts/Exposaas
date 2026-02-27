@@ -1,10 +1,10 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { downloadFile as downloadFromAzure } from "../../src/lib/blob.mjs";
 
 const RETRY_CONFIG = {
   maxRetries: 5,
-  baseDelayMs: 5000,      
-  maxDelayMs: 120000,      
+  baseDelayMs: 5000,
+  maxDelayMs: 120000,
   backoffMultiplier: 2,
 };
 
@@ -14,17 +14,23 @@ function extractRetryDelay(error) {
   const message = error?.message || String(error);
   const match = message.match(/retry in ([\d.]+)s/i);
   if (match) {
-    return Math.ceil(parseFloat(match[1]) * 1000) + 1000; 
+    return Math.ceil(parseFloat(match[1]) * 1000) + 1000;
   }
   return null;
 }
 
-async function callGeminiWithRetry(model, content, pageNumber = 0) {
+/**
+ * Call Gemini with exponential backoff retry for rate-limit errors.
+ * @param {GoogleGenAI} ai - Initialized GoogleGenAI client
+ * @param {object} request - Full request object for ai.models.generateContent()
+ * @param {number} pageNumber - For logging only
+ */
+async function callGeminiWithRetry(ai, request, pageNumber = 0) {
   let lastError = null;
 
   for (let attempt = 1; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
     try {
-      const result = await model.generateContent(content);
+      const result = await ai.models.generateContent(request);
       return result;
     } catch (error) {
       lastError = error;
@@ -86,8 +92,7 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
       throw new Error("Missing GEMINI_API_KEY in environment");
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
     const base64Data = pdfBuffer.toString("base64");
 
@@ -142,34 +147,37 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
       });
     }
 
-    const result = await callGeminiWithRetry(model, [
-      {
-        inlineData: {
-          mimeType: "application/pdf",
-          data: base64Data,
+    // Build request with optional Structured Output config
+    const request = {
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: base64Data,
+          },
         },
-      },
-      dynamicPrompt,
-    ], pageNumber);
+        dynamicPrompt,
+      ],
+      config: options.responseConfig || {},
+    };
 
-    // Extract text from response
+    const result = await callGeminiWithRetry(ai, request, pageNumber);
+
+    // Extract text from response (new SDK: response.text is a property)
     let text = "";
     try {
-      if (result?.response?.text) {
-        text = (await result.response.text()).trim();
-      } else if (result?.output?.[0]?.content) {
-        const out = result.output[0];
-        text = typeof out.content === "string" ? out.content.trim() : out.content[0]?.text?.trim();
-      } else if (result?.outputs?.[0]) {
-        const out0 = result.outputs[0];
-        text = out0.text?.trim() || out0.content?.[0]?.text?.trim() || "";
+      if (result?.text != null) {
+        text = result.text.trim();
+      } else if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        text = result.candidates[0].content.parts[0].text.trim();
       } else {
         text = String(result).slice(0, 10000);
       }
     } catch (err) {
-
       text = String(result || "").slice(0, 10000);
     }
+
     // Parse JSON
     let cleanText = text
       .replace(/^```json/i, "")
@@ -180,6 +188,7 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
     try {
       parsed = JSON.parse(cleanText);
     } catch (e) {
+      // Fallback: extract JSON from mixed text (only needed without Structured Output)
       const re = /({[\s\S]*}|\[[\s\S]*\])/m;
       const m = re.exec(cleanText);
       if (m) {

@@ -21,7 +21,9 @@ import {
   buildDocumentExtractionPrompt,
 } from "../ai/documentSchemas.mjs";
 import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
-import { logVehicleAudit } from "../utils/auditLog.mjs";
+import { logVehicleAudit } from "../utils/auditLog.ts";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { DOC_ZOD_MAP } from "../ai/zodSchemas.ts";
 
 let boss;
 
@@ -54,11 +56,26 @@ let boss;
         // Build the extraction prompt
         const extractionPrompt = buildDocumentExtractionPrompt(schema);
 
+        // Build Structured Output config if Zod schema exists for this docType
+        const zodSchema = DOC_ZOD_MAP[docType];
+        const responseConfig = zodSchema
+          ? { responseMimeType: "application/json", responseJsonSchema: zodToJsonSchema(zodSchema) }
+          : {};
+
         // Process with Gemini — single page, flat JSON response
         const extracted = await processPageWithGemini(fileUrl, 1, {
           customPrompt: extractionPrompt,
           rawJsonResponse: true,
+          responseConfig,
         });
+
+        // Validate with Zod (soft — log warning, don't block extraction)
+        if (zodSchema && extracted) {
+          const validationResult = zodSchema.safeParse(extracted);
+          if (!validationResult.success) {
+            console.warn(`[docExtract] Zod validation warning for ${docType}:`, validationResult.error.issues);
+          }
+        }
 
         if (!extracted) {
           // Empty extraction

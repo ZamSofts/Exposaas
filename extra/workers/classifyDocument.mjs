@@ -24,6 +24,14 @@ import {
   CLASSIFICATION_CONFIDENCE_THRESHOLD,
   DOCUMENT_TYPES,
 } from "../ai/classificationSchema.mjs";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { ClassificationSchema } from "../ai/zodSchemas.ts";
+
+/** Structured Output config for classification */
+const classificationResponseConfig = {
+  responseMimeType: "application/json",
+  responseJsonSchema: zodToJsonSchema(ClassificationSchema),
+};
 
 async function streamToBuffer(stream) {
   const chunks = [];
@@ -82,18 +90,24 @@ let boss;
           "documents/temp/"
         );
 
-        // Step 3: Classify with Gemini
+        // Step 3: Classify with Gemini (Structured Output ensures valid JSON)
         const classificationResult = await processPageWithGemini(
           tempUpload.url,
           1,
           {
             customPrompt: CLASSIFICATION_PROMPT,
             rawJsonResponse: true,
+            responseConfig: classificationResponseConfig,
           }
         );
 
-        const docType = classificationResult?.type || "unknown";
-        const confidence = classificationResult?.confidence || 0;
+        // Validate with Zod (safeParse for graceful fallback)
+        const parsed = ClassificationSchema.safeParse(classificationResult);
+        const docType = parsed.success ? parsed.data.type : (classificationResult?.type || "unknown");
+        const confidence = parsed.success ? parsed.data.confidence : (classificationResult?.confidence || 0);
+        if (!parsed.success) {
+          console.warn(`[classify] Zod validation failed:`, parsed.error.issues);
+        }
 
         console.log(`📋 Classification result: type=${docType}, confidence=${confidence}`);
 

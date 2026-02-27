@@ -1,6 +1,15 @@
 import { ensureQueue } from "../queues/pgBoss.mjs";
 import { processPageWithGemini } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { InvoicePageResponseSchema } from "../ai/zodSchemas.ts";
+
+/** Structured Output config for invoice extraction */
+const invoiceResponseConfig = {
+  responseMimeType: "application/json",
+  responseJsonSchema: zodToJsonSchema(InvoicePageResponseSchema),
+};
+
 let boss;
 
 (async () => {
@@ -23,7 +32,10 @@ let boss;
         });
 
         // Process with Gemini (returns unwrapped vehicle array)
-        const vehicles = await processPageWithGemini(pageUrl, pageNumber, { companyId });
+        const vehicles = await processPageWithGemini(pageUrl, pageNumber, {
+          companyId,
+          responseConfig: invoiceResponseConfig,
+        });
 
         // Determine status based on result
         const status = vehicles.length > 0 ? 'completed' : 'empty';

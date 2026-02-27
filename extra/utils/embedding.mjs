@@ -8,7 +8,7 @@
  * Part of the AI Learning Loop Stage 2 (Embedding Few-Shot Selection).
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 
 const EMBEDDING_MODEL = "gemini-embedding-001";
@@ -83,11 +83,13 @@ export async function computeEmbedding(text) {
     throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: EMBEDDING_MODEL });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  const result = await model.embedContent(text);
-  return result.embedding.values;
+  const result = await ai.models.embedContent({
+    model: EMBEDDING_MODEL,
+    contents: text,
+  });
+  return result.embeddings[0].values;
 }
 
 /**

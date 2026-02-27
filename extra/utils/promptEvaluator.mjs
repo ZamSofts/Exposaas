@@ -1,5 +1,5 @@
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import { computeScoredDiff } from "./computeDiff.mjs";
+import { computeScoredDiff } from "./computeDiff.ts";
 
 /**
  * Evaluate extraction against golden records.
