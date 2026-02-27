@@ -2,8 +2,9 @@ import { initQueue } from "../queues/vehicle.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
-import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.mjs";
-import { logVehicleAudit } from "../utils/auditLog.mjs";
+import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.ts";
+import { resolveBrands, resolveCustomers } from "../utils/vehicleDomain.ts";
+import { logVehicleAudit } from "../utils/auditLog.ts";
 
 let boss;
 
@@ -39,81 +40,9 @@ let boss;
           .on("data", data => results.push(data))
           .on("end", async () => {
             try {
-              // --- Pre-load brands & customers to avoid N+1 per row ---
-              const allBrands = await prisma.brand.findMany({ select: { id: true, name: true } });
-              const brandMap = new Map(allBrands.map(b => [b.name, b.id]));
-              if (!brandMap.has("-")) {
-                const created = await prisma.brand.create({ data: { name: "-" } });
-                brandMap.set("-", created.id);
-              }
-
-              // Collect unique brand names and customer names from CSV
-              const newBrandNames = new Set();
-              const customerNames = new Set();
-              for (const row of results) {
-                const bn = row["brand"]?.trim();
-                if (bn && bn !== "" && !brandMap.has(bn)) newBrandNames.add(bn);
-                const cn = row["customer"]?.trim();
-                if (cn) customerNames.add(cn);
-              }
-
-              // Batch create missing brands (with race condition protection)
-              for (const name of newBrandNames) {
-                try {
-                  const created = await prisma.brand.create({ data: { name } });
-                  brandMap.set(name, created.id);
-                } catch (e) {
-                  if (e.code === "P2002") {
-                    // Brand was created by concurrent upload, fetch it
-                    const existing = await prisma.brand.findUnique({ where: { name } });
-                    if (existing) brandMap.set(name, existing.id);
-                  } else {
-                    throw e;
-                  }
-                }
-              }
-
-              // Batch load customers (scoped to company)
-              const customerMap = new Map();
-              let newCustomerCount = 0;
-              if (customerNames.size > 0) {
-                const existingCustomers = await prisma.customer.findMany({
-                  where: {
-                    companyId: Number(companyId),
-                    name: { in: [...customerNames], mode: "insensitive" },
-                  },
-                  select: { id: true, name: true },
-                });
-                for (const c of existingCustomers) customerMap.set(c.name.toLowerCase(), c.id);
-
-                // Auto-create missing customers (with race condition protection)
-                for (const name of customerNames) {
-                  if (!customerMap.has(name.toLowerCase())) {
-                    try {
-                      const created = await prisma.customer.create({
-                        data: {
-                          name,
-                          companyId: Number(companyId),
-                          uniqueId: `CSV-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                        },
-                      });
-                      customerMap.set(name.toLowerCase(), created.id);
-                      newCustomerCount++;
-                    } catch (e) {
-                      if (e.code === "P2002") {
-                        // Customer was created by concurrent upload, fetch it
-                        const existing = await prisma.customer.findFirst({
-                          where: { companyId: Number(companyId), name: { equals: name, mode: "insensitive" } },
-                          select: { id: true },
-                        });
-                        if (existing) customerMap.set(name.toLowerCase(), existing.id);
-                      } else {
-                        throw e;
-                      }
-                    }
-                  }
-                }
-              }
+              // --- Resolve brands & customers (shared domain logic) ---
+              const { brandMap } = await resolveBrands(prisma, results.map(r => r["brand"]));
+              const customerMap = await resolveCustomers(prisma, Number(companyId), results.map(r => r["customer"]), "CSV");
 
               // --- Process rows in a transaction (batch of 50) ---
               const BATCH_SIZE = 50;
