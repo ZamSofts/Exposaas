@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Head from "next/head";
-import { useConfirm, Error, API, MultiSelect, CustomButton, Loader, useAuth,DataTable,PermissionSelector } from "@/hooks/wrapper";
+import { useConfirm, Error, API, MultiSelect, CustomButton, Loader, useAuth, DataTable, PermissionSelector, usePaginatedList, useStaticOptions, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 
 import { Plus, Edit, Trash2, Shield } from "lucide-react";
@@ -8,96 +9,38 @@ import { Plus, Edit, Trash2, Shield } from "lucide-react";
 export default function Role() {
   const { session } = useAuth(["view:role", "Sadmin"]);
   const { confirm, ConfirmComponent } = useConfirm();
+  const queryClient = useQueryClient();
 
-  const [roles, setRole] = useState([]);
-  const [static_permissions, setStaticPermissions] = useState([]);
+  // ── Data fetching (React Query) ──
+  const {
+    items: roles, total, isLoading, error: listError,
+    handleSearch, handleSort, handlePageChange, sortBy, sortOrder,
+  } = usePaginatedList(queryKeys.roles, "role", {
+    defaultPerPage: 10,
+    select: (res) => ({
+      items: res.role || [],
+      total: res.total || 0,
+    }),
+  });
 
+  // ── Static data: permissions list ──
+  const static_permissions = useStaticOptions(
+    queryKeys.permissions(),
+    "permission",
+    (data) => data?.permissions || [],
+  );
+
+  // ── Form state ──
   const [name, setName] = useState("");
   const [permissions, setPermission] = useState([]);
 
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setcustomLoader] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFullAccess, setIsFullAccess] = useState(false);
 
-  // Pagination and search states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
-  const [search, setSearch] = useState("");
-
-  // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("asc");
-
-  // Reload data when pagination, search, or sorting changes
-  useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, search, sortBy, sortOrder]);
-
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
-    try {
-      setIsLoading(true);
-
-      const Data = await API("GET", "permission");
-      if (Data.error) {
-        setError(Data.error);
-        return;
-      }
-      setError("");
-      setStaticPermissions(Data.permissions);
-    } catch (err) {
-      setError("Failed to load data");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: perPage.toString(),
-        search: search,
-        sortBy: sortBy,
-        sortOrder: sortOrder,
-      });
-
-      const data = await API("GET", `role?${params}`);
-      if (data.error) {
-        setError(data.error);
-        return;
-      }
-      setRole(data.role);
-      setTotal(data.total);
-    } catch (err) {
-      setError("Failed to load roles");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handleSearch = search => {
-    setSearch(search);
-    setCurrentPage(1); // Reset to first page on search
-  };
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["roles"] });
 
   const editData = async () => {
     if (!name || (permissions.length === 0 && !isFullAccess)) {
@@ -139,7 +82,7 @@ export default function Role() {
       setcustomLoader(false);
       return;
     }
-    loadData();
+    invalidate();
     resetForm();
   };
 
@@ -178,7 +121,7 @@ export default function Role() {
       setcustomLoader(false);
       return;
     }
-    loadData();
+    invalidate();
     setcustomLoader(false);
   };
 
@@ -204,7 +147,6 @@ export default function Role() {
     setPermission([]);
     setEdit(null);
     setError("");
-    setIsLoading(false);
     setcustomLoader(false);
     setIsDropdownOpen(false);
     setIsFullAccess(false);
@@ -214,10 +156,8 @@ export default function Role() {
   const handleFullAccessToggle = checked => {
     setIsFullAccess(checked);
     if (checked) {
-      // Select all permissions
       setPermission(static_permissions.map(permission => permission.id));
     } else {
-      // Clear all permissions
       setPermission([]);
     }
   };
@@ -225,8 +165,6 @@ export default function Role() {
   // Handle individual permission changes
   const handlePermissionChange = selectedPermissions => {
     setPermission(selectedPermissions);
-
-    // Check if all permissions are selected
     const allSelected = static_permissions.length > 0 && static_permissions.every(permission => selectedPermissions.includes(permission.id));
     setIsFullAccess(allSelected);
   };
@@ -247,7 +185,6 @@ export default function Role() {
                 </div>
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">Roles Management</h1>
               </div>
-              {/* Add Company Button */}
               <CustomButton title="Add Roles" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
             </div>
             <p className="text-[var(--secondary-foreground)]">Manage and oversee all registered roles in your platform</p>
@@ -257,8 +194,8 @@ export default function Role() {
           {edit != null && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div
-                className={`bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full 
-    max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-2xl 
+                className={`bg-[var(--surface)] border bounce border-[var(--border)] rounded-xl p-6 w-full
+    max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-2xl
     relative transition-all duration-300
     ${isDropdownOpen ? "min-h-[600px] max-h-[80vh] overflow-visible" : "max-h-[90vh] overflow-y-auto"}`}
               >
@@ -279,12 +216,6 @@ export default function Role() {
                       className={`input-style ${name.toLowerCase() === "sadmin" ? "border-[var(--error)] focus:ring-[var(--error)]" : ""}`}
                       autoFocus
                     />
-                    {/* {name.toLowerCase() === "sadmin" && (
-                      <p className="text-xs text-[var(--error)] mt-1 flex items-center gap-1">
-                        <span>⚠️</span>
-                        'Sadmin' is a reserved system role name
-                      </p>
-                    )} */}
                   </div>
 
                   <div className="relative z-[60]">
@@ -323,10 +254,9 @@ export default function Role() {
               </div>
             </div>
           </div>
-          <Error message={error} />
+          <Error message={listError || error} />
 
           {customLoader && <Loader />}
-          {/* DataTable with JSX children */}
           <DataTable
             data={roles}
             total={total}
@@ -339,7 +269,6 @@ export default function Role() {
             sortBy={sortBy}
             sortOrder={sortOrder}
           >
-            {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
                 <th id="id">ID</th>
@@ -349,7 +278,6 @@ export default function Role() {
               </tr>
             </thead>
 
-            {/* Table Body with data rows */}
             <tbody>
               {roles.map(role => (
                 <tr key={role.id} className="hover:bg-[var(--input)] transition-colors duration-200">
@@ -385,7 +313,7 @@ export default function Role() {
                         <>
                           <button
                             onClick={() => loadEdit(role.id)}
-                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
+                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)]
                                      hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
                             title="Edit role"
                           >
@@ -393,7 +321,7 @@ export default function Role() {
                           </button>
                           <button
                             onClick={() => deleteIt(role.id)}
-                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
+                            className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)]
                                    hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
                             title="Delete role"
                           >
@@ -420,7 +348,6 @@ export default function Role() {
         </div>
       </Sidebar>
 
-      {/* Confirmation Modal */}
       <ConfirmComponent />
     </>
   );

@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Head from "next/head";
 import { useAuth } from "@/hooks/useAuth";
-import { Error, API, DataTable, InvoiceDataViewer } from "@/hooks/wrapper";
+import { Error, API, DataTable, InvoiceDataViewer, usePaginatedList, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { ReceiptText, FileText, Car, RefreshCw } from "lucide-react";
@@ -16,60 +17,27 @@ import {
 
 export default function InvoiceJobsPage() {
   const { session } = useAuth();
+  const queryClient = useQueryClient();
+
+  // ── Data fetching (React Query) ──
+  const {
+    items: rows, total, isLoading, error: listError,
+    handleSort, handlePageChange, sortBy, sortOrder,
+  } = usePaginatedList(queryKeys.invoiceJobs, "InvoiceJobs", {
+    defaultPerPage: 10,
+    defaultOrder: "desc",
+    select: (res) => ({
+      items: res.data || [],
+      total: res.total || (res.data || []).length,
+    }),
+  });
 
   const [error, setError] = useState("");
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("desc");
-
   const [selected, setSelected] = useState(null);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [retrying, setRetrying] = useState(null);
 
-  useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, sortBy, sortOrder]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(currentPage),
-        limit: String(perPage),
-        sortBy: String(sortBy),
-        sortOrder: String(sortOrder),
-      });
-
-      const res = await API("GET", `InvoiceJobs?${params}`);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-
-      setRows(res.data || []);
-      setTotal(res.total || (res.data || []).length);
-    } catch (err) {
-      console.error("Error loading invoice jobs", err);
-      setError("Failed to load invoice jobs");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["invoiceJobs"] });
 
   const openViewer = async (row) => {
     let corrected = null;
@@ -83,7 +51,7 @@ export default function InvoiceJobsPage() {
   const handleBackToList = () => {
     setViewerOpen(false);
     setSelected(null);
-    loadData();
+    invalidate();
   };
 
   const handleRetry = async (jobId) => {
@@ -93,7 +61,7 @@ export default function InvoiceJobsPage() {
       if (res.error) {
         setError(res.error);
       } else {
-        loadData();
+        invalidate();
       }
     } catch (err) {
       console.error("Error retrying job", err);
@@ -129,7 +97,7 @@ export default function InvoiceJobsPage() {
             </p>
           </div>
 
-          <Error message={error} />
+          <Error message={listError || error} />
 
           <DataTable
             data={rows}
@@ -139,7 +107,7 @@ export default function InvoiceJobsPage() {
             onSort={handleSort}
             onPageChange={handlePageChange}
             title="Invoice Jobs"
-            initialPerPage={perPage}
+            initialPerPage={10}
             sortBy={sortBy}
             sortOrder={sortOrder}
           >

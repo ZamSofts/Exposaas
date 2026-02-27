@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Head from "next/head";
-import { useAuth, useConfirm, API, Error, DataTable, isAllowed, Toast, Loader, EditVehicle, FilePreviewer } from "@/hooks/wrapper";
+import { useAuth, useConfirm, API, Error, DataTable, isAllowed, Toast, Loader, EditVehicle, FilePreviewer, usePaginatedList, useStaticOptions, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import { Plus, Search, Filter } from "lucide-react";
 import VehicleRow from "@/components/VehicleRow";
@@ -12,157 +13,144 @@ export default function VehiclesPage() {
   const canEditCharges = isAllowed(["edit:vehicle"], session);
 
   const { confirm, ConfirmComponent } = useConfirm();
+  const queryClient = useQueryClient();
 
-  const [vehicles, setVehicles] = useState([]);
+  // ── Filter state (lives outside usePaginatedList) ──
+  const [filters, setFilters] = useState([]);
+  const [conjunction, setConjunction] = useState("and");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter is "active" when it has field + operator + value (or isEmpty/isNotEmpty which need no value)
+  const isFilterActive = (f) =>
+    f.field && f.operator && (["isEmpty", "isNotEmpty"].includes(f.operator) || (f.value !== "" && f.value != null));
+  const activeFilterCount = filters.filter(isFilterActive).length;
+
+  // ── Build extra params (filters) ──
+  const buildParams = useCallback(
+    (urlParams) => {
+      const activeFilters = filters.filter(isFilterActive);
+      if (activeFilters.length > 0) {
+        urlParams.set(
+          "filters",
+          JSON.stringify({
+            conjunction,
+            conditions: activeFilters.map((f) => ({
+              field_name: f.field,
+              operator: f.operator,
+              value: f.value,
+            })),
+          })
+        );
+      }
+    },
+    [filters, conjunction]
+  );
+
+  // Custom queryKey includes filters + conjunction so changes trigger refetch
+  const vehicleKeyFn = useCallback(
+    (params) => ["vehicles", { ...params, filters, conjunction }],
+    [filters, conjunction]
+  );
+
+  // ── Data fetching (React Query) ──
+  const {
+    items: vehicles, total, isLoading, error: listError,
+    handleSort, handleSearch, handlePageChange, sortBy, sortOrder, setPage,
+  } = usePaginatedList(vehicleKeyFn, "vehicle", {
+    defaultPerPage: 25,
+    defaultOrder: "desc",
+    debounceMs: 400,
+    buildParams,
+    select: (res) => ({
+      items: res.vehicles || [],
+      total: res.total || 0,
+    }),
+  });
+
+  // ── Static options (React Query — cached indefinitely) ──
+  const brandOptions = useStaticOptions(
+    queryKeys.brands(),
+    "brand",
+    (data) => {
+      if (!data || data.error) return [];
+      return (Array.isArray(data) ? data : []).map((b) => ({ value: b.id, label: b.name }));
+    }
+  );
+
+  const customerOptions = useStaticOptions(
+    queryKeys.customerOptions(),
+    "customer?col=id,name,uniqueId",
+    (data) => {
+      if (!data || data.error) return [];
+      return (Array.isArray(data) ? data : []).map((c) => ({ value: c.id, label: `${c.name}-${c.uniqueId}` }));
+    }
+  );
+
+  const suggestions = useStaticOptions(
+    queryKeys.suggestions("auction,transportCompany,deliverTo,documentStatus"),
+    "vehicleSuggestions?fields=auction,transportCompany,deliverTo,documentStatus",
+    (data) => {
+      if (!data || data.error) return {};
+      return data;
+    }
+  );
+
+  // ── Local UI state ──
   const [error, setError] = useState("");
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
   const [edit, setEdit] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
-  // Dropdown / combobox options for inline editing
-  const [brandOptions, setBrandOptions] = useState([]);
-  const [customerOptions, setCustomerOptions] = useState([]);
-  const [suggestions, setSuggestions] = useState({});
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["vehicles"] });
 
   // Memoize dropdown options object so VehicleRow memo isn't broken
   const dropdownOpts = useMemo(() => ({ brandOptions, customerOptions }), [brandOptions, customerOptions]);
 
-  // Pagination and search states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("desc");
-
-  // Filter state
-  const [filters, setFilters] = useState([]);
-  const [conjunction, setConjunction] = useState("and");
-  const [showFilters, setShowFilters] = useState(false);
-  const filterTimeoutRef = useRef(null);
-
-  // Toast state
-  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
-
-  useEffect(() => {
-    loadOptions();
-  }, []);
-
-  useEffect(() => {
-    clearTimeout(filterTimeoutRef.current);
-    filterTimeoutRef.current = setTimeout(
-      () => {
-        loadData();
-      },
-      filters.length > 0 ? 400 : 0
-    );
-    return () => clearTimeout(filterTimeoutRef.current);
-  }, [currentPage, perPage, search, sortBy, sortOrder, filters, conjunction]);
+  // Build combobox options from suggestions (memoized per field)
+  const comboOpts = useCallback(
+    (field) => (suggestions[field] || []).map((v) => ({ value: v, label: v })),
+    [suggestions]
+  );
 
   const showToast = useCallback((message, type = "success") => {
     setToast({ id: Date.now(), message, type });
   }, []);
 
-  const loadOptions = async () => {
-    const [brandData, customerData, suggestionsData] = await Promise.all([
-      API("GET", "brand"),
-      API("GET", "customer?col=id,name,uniqueId"),
-      API("GET", "vehicleSuggestions?fields=auction,transportCompany,deliverTo,documentStatus"),
-    ]);
-    if (!brandData.error) {
-      setBrandOptions(brandData.map(b => ({ value: b.id, label: b.name })));
-    }
-    if (!customerData.error) {
-      setCustomerOptions(customerData.map(c => ({ value: c.id, label: `${c.name}-${c.uniqueId}` })));
-    }
-    if (!suggestionsData.error) {
-      setSuggestions(suggestionsData);
-    }
-  };
-
+  // ── Inline editing: optimistic update via queryClient cache ──
   const handleInlineSave = useCallback(
     (vehicleId, updatedVehicle) => {
-      setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, ...updatedVehicle } : v)));
+      // Optimistically update the React Query cache
+      queryClient.setQueriesData({ queryKey: ["vehicles"] }, (old) => {
+        if (!old || !old.vehicles) return old;
+        return {
+          ...old,
+          vehicles: old.vehicles.map((v) =>
+            v.id === vehicleId ? { ...v, ...updatedVehicle } : v
+          ),
+        };
+      });
       showToast("Updated", "success");
     },
-    [showToast]
+    [queryClient, showToast]
   );
 
   const handleInlineError = useCallback(
-    msg => {
+    (msg) => {
       showToast(msg || "Failed to update", "error");
     },
     [showToast]
   );
 
-  // Build combobox options from suggestions (memoized per field)
-  const comboOpts = useCallback(field => (suggestions[field] || []).map(v => ({ value: v, label: v })), [suggestions]);
-
-  // Filter is "active" when it has field + operator + value (or isEmpty/isNotEmpty which need no value)
-  const isFilterActive = f => f.field && f.operator && (["isEmpty", "isNotEmpty"].includes(f.operator) || (f.value !== "" && f.value != null));
-
-  const activeFilterCount = filters.filter(isFilterActive).length;
-
-  const loadData = async () => {
-    setIsLoading(true);
-    setError("");
-    const params = new URLSearchParams({
-      page: currentPage,
-      limit: perPage,
-      search,
-      sortBy,
-      sortOrder,
-    });
-
-    const activeFilters = filters.filter(isFilterActive);
-    if (activeFilters.length > 0) {
-      params.set(
-        "filters",
-        JSON.stringify({
-          conjunction,
-          conditions: activeFilters.map(f => ({
-            field_name: f.field,
-            operator: f.operator,
-            value: f.value,
-          })),
-        })
-      );
-    }
-
-    const data = await API("GET", `vehicle?${params}`);
-    if (data.error) {
-      setError(data.error);
-      setIsLoading(false);
-      return;
-    }
-    setVehicles(data.vehicles || []);
-    setTotal(data.total || 0);
-    setIsLoading(false);
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handleSearch = value => {
-    setSearch(value);
-    setCurrentPage(1);
-  };
-
-  const handleFiltersChange = useCallback(newFilters => {
+  // ── Filter change handler ──
+  const handleFiltersChange = useCallback((newFilters) => {
     setFilters(newFilters);
-    setCurrentPage(1);
-  }, []);
+    setPage(1);
+  }, [setPage]);
 
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
-  };
-
-  const deleteIt = async id => {
+  // ── Delete vehicle ──
+  const deleteIt = async (id) => {
     const confirmed = await confirm({
       title: "Delete Vehicle",
       message: "Are you sure you want to delete this vehicle? This will also permanently delete all associated documents and Payments. This action cannot be undone.",
@@ -183,27 +171,21 @@ export default function VehiclesPage() {
     setCustomLoader(false);
     const documentsDeletedText = data.documentsDeleted > 0 ? ` ${data.documentsDeleted} associated document(s) were also removed.` : "";
     showToast(`Vehicle deleted successfully!${documentsDeletedText}`, "success");
-    loadData();
+    invalidate();
   };
 
-  const resetForm = () => {
-    setError("");
-    setEdit(null);
-    setCustomLoader(false);
-  };
-
-  // View management functions
+  // ── View management ──
   const handleAddVehicle = () => {
-    setEdit(0); // 0 for new vehicle
+    setEdit(0);
   };
 
-  const handleEditVehicle = useCallback(vehicleId => {
+  const handleEditVehicle = useCallback((vehicleId) => {
     setEdit(vehicleId);
   }, []);
 
   const handleBackToList = () => {
     setEdit(null);
-    loadData();
+    invalidate();
   };
 
   const handleFormSuccess = () => {
@@ -221,7 +203,7 @@ export default function VehiclesPage() {
       </Head>
       <Sidebar>
         <div className="p-2 bg-[var(--background)] min-h-screen">
-          <Error message={error} />
+          <Error message={listError || error} />
           {customLoader && <Loader />}
 
           {/* Spreadsheet Toolbar */}
@@ -234,8 +216,8 @@ export default function VehiclesPage() {
                   type="text"
                   placeholder="Search..."
                   value={searchInput}
-                  onChange={e => setSearchInput(e.target.value)}
-                  onKeyDown={e => {
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") handleSearch(searchInput);
                   }}
                   className="pl-7 pr-2 py-1 text-xs bg-[var(--input)] border border-[var(--border)] rounded
@@ -293,7 +275,7 @@ export default function VehiclesPage() {
             >
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  {VEHICLE_COLUMNS.map(col => {
+                  {VEHICLE_COLUMNS.map((col) => {
                     if (col.type === "actions" && !isAllowed(col.requirePermission, session)) return null;
                     return (
                       <th key={col.id} id={col.id} style={{ width: col.width }}>
@@ -304,7 +286,7 @@ export default function VehiclesPage() {
                 </tr>
               </thead>
               <tbody>
-                {vehicles.map(v => (
+                {vehicles.map((v) => (
                   <VehicleRow
                     key={v.id}
                     vehicle={v}

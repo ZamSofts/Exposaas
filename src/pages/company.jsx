@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { DataTable,useConfirm, Error, Loader, useAuth, API } from "@/hooks/wrapper";
+import { DataTable, useConfirm, Error, Loader, useAuth, API, usePaginatedList, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import { Plus, Building2, Edit, Trash2 } from "lucide-react";
 
@@ -9,24 +10,29 @@ export default function Company() {
   const { session } = useAuth();
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
+  const queryClient = useQueryClient();
 
-  const [companies, setCompanies] = useState([]);
+  // ── Data fetching (React Query) ──
+  const {
+    items: companies, total, isLoading, error: listError,
+    handleSearch, handleSort, handlePageChange, sortBy, sortOrder, extra,
+  } = usePaginatedList(queryKeys.companies, "company", {
+    defaultPerPage: 5,
+    defaultOrder: "desc",
+    select: (res) => ({
+      items: res.company || [],
+      total: res.total || 0,
+      extra: { inactive: res.inactive || 0 },
+    }),
+  });
+
+  const inactive = extra?.inactive || 0;
+
+  // ── Form state (not managed by React Query) ──
   const [name, setName] = useState("");
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
-  const [total, setTotal] = useState(0);
-  const [inactive, setInactive] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
-
-  // Pagination and search states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(5);
-  const [search, setSearch] = useState("");
-
-  // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("desc");
 
   useEffect(() => {
     if (session?.role !== "Sadmin") {
@@ -34,50 +40,7 @@ export default function Company() {
     }
   }, []);
 
-  // Reload data when pagination, search, or sorting changes
-  useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, search, sortBy, sortOrder]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    // Resets all form and stats to initial state
-
-    const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      search: search,
-      sortBy: sortBy,
-      sortOrder: sortOrder,
-    });
-
-    const data = await API("GET", `company?${params}`);
-    if (data.error) {
-      setError(data.error);
-      setIsLoading(false);
-      return;
-    }
-    setError("");
-    setCompanies(data.company);
-    setTotal(data.total);
-    setInactive(data.inactive);
-    setIsLoading(false);
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handleSearch = search => {
-    setSearch(search);
-    setCurrentPage(1); // Reset to first page on search
-  };
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["companies"] });
 
   const editData = async () => {
     if (!name.trim()) {
@@ -101,7 +64,7 @@ export default function Company() {
       }
     }
 
-    loadData();
+    invalidate();
     resetForm();
   };
 
@@ -132,7 +95,7 @@ export default function Company() {
       setCustomLoader(false);
       return;
     }
-    loadData();
+    invalidate();
     setCustomLoader(false);
   };
 
@@ -155,7 +118,7 @@ export default function Company() {
       setCustomLoader(false);
       return;
     }
-    loadData();
+    invalidate();
     setCustomLoader(false);
   };
 
@@ -164,7 +127,6 @@ export default function Company() {
     setEdit(null);
     setError("");
     setCustomLoader(false);
-    setIsLoading(false);
   };
 
   return (
@@ -277,7 +239,7 @@ export default function Company() {
               </div>
             </div>
           </div>
-          <Error message={error} />
+          <Error message={listError} />
           {customLoader && <Loader />}
           {/* DataTable with JSX children */}
           <DataTable
@@ -332,14 +294,14 @@ export default function Company() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => loadEdit(company.id)}
-                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)]
                                  hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(company.id)}
-                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)]
                                hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
                       >
                         <Trash2 className="w-4 h-4" />

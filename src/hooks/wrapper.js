@@ -12,6 +12,7 @@ export { EditVehicle } from "@/components/EditVehicle";
 export { InvoiceDataViewer } from "@/components/InvoiceDataViewer";
 export { PermissionSelector } from "@/components/ui/PermissionSelector";
 export { default as DataTable } from "@/components/ui/DataTable";
+export { usePaginatedList, useApiMutation, useStaticOptions, queryKeys } from "@/hooks/useQuery";
 
 export const API = async (method, name, d = {}, isFile= false) => {
   if (method == "GET" || method == "DELETE") {

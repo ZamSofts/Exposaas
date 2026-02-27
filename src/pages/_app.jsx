@@ -1,7 +1,18 @@
 import "@/styles/globals.css";
 import React from "react";
 import { SessionProvider } from "next-auth/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeContext, useThemeState } from "@/hooks/useTheme";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 if (typeof window !== "undefined") {
   window.goodDateTime = d => {
@@ -46,8 +57,10 @@ function AppContent({ Component, pageProps }) {
 
 export default function App({ Component, pageProps: { session, ...pageProps }, router }) {
   return (
-    <SessionProvider session={session}>
-      <AppContent Component={Component} pageProps={pageProps} router={router} />
-    </SessionProvider>
+    <QueryClientProvider client={queryClient}>
+      <SessionProvider session={session}>
+        <AppContent Component={Component} pageProps={pageProps} router={router} />
+      </SessionProvider>
+    </QueryClientProvider>
   );
 }

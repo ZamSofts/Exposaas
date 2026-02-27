@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Head from "next/head";
-import { useAuth, API, Error, Toast, Loader } from "@/hooks/wrapper";
+import { useAuth, API, Error, Toast, Loader, queryKeys } from "@/hooks/wrapper";
+import { useQuery } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import { BarChart3, TrendingUp, CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 import { ACCURACY_PCT, ACCURACY_THRESHOLDS, getAccuracyColor } from "@/config/aiConstants";
@@ -69,27 +70,19 @@ function CustomTooltip({ active, payload, label }) {
 
 export default function AccuracyPage() {
   const { session, status } = useAuth(["view:vehicle"], ["Sadmin"]);
-  const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [period, setPeriod] = useState("30d");
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-    const res = await API("GET", `accuracyStats?period=${period}`);
-    if (res.error) {
-      setError(res.error);
-    } else {
-      setData(res);
-    }
-    setIsLoading(false);
-  }, [period]);
-
-  useEffect(() => {
-    if (status === "authenticated") loadData();
-  }, [status, loadData]);
+  // ── Data fetching (React Query) ──
+  const { data, isLoading, error } = useQuery({
+    queryKey: queryKeys.accuracy({ period }),
+    queryFn: async () => {
+      const res = await API("GET", `accuracyStats?period=${period}`);
+      if (res.error) throw new Error(res.error);
+      return res;
+    },
+    enabled: status === "authenticated",
+  });
 
   if (status === "loading") return <Loader />;
 
@@ -119,7 +112,7 @@ export default function AccuracyPage() {
       </Head>
       <Sidebar>
         <div className="p-6 md:p-8 bg-[var(--background)] min-h-screen">
-          <Error message={error} />
+          <Error message={error?.message || ""} />
 
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">

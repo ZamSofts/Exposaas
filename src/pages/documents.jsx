@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import Head from "next/head";
 import { useAuth } from "@/hooks/useAuth";
-import { Error, API, DataTable } from "@/hooks/wrapper";
+import { Error, API, DataTable, usePaginatedList, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import useFileUpload from "@/hooks/useFileUpload";
 import FileUploadModal from "@/components/ui/FileUploadModal";
 import DocumentViewer from "@/components/DocumentViewer";
@@ -62,19 +63,38 @@ function DocTypeBadge({ docType }) {
 // ---------------------------------------------------------------------------
 export default function DocumentsPage() {
   const { session } = useAuth();
-
-  const [error, setError] = useState("");
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const queryClient = useQueryClient();
 
   // Filter by docType tab
   const [activeTab, setActiveTab] = useState("all");
+
+  // ── Data fetching (React Query) ──
+  const buildDocParams = useCallback((urlParams) => {
+    if (activeTab !== "all") {
+      urlParams.set("docType", activeTab);
+    }
+  }, [activeTab]);
+
+  // Custom key includes activeTab so tab changes trigger refetch
+  const docKeyFn = useCallback(
+    (params) => ["documents", { ...params, docType: activeTab }],
+    [activeTab]
+  );
+
+  const {
+    items: rows, total, isLoading, error: listError,
+    handleSort, handlePageChange, sortBy, sortOrder, setPage,
+  } = usePaginatedList(docKeyFn, "InvoiceJobs", {
+    defaultPerPage: 10,
+    defaultOrder: "desc",
+    buildParams: buildDocParams,
+    select: (res) => ({
+      items: res.data || [],
+      total: res.total || (res.data || []).length,
+    }),
+  });
+
+  const [error, setError] = useState("");
 
   // Upload modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -96,54 +116,12 @@ export default function DocumentsPage() {
     fileLabel: "PDF / CSV",
   });
 
-  useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, sortBy, sortOrder, activeTab]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(currentPage),
-        limit: String(perPage),
-        sortBy: String(sortBy),
-        sortOrder: String(sortOrder),
-      });
-
-      if (activeTab !== "all") {
-        params.set("docType", activeTab);
-      }
-
-      const res = await API("GET", `InvoiceJobs?${params}`);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-
-      setRows(res.data || []);
-      setTotal(res.total || (res.data || []).length);
-    } catch (err) {
-      console.error("Error loading documents", err);
-      setError("Failed to load documents");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["documents"] });
 
   const handleUploadSuccess = () => {
     setUploadModalOpen(false);
     docUpload.reset();
-    setTimeout(() => loadData(), 1000);
+    setTimeout(() => invalidate(), 1000);
   };
 
   const handleUploadError = (err) => {
@@ -172,7 +150,7 @@ export default function DocumentsPage() {
   const handleBackToList = () => {
     setViewerOpen(false);
     setViewerData(null);
-    loadData();
+    invalidate();
   };
 
   const handleRetry = async (jobId) => {
@@ -182,7 +160,7 @@ export default function DocumentsPage() {
       if (res.error) {
         setError(res.error);
       } else {
-        loadData();
+        invalidate();
       }
     } catch (err) {
       setError("Failed to retry job");
@@ -252,14 +230,14 @@ export default function DocumentsPage() {
             </p>
           </div>
 
-          <Error message={error} />
+          <Error message={listError || error} />
 
           {/* Doc Type Tabs */}
           <div className="flex gap-1 mb-6 bg-[var(--surface)] rounded-lg p-1 border border-[var(--border)] w-fit">
             {Object.entries(DOC_TYPES).map(([key, config]) => (
               <button
                 key={key}
-                onClick={() => { setActiveTab(key); setCurrentPage(1); }}
+                onClick={() => { setActiveTab(key); setPage(1); }}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   activeTab === key
                     ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
@@ -286,7 +264,7 @@ export default function DocumentsPage() {
             onSort={handleSort}
             onPageChange={handlePageChange}
             title="Documents"
-            initialPerPage={perPage}
+            initialPerPage={10}
             sortBy={sortBy}
             sortOrder={sortOrder}
           >

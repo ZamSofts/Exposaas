@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Head from "next/head";
-import { useAuth, API, Error, Toast, Loader } from "@/hooks/wrapper";
+import { useAuth, API, Error, Toast, Loader, queryKeys } from "@/hooks/wrapper";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import {
   Sparkles, Play, CheckCircle, Archive, Trash2, Plus, Wand2, Eye, EyeOff,
@@ -33,10 +34,7 @@ function ScoreBadge({ score }) {
 
 export default function PromptsPage() {
   const { session, status } = useAuth(["view:vehicle"], ["Sadmin"]);
-  const [versions, setVersions] = useState([]);
-  const [activeId, setActiveId] = useState(null);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
   // UI state
@@ -49,22 +47,21 @@ export default function PromptsPage() {
   const [optimizeResults, setOptimizeResults] = useState(null);
   const [isInitializing, setIsInitializing] = useState(false);
 
-  const loadVersions = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-    const res = await API("GET", "promptVersion");
-    if (res.error) {
-      setError(res.error);
-    } else {
-      setVersions(res.versions || []);
-      setActiveId(res.activeId);
-    }
-    setIsLoading(false);
-  }, []);
+  // ── Data fetching (React Query) ──
+  const { data: promptData, isLoading, error: queryError } = useQuery({
+    queryKey: queryKeys.prompts(),
+    queryFn: async () => {
+      const res = await API("GET", "promptVersion");
+      if (res.error) throw new Error(res.error);
+      return res;
+    },
+    enabled: status === "authenticated",
+  });
 
-  useEffect(() => {
-    if (status === "authenticated") loadVersions();
-  }, [status, loadVersions]);
+  const versions = promptData?.versions || [];
+  const activeId = promptData?.activeId || null;
+  const error = queryError?.message || "";
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["prompts"] });
 
   const createVersion = async () => {
     if (!newPromptContent.trim()) {
@@ -81,7 +78,7 @@ export default function PromptsPage() {
       setToast({ id: Date.now(), message: `Created ${res.version}`, type: "success" });
       setShowCreateForm(false);
       setNewPromptContent("");
-      loadVersions();
+      invalidate();
     }
   };
 
@@ -93,7 +90,7 @@ export default function PromptsPage() {
     } else {
       const count = res.generated?.length || 0;
       setToast({ id: Date.now(), message: `Generated ${count} prompt variation(s)`, type: "success" });
-      loadVersions();
+      invalidate();
     }
     setIsGenerating(false);
   };
@@ -111,7 +108,7 @@ export default function PromptsPage() {
         ? `AI最適化完了: ${best.approach} (${Math.round((best.score || 0) * 100)}%)${res.improvement != null ? ` 改善: ${res.improvement >= 0 ? "+" : ""}${res.improvement}%` : ""}`
         : "AI最適化完了";
       setToast({ id: Date.now(), message: msg, type: "success" });
-      loadVersions();
+      invalidate();
     }
     setIsOptimizing(false);
   };
@@ -123,7 +120,7 @@ export default function PromptsPage() {
       setToast({ id: Date.now(), message: res.error, type: "error" });
     } else {
       setToast({ id: Date.now(), message: `初期プロンプト v1.0 を作成しました (schema_default)`, type: "success" });
-      loadVersions();
+      invalidate();
     }
     setIsInitializing(false);
   };
@@ -136,7 +133,7 @@ export default function PromptsPage() {
     } else {
       const score = res.aggregateScore != null ? Math.round(res.aggregateScore * 100) : "?";
       setToast({ id: Date.now(), message: `Evaluation complete: ${score}% accuracy`, type: "success" });
-      loadVersions();
+      invalidate();
     }
     setEvaluatingId(null);
   };
@@ -147,7 +144,7 @@ export default function PromptsPage() {
       setToast({ id: Date.now(), message: res.error, type: "error" });
     } else {
       setToast({ id: Date.now(), message: "Prompt activated! Future extractions will use this prompt.", type: "success" });
-      loadVersions();
+      invalidate();
     }
   };
 
@@ -157,7 +154,7 @@ export default function PromptsPage() {
       setToast({ id: Date.now(), message: res.error, type: "error" });
     } else {
       setToast({ id: Date.now(), message: "Prompt archived", type: "success" });
-      loadVersions();
+      invalidate();
     }
   };
 
@@ -167,7 +164,7 @@ export default function PromptsPage() {
       setToast({ id: Date.now(), message: res.error, type: "error" });
     } else {
       setToast({ id: Date.now(), message: "Prompt deleted", type: "success" });
-      loadVersions();
+      invalidate();
     }
   };
 
