@@ -33,7 +33,7 @@
 - `src/lib/` - Server utilities (useful.js, blob.mjs, auth.js, db.js)
 - `extra/workers/` - Background jobs (5 workers: vehicle, invoice, invoicePage, classifyDocument, documentExtract)
 - `extra/ai/` - AI extraction pipeline (schema, promptBuilder, optimizer, classificationSchema, documentSchemas)
-- `extra/utils/` - Shared utilities (computeDiff, chargeMapping, pdfSplitter, fewShotExamples, promptEvaluator, promptGenerator, auditLog)
+- `extra/utils/` - Shared utilities (vehicleDomain, chargeMapping, computeDiff, auditLog, pdfSplitter, fewShotExamples, embedding, promptEvaluator, promptGenerator)
 - `extra/queues/` - pg-boss queue initializers (pgBoss, pdfInvoice, vehicle)
 - `prisma/` - Database schema
 
@@ -66,6 +66,65 @@ npx prisma studio          # View data
 - Run commands directly without pipes when possible
 - If you need to limit output, use command-specific flags (e.g., `git log -n 10` instead of `git log | head -10`)
 - Avoid chained pipes that can cause output to buffer indefinitely
+
+---
+
+## コア原則
+
+- **シンプル第一**：すべての変更をできる限りシンプルにする。影響するコードを最小限にする。
+- **手を抜かない**：根本原因を見つける。一時的な修正は避ける。シニアエンジニアの水準を保つ。
+- **影響を最小化する**：変更は必要な箇所のみにとどめる。バグを新たに引き込まない。
+
+---
+
+## ワークフロー設計
+
+### 1. Planモードを基本とする
+- 3ステップ以上 or アーキテクチャに関わるタスクは必ずPlanモードで開始する
+- 途中でうまくいかなくなったら、無理に進めずすぐに立ち止まって再計画する
+- 構築だけでなく、検証ステップにもPlanモードを使う
+- 曖昧さを減らすため、実装前に詳細な仕様を書く
+
+### 2. サブエージェント戦略
+- メインのコンテキストウィンドウをクリーンに保つためにサブエージェントを積極的に活用する
+- リサーチ・調査・並列分析はサブエージェントに任せる
+- 複雑な問題には、サブエージェントを使ってより多くの計算リソースを投入する
+- 集中して実行するために、サブエージェント1つにつき1タスクを割り当てる
+
+### 3. 自己改善ループ
+- ユーザーから修正を受けたら必ず `tasks/lessons.md` にそのパターンを記録する
+- 同じミスを繰り返さないように、自分へのルールを書く
+- ミス率が下がるまで、ルールを徹底的に改善し続ける
+- セッション開始時に、そのプロジェクトに関連するlessonsをレビューする
+
+### 4. 完了前に必ず検証する
+- 動作を証明できるまで、タスクを完了とマークしない
+- 必要に応じてmainブランチと自分の変更の差分を確認する
+- 「スタッフエンジニアはこれを承認するか？」と自問する
+- テストを実行し、ログを確認し、正しく動作することを示す
+
+### 5. エレガントさを追求する（バランスよく）
+- 重要な変更をする前に「もっとエレガントな方法はないか？」と一度立ち止まる
+- ハック的な修正に感じたら「今知っていることをすべて踏まえて、エレガントな解決策を実装する」
+- シンプルで明白な修正にはこのプロセスをスキップする（過剰設計しない）
+- 提示する前に自分の作業に自問自答する
+
+### 6. 自律的なバグ修正
+- バグレポートを受けたら、手取り足取り教えてもらわずにそのまま修正する
+- ログ・エラー・失敗しているテストを見て、自分で解決する
+- ユーザーのコンテキスト切り替えをゼロにする
+- 言われなくても、失敗しているCIテストを修正しに行く
+
+---
+
+## タスク管理
+
+1. **まず計画を立てる**：チェック可能な項目として `tasks/todo.md` に計画を書く
+2. **計画を確認する**：実装を開始する前に確認する
+3. **進捗を記録する**：完了した項目を随時マークしていく
+4. **変更を説明する**：各ステップで高レベルのサマリーを提供する
+5. **結果をドキュメント化する**：`tasks/todo.md` にレビューセクションを追加する
+6. **学びを記録する**：修正を受けた後に `tasks/lessons.md` を更新する
 
 ---
 
@@ -123,7 +182,7 @@ Multi-condition filter panel with AND/OR conjunction. Operators vary by field ty
 
 **7. Vehicle Charges & Tax Calculation**
 6 charge columns (bidAmount, auctionFee, insuranceFee, recyclingFee, transportFee, otherFees). Tax = 10% on all except recyclingFee (tax-exempt). Shared calculation across inline update, vehicle creation, and CSV import.
-- Utils: `chargeMapping.mjs` (CHARGE_TYPE_MAP, calculateTaxAndTotal)
+- Utils: `chargeMapping.mjs` (CHARGE_TYPE_MAP, parseChargesFromArray, calculateTaxAndTotal)
 
 **8. CSV Vehicle Import**
 Upload CSV via `addDocument` API → pg-boss "vehicle" queue. csv-parser, batch-upsert (50/tx), brand/customer auto-create with race condition protection.
@@ -173,7 +232,7 @@ Records WHO did WHAT, WHEN, and WHY for all vehicle operations. VehicleAuditLog 
 
 ---
 
-## Current Status (updated: 2026-02-21)
+## Current Status (updated: 2026-02-27)
 
 | Metric | Value |
 |--------|-------|
@@ -181,6 +240,15 @@ Records WHO did WHAT, WHEN, and WHY for all vehicle operations. VehicleAuditLog 
 | Golden records | 33 (across 22 auctions) |
 | PromptVersion | v1.0 (schema_default, score: unscored) |
 | auctionHouse null records | 24 (need review) |
+
+**Recent additions (2026-02-27):**
+- TypeScript Phase 1: 6 files converted to `.ts` (aiConstants, vehicleColumns, chargeMapping, auditLog, vehicleDomain, computeDiff)
+- Added `tsconfig.json` (strict mode, allowJs for gradual migration), `typecheck` npm script
+- Node 24 natively handles `.ts` imports — no tsx/ts-node needed
+- Domain layer extraction: `extra/utils/vehicleDomain.ts` with `resolveBrands` and `resolveCustomers`
+- Moved `parseChargesFromArray` into `chargeMapping.ts` (was duplicated locally in createVehiclesFromInvoice.js)
+- Bug fix: `paymentConfirmation.js` brand creation now has P2002 race condition protection (was missing)
+- Net result: ~180 lines of duplicated brand/customer/charge logic replaced with shared domain functions
 
 **Recent additions (2026-02-21):**
 - Added Vehicle Audit Trail (feature #19): VehicleAuditLog model, 8 instrumented endpoints/workers, VehicleHistory UI, vehicleAuditLog API
@@ -209,6 +277,8 @@ Records WHO did WHAT, WHEN, and WHY for all vehicle operations. VehicleAuditLog 
 5. **Payment Deadline Tracking** — Auto-calculate due dates based on auction-specific rules (e.g., "USS → Next Monday")
 6. **Customer Billing (future)** — CustomerCharge table, separate from VehicleCharge acquisition costs
 
+**DX improvements** are tracked separately in `tasks/todo.md` (TypeScript migration, React Query, component splitting, AI pipeline improvements).
+
 ---
 
 ## Important Patterns
@@ -221,6 +291,8 @@ Records WHO did WHAT, WHEN, and WHY for all vehicle operations. VehicleAuditLog 
 - **Costing sheet vs customer billing:** Vehicle table = acquisition costs (office use). Customer billing = separate, currently managed in Excel by staff (future feature)
 - **Certs don't create vehicles:** Only invoices create vehicles. Certs (車検証/一時抹消/輸出抹消) only link to existing vehicles. Accuracy is already good (government-standard format), no HITL needed for certs.
 - **Audit logging is fire-and-forget:** All audit calls wrapped in try/catch, never break parent operations. `auditLog.mjs` takes `prisma` as parameter (works with both API and worker Prisma instances). Audit logs survive vehicle deletion (vehicleId set to null, snapshot in metadata).
+- **Domain layer (`vehicleDomain.mjs`):** Brand find-or-create (`resolveBrands`) and customer find-or-create (`resolveCustomers`) are shared domain functions. All consumers (createVehiclesFromInvoice, vehicle.mjs worker, paymentConfirmation) use these instead of inline implementations. Both functions accept `prisma` as parameter and include P2002 race condition protection.
+- **Charge parsing is centralized in `chargeMapping.mjs`:** `parseChargesFromArray` (AI extraction → DB columns), `parseChargeFieldsFromFlat` (CSV/form → DB columns), `calculateTaxAndTotal` (inline edit recalculation). Don't duplicate charge/tax logic elsewhere.
 
 ---
 
@@ -258,3 +330,4 @@ A: It implements OPRO-style meta-prompting (Gemini rewrites its own prompt). The
 - `extra/ai/optimizer.mjs` - OPRO-style meta-prompting (available but expensive, not primary strategy)
 - `extra/utils/computeDiff.mjs` - Diff computation for user corrections (chassis_number preserves format differences)
 - `extra/utils/auditLog.mjs` - Shared audit logging (logVehicleAudit, logVehicleFieldChanges — fire-and-forget, prisma as param)
+- `extra/utils/vehicleDomain.mjs` - Shared domain functions (resolveBrands, resolveCustomers — P2002 safe, prisma as param)
