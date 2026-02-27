@@ -1,7 +1,7 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile } from "@/lib/blob.mjs";
 import multer from "multer";
-import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
+import { logVehicleAudit } from "../../../extra/utils/auditLog";
 
 const upload = multer({
   storage: multer.memoryStorage(),

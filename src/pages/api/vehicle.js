@@ -1,8 +1,8 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile, putMultipleFiles } from "@/lib/blob.mjs";
 import multer from "multer";
-import { parseChargeFieldsFromFlat } from "../../../extra/utils/chargeMapping.mjs";
-import { logVehicleAudit, logVehicleFieldChanges } from "../../../extra/utils/auditLog.mjs";
+import { parseChargeFieldsFromFlat } from "../../../extra/utils/chargeMapping";
+import { logVehicleAudit, logVehicleFieldChanges } from "../../../extra/utils/auditLog";
 
 const upload = multer({
   storage: multer.memoryStorage(),

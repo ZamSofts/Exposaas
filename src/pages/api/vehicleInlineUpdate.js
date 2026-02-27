@@ -1,6 +1,6 @@
 import { prisma, getSession } from "@/lib/useful";
-import { calculateTaxAndTotal } from "../../../extra/utils/chargeMapping.mjs";
-import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
+import { calculateTaxAndTotal } from "../../../extra/utils/chargeMapping";
+import { logVehicleAudit } from "../../../extra/utils/auditLog";
 
 // Field configuration: defines all inline-editable fields and their types
 const FIELD_CONFIG = {
