@@ -127,7 +127,7 @@ export function usePaginatedList(keyFn, endpoint, options = {}) {
     return p;
   }, [queryParams, buildParams]);
 
-  const queryKey = useMemo(() => keyFn(queryParams), [queryParams]);
+  const queryKey = useMemo(() => keyFn(queryParams), [queryParams, keyFn]);
 
   const { data: raw, isLoading, error: queryError, refetch } = useQuery({
     queryKey,

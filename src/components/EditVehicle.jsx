@@ -117,7 +117,7 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
         !customerData.error
           ? customerData.map(c => ({
               id: c.id,
-              name: c.name + "-" + c.uniqueId,
+              name: /^(CSV-|auto-)/.test(c.uniqueId || "") ? c.name : c.name + "-" + c.uniqueId,
             }))
           : []
       );

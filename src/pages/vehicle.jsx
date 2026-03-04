@@ -83,7 +83,10 @@ export default function VehiclesPage() {
     "customer?col=id,name,uniqueId",
     (data) => {
       if (!data || data.error) return [];
-      return (Array.isArray(data) ? data : []).map((c) => ({ value: c.id, label: `${c.name}-${c.uniqueId}` }));
+      return (Array.isArray(data) ? data : []).map((c) => ({
+        value: c.id,
+        label: /^(CSV-|auto-)/.test(c.uniqueId || "") ? c.name : `${c.name}-${c.uniqueId}`,
+      }));
     }
   );
 
