@@ -42,8 +42,7 @@ export default async function handler(req, res) {
         });
 
         // Get accuracy data
-        const { default: accuracyHandler } = await import("./accuracyStats");
-        // We'll compute accuracy inline instead of calling the handler
+        // Compute accuracy inline (no need to import handler)
         const allRecords = await prisma.paymentConfirmation.findMany({
           where: { companyId: session.companyId, diffSummary: { not: null } },
           select: { diffSummary: true, auctionHouse: true, isCorrect: true },

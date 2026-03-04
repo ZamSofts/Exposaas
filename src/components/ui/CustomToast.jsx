@@ -106,7 +106,7 @@ export function Toast({ id, type = "success", message, onClose, duration }) {
   return (
     <>
       <div
-        className={`fixed top-4 left-[60%] transform -translate-x-1/2 z-[9999] 
+        className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] 
           min-w-[280px] max-w-[400px] transition-all duration-300 ease-out
           ${isExiting ? "animate-toast-exit" : "animate-toast-enter"}
           ${config.bgColor} ${config.textColor} ${config.borderColor}

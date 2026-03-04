@@ -16,6 +16,7 @@
 import { ensureQueue } from "../queues/pgBoss.mjs";
 import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
+import { deleteFile } from "../../src/lib/blob.mjs";
 import {
   DOCUMENT_SCHEMA_MAP,
   buildDocumentExtractionPrompt,
@@ -100,6 +101,12 @@ let boss;
         });
 
         console.log(`✅ Extraction complete for InvoiceJob #${invoiceJobId}:`, JSON.stringify(extracted));
+
+        // Cleanup: delete the split-page blob (fire-and-forget)
+        if (fileUrl) {
+          try { await deleteFile(fileUrl); }
+          catch (cleanupErr) { console.warn(`[docExtract] Failed to delete page blob:`, cleanupErr.message); }
+        }
 
         // Auto-link to vehicle by chassis number
         const chassisNumber = extracted.chassis_number;

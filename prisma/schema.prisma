@@ -205,6 +205,7 @@ model PaymentConfirmation {
   isGolden     Boolean  @default(false)
   embedding    Json?    // Gemini text-embedding vector for few-shot similarity search
   invoiceJobId Int?
+  invoiceJob   InvoiceJobs? @relation("PaymentConfirmationInvoiceJob", fields: [invoiceJobId], references: [id])
   reviewedById String?  // User ID who reviewed/saved this extraction
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id])
@@ -212,6 +213,7 @@ model PaymentConfirmation {
 
   @@index([companyId])
   @@index([companyId, auctionHouse])
+  @@index([companyId, isGolden])
   @@index([invoiceJobId])
 }
 
@@ -233,6 +235,7 @@ model InvoiceJobs {
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
   vehicles    Vehicle[]  // Vehicles created from this invoice
+  paymentConfirmations PaymentConfirmation[] @relation("PaymentConfirmationInvoiceJob")
 
   @@index([companyId])
   @@index([companyId, docType])

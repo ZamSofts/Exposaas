@@ -1,3 +1,4 @@
+import "@/lib/validateEnv"; // Validate env vars at startup (server-side only)
 import "@/styles/globals.css";
 import React from "react";
 import { SessionProvider } from "next-auth/react";

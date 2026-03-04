@@ -133,7 +133,7 @@ let boss;
                   brandId,
                   companyId,
                   updatedById: userId ? String(userId) : null,
-                  ...(customerId ? { customerId } : {}),
+                  customerId: customerId || null,
                   ...charges,
                   ...metadata,
                 },

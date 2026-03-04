@@ -207,7 +207,7 @@ export default async function handler(req, res) {
     const id = Number(req.query.id);
     const chassisNumber = req.query.chassisNumber;
     const { page = 1, limit: rawLimit = 10, search = "", sortBy = "id", sortOrder = "asc", col } = req.query;
-    const limit = Math.min(Number(rawLimit), 5000);
+    const limit = Math.min(Number(rawLimit), 500);
     const selectFields = col ? Object.fromEntries(col.split(",").map(c => [c, true])) : undefined;
     const userFilter = session.role === "Sadmin" ? {} : { companyId: session?.companyId };
 

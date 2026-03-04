@@ -115,7 +115,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         console.warn("Failed to fetch auction accuracy:", err);
       }
     })();
-  }, [editable.length > 0 && editable[0]?.auction]);
+  }, [editable.length, editable[0]?.auction]);
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });

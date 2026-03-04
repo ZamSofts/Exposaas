@@ -96,6 +96,14 @@ let boss;
           }
         );
 
+        // Cleanup: delete temporary page-1 blob (fire-and-forget)
+        try {
+          const { deleteFile } = await import("../../src/lib/blob.mjs");
+          await deleteFile(tempUpload.url);
+        } catch (cleanupErr) {
+          console.warn("[classify] Failed to delete temp blob:", cleanupErr.message);
+        }
+
         // Validate with Zod (safeParse for graceful fallback)
         const parsed = ClassificationSchema.safeParse(classificationResult);
         const docType = parsed.success ? parsed.data.type : (classificationResult?.type || "unknown");
