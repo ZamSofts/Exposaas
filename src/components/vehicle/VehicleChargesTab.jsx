@@ -22,27 +22,27 @@ export default function VehicleChargesTab({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
           <label className="input-label">Bid Amount</label>
-          <input type="number" value={bidAmount} onChange={e => setBidAmount(e.target.value)} className="input-style" placeholder="0" />
+          <input type="number" min="0" value={bidAmount} onChange={e => setBidAmount(e.target.value)} className="input-style" placeholder="0" />
         </div>
         <div>
           <label className="input-label">Auction Fee</label>
-          <input type="number" value={auctionFee} onChange={e => setAuctionFee(e.target.value)} className="input-style" placeholder="0" />
+          <input type="number" min="0" value={auctionFee} onChange={e => setAuctionFee(e.target.value)} className="input-style" placeholder="0" />
         </div>
         <div>
           <label className="input-label">Insurance Fee</label>
-          <input type="number" value={insuranceFee} onChange={e => setInsuranceFee(e.target.value)} className="input-style" placeholder="0" />
+          <input type="number" min="0" value={insuranceFee} onChange={e => setInsuranceFee(e.target.value)} className="input-style" placeholder="0" />
         </div>
         <div>
           <label className="input-label">Recycling Fee</label>
-          <input type="number" value={recyclingFee} onChange={e => setRecyclingFee(e.target.value)} className="input-style" placeholder="0" />
+          <input type="number" min="0" value={recyclingFee} onChange={e => setRecyclingFee(e.target.value)} className="input-style" placeholder="0" />
         </div>
         <div>
           <label className="input-label">Transport Fee</label>
-          <input type="number" value={transportFee} onChange={e => setTransportFee(e.target.value)} className="input-style" placeholder="0" />
+          <input type="number" min="0" value={transportFee} onChange={e => setTransportFee(e.target.value)} className="input-style" placeholder="0" />
         </div>
         <div>
           <label className="input-label">Other Fees</label>
-          <input type="number" value={otherFees} onChange={e => setOtherFees(e.target.value)} className="input-style" placeholder="0" />
+          <input type="number" min="0" value={otherFees} onChange={e => setOtherFees(e.target.value)} className="input-style" placeholder="0" />
         </div>
       </div>
 

@@ -347,7 +347,7 @@ export default async function handler(req, res) {
           ...chargeFields,
         };
 
-        if (name !== "null") {
+        if (name != null && name !== "null") {
           updateData.name = name;
         }
 

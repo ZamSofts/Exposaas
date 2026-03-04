@@ -15,29 +15,27 @@ export { default as DataTable } from "@/components/ui/DataTable";
 export { usePaginatedList, useApiMutation, useStaticOptions, queryKeys } from "@/hooks/useQuery";
 
 export const API = async (method, name, d = {}, isFile= false) => {
+  let resp;
+
   if (method == "GET" || method == "DELETE") {
-    const data = await fetch("/api/" + name, {
-      method: method,
-    });
-    return await data.json();
-  }
-
-  if (isFile && d instanceof FormData) {
-    const data = await fetch("/api/" + name, {
+    resp = await fetch("/api/" + name, { method });
+  } else if (isFile && d instanceof FormData) {
+    resp = await fetch("/api/" + name, { method, body: d });
+  } else {
+    resp = await fetch("/api/" + name, {
       method,
-      body: d,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(d),
     });
-    return await data.json();
   }
 
-  const data = await fetch("/api/" + name, {
-    method: method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(d),
-  });
-  return await data.json();
+  const json = await resp.json().catch(() => ({}));
+
+  if (!resp.ok && !json.error) {
+    json.error = `Request failed (${resp.status})`;
+  }
+
+  return json;
 };
 
 export const isValid = (fieldsObj, setError) => {
