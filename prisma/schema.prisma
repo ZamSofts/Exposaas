@@ -21,6 +21,7 @@ model Company {
   customers Customer[]
   promptVersions PromptVersion[]
   exportTemplates ExportTemplate[]
+  gmailAccount GmailAccount?
 }
 
 model Customer {
@@ -295,6 +296,41 @@ model ExportTemplate {
 
   @@unique([companyId, name])
   @@index([companyId])
+}
+
+model GmailAccount {
+  id            Int      @id @default(autoincrement())
+  companyId     Int      @unique
+  email         String
+  refreshToken  String
+  lastHistoryId String?
+  ussPassword   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  emails        EmailMessage[]
+}
+
+model EmailMessage {
+  id              Int       @id @default(autoincrement())
+  gmailAccountId  Int
+  gmailMessageId  String
+  subject         String?
+  fromAddress     String?
+  receivedAt      DateTime?
+  attachmentUrl   String?
+  status          String    @default("pending")
+  skipReason      String?
+  documentJobId   Int?
+  createdAt       DateTime  @default(now())
+
+  gmailAccount    GmailAccount @relation(fields: [gmailAccountId], references: [id])
+
+  @@unique([gmailAccountId, gmailMessageId])
+  @@index([gmailAccountId])
+  @@index([status])
 }
 
 enum CompanyStatus {

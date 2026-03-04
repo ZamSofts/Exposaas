@@ -8,6 +8,17 @@ const RETRY_CONFIG = {
   backoffMultiplier: 2,
 };
 
+/**
+ * Custom error for daily quota exhaustion.
+ * Workers should NOT retry immediately — pg-boss will retry after a long delay.
+ */
+export class QuotaExhaustedError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "QuotaExhaustedError";
+  }
+}
+
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 function extractRetryDelay(error) {
@@ -41,8 +52,16 @@ async function callGeminiWithRetry(ai, request, pageNumber = 0) {
                           errorMessage.includes('Too Many Requests');
 
       if (!isRateLimit) {
-        // Not a rate limit error, don't retry
         throw error;
+      }
+
+      // Distinguish daily quota exhaustion from RPM throttle.
+      // Daily quota errors mention "quota" and won't resolve with short retries.
+      const isDailyQuota = errorMessage.includes('quota') ||
+                           errorMessage.includes('exceeded your current quota');
+      if (isDailyQuota) {
+        console.error(`🚫 [gemini] Daily quota exhausted (page ${pageNumber}). Will not retry immediately.`);
+        throw new QuotaExhaustedError(errorMessage);
       }
 
       if (attempt === RETRY_CONFIG.maxRetries) {

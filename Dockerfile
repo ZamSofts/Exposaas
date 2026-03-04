@@ -1,6 +1,9 @@
 # Step 1: Use Node 22 because pg-boss requires it
 FROM node:22-alpine
 
+# Install qpdf for PDF decryption (USS auction password-protected PDFs)
+RUN apk add --no-cache qpdf
+
 # Step 2: Set working directory
 WORKDIR /app
 

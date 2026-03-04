@@ -144,6 +144,9 @@ export async function embedRecord(recordId) {
  * @param {number} companyId
  * @returns {Promise<{ total: number, computed: number, skipped: number }>}
  */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const BACKFILL_DELAY_MS = 200;
+
 export async function backfillGoldenEmbeddings(companyId) {
   const records = await prisma.paymentConfirmation.findMany({
     where: { companyId, isGolden: true },
@@ -168,6 +171,7 @@ export async function backfillGoldenEmbeddings(companyId) {
     });
 
     computed++;
+    await sleep(BACKFILL_DELAY_MS);
   }
 
   return { total: records.length, computed, skipped };
