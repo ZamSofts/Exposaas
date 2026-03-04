@@ -51,6 +51,13 @@ npx prisma generate        # Regenerate Prisma client
 npx prisma studio          # View data
 ```
 
+**Running tests:**
+```bash
+npm run test           # Run all tests (Vitest, 104 tests across 5 suites)
+npm run test:watch     # Watch mode for development
+npm run test:coverage  # Run with coverage report
+```
+
 **Testing AI extraction:**
 1. Upload test PDF at `/documents`
 2. Check classification + extraction in Documents page
@@ -215,7 +222,7 @@ Company-scoped CRUD. Optional user account creation (username/password).
 ### Infrastructure
 
 **14. File Storage (Azure Blob)** — `blob.mjs`: putFile, putMultipleFiles, downloadFile, deleteFile
-**15. Background Job Queue (pg-boss)** — 5 queues: vehicle, gemini-extract, gemini-extract-page, classify-document, extract-document
+**15. Background Job Queue (pg-boss)** — 5 queues + Dead Letter Queues: vehicle, gemini-extract, gemini-extract-page, classify-document, extract-document (each has companion `__dlq` queue for failed job preservation)
 **16. Theme System** — Dark/light toggle, localStorage persistence, CSS variables
 **17. Reusable UI Components** — DataTable (virtualized), EditableCell, FilePreviewer, ConfirmModal, Toast, Skeleton, StatusBadge, etc. Barrel export via `wrapper.js`
 **18. Deployment** — Dockerfile (Node 22 Alpine), Docker Compose, concurrently with 5 workers + auto-restart
@@ -232,7 +239,7 @@ Records WHO did WHAT, WHEN, and WHY for all vehicle operations. VehicleAuditLog 
 
 ---
 
-## Current Status (updated: 2026-02-27)
+## Current Status (updated: 2026-03-05)
 
 | Metric | Value |
 |--------|-------|
@@ -240,6 +247,19 @@ Records WHO did WHAT, WHEN, and WHY for all vehicle operations. VehicleAuditLog 
 | Golden records | 33 (across 22 auctions) |
 | PromptVersion | v1.0 (schema_default, score: unscored) |
 | auctionHouse null records | 24 (need review) |
+| Test suite | 104 tests across 5 suites (Vitest) |
+| DX audit issues fixed | 44/48 (92%) |
+
+**Recent additions (2026-03-05):**
+- Test infrastructure: Vitest with 104 tests across 5 suites (chargeMapping, computeDiff, embedding, invoiceJobUtils, vehicleFilters)
+- Dead Letter Queue: pg-boss `ensureQueue()` creates companion `__dlq` queues — failed jobs preserved for debugging
+- Status enum: `InvoiceJobs.status` migrated from `String` to `JobStatus` enum (pending, processing, completed, failed, empty, needs_classification)
+- Multi-file upload: `useFileUpload` hook + `FileUploadModal` support multiple file selection with parallel upload via `Promise.allSettled`
+- Audit FK: `Vehicle.createdById/updatedById`, `PaymentConfirmation.reviewedById`, `ExportTemplate.createdById` changed from `String?` to `Int?` with `parseInt()` at all write points
+- Security: login rate limiting (10 attempts/15min), security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy), env validation at startup
+- Performance: N+1 fix in evaluationDataset, recharts tree-shaking, vehicle bulk fetch limit 5000→500
+- Cleanup: temp blob cleanup in workers, useEffect dep fix, Toast centering, CSV customer unlinking
+- Note: `npx prisma db push` needed to apply JobStatus enum + Int? column type changes
 
 **Recent additions (2026-02-27):**
 - TypeScript Phase 1: 6 files converted to `.ts` (aiConstants, vehicleColumns, chargeMapping, auditLog, vehicleDomain, computeDiff)
@@ -293,6 +313,10 @@ Records WHO did WHAT, WHEN, and WHY for all vehicle operations. VehicleAuditLog 
 - **Audit logging is fire-and-forget:** All audit calls wrapped in try/catch, never break parent operations. `auditLog.mjs` takes `prisma` as parameter (works with both API and worker Prisma instances). Audit logs survive vehicle deletion (vehicleId set to null, snapshot in metadata).
 - **Domain layer (`vehicleDomain.mjs`):** Brand find-or-create (`resolveBrands`) and customer find-or-create (`resolveCustomers`) are shared domain functions. All consumers (createVehiclesFromInvoice, vehicle.mjs worker, paymentConfirmation) use these instead of inline implementations. Both functions accept `prisma` as parameter and include P2002 race condition protection.
 - **Charge parsing is centralized in `chargeMapping.mjs`:** `parseChargesFromArray` (AI extraction → DB columns), `parseChargeFieldsFromFlat` (CSV/form → DB columns), `calculateTaxAndTotal` (inline edit recalculation). Don't duplicate charge/tax logic elsewhere.
+- **InvoiceJobs.status is an enum (`JobStatus`):** 6 values — pending, processing, completed, failed, empty, needs_classification. Don't use arbitrary strings.
+- **createdById/updatedById are `Int?`:** Match `User.id` (integer). Use `parseInt(session.id, 10) || null` at write points. `VehicleAuditLog.actorId` is intentionally `String?` (stores "ai", "system", etc.).
+- **Dead Letter Queues:** Every pg-boss queue has a companion `__dlq` queue. Failed jobs are routed there instead of expiring — check DLQ when debugging missing jobs.
+- **Multi-file upload:** `useFileUpload({ multiple: true })` supports parallel upload with `Promise.allSettled`. Partial failures still trigger `onSuccess` for files that succeeded.
 
 ---
 

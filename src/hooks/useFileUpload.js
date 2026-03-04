@@ -60,12 +60,15 @@ export default function useFileUpload({ endpoint, method, validExtensions, valid
     }, 200);
 
     try {
-      // Upload all files in parallel
-      const results = await Promise.all(
+      // Upload all files — use allSettled so partial failures don't block successes
+      const settled = await Promise.allSettled(
         toUpload.map((f) => {
           const formData = new FormData();
           formData.append("file", f);
-          return API(method, endpoint, formData, true);
+          return API(method, endpoint, formData, true).then((r) => {
+            if (r.error) throw new Error(r.error);
+            return r;
+          });
         })
       );
 
@@ -73,20 +76,26 @@ export default function useFileUpload({ endpoint, method, validExtensions, valid
       setProgress(100);
       setTimeout(() => setProgress(0), 1000);
 
-      // Check for errors in any response
-      const errors = results.filter((r) => r.error);
-      if (errors.length > 0) {
-        const msg = errors.map((r) => r.error).join("; ");
-        setError(msg);
-        onError?.(msg);
-        return;
+      const successes = settled.filter((r) => r.status === "fulfilled").map((r) => r.value);
+      const failures = settled.filter((r) => r.status === "rejected").map((r) => r.reason?.message || "Upload failed");
+
+      // Always call onSuccess if any files succeeded (so UI refreshes)
+      if (successes.length > 0) {
+        onSuccess?.(multiple ? successes : successes[0]);
       }
 
-      // Return first result for backward compat, or all results for multiple
-      onSuccess?.(multiple ? results : results[0]);
-      setFile(null);
-      setFiles([]);
-      setError("");
+      if (failures.length > 0) {
+        const msg = failures.join("; ");
+        setError(msg);
+        onError?.(msg);
+      }
+
+      // Only reset file state when all succeeded
+      if (failures.length === 0) {
+        setFile(null);
+        setFiles([]);
+        setError("");
+      }
     } catch (err) {
       clearInterval(interval);
       setProgress(0);
