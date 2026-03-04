@@ -14,7 +14,7 @@
  */
 
 import { ensureQueue } from "../queues/pgBoss.mjs";
-import { processPageWithGemini } from "./geminiProcess.mjs";
+import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import {
   DOCUMENT_SCHEMA_MAP,
@@ -24,6 +24,7 @@ import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
 import { logVehicleAudit } from "../utils/auditLog.ts";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DOC_ZOD_MAP } from "../ai/zodSchemas.ts";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.ts";
 
 let boss;
 
@@ -113,15 +114,19 @@ let boss;
               },
             });
 
-            // 2nd try: strip all dashes/spaces and partial match (fallback for format differences)
+            // 2nd try: strip all dashes/spaces and exact normalized match
             if (!vehicle) {
-              const stripped = chassisNumber.replace(/[\s-]/g, "");
-              vehicle = await prisma.vehicle.findFirst({
+              const stripped = chassisNumber.replace(/[\s-]/g, "").toLowerCase();
+              const candidates = await prisma.vehicle.findMany({
                 where: {
                   companyId,
                   chassisNumber: { contains: stripped, mode: "insensitive" },
                 },
+                select: { id: true, chassisNumber: true },
               });
+              vehicle = candidates.find(
+                (v) => v.chassisNumber.replace(/[\s-]/g, "").toLowerCase() === stripped
+              ) || null;
             }
 
             if (vehicle) {
@@ -203,6 +208,16 @@ let boss;
 
       } catch (err) {
         console.error(`❌ Document extraction failed for InvoiceJob #${invoiceJobId}:`, err.message);
+
+        if (err instanceof QuotaExhaustedError) {
+          console.warn(`⏳ InvoiceJob #${invoiceJobId}: quota exhausted, re-queuing in 30 minutes`);
+          await prisma.invoiceJobs.update({
+            where: { id: invoiceJobId },
+            data: { status: "pending" },
+          });
+          await boss.send("extract-document", job.data, { startAfter: QUOTA_REQUEUE_DELAY_SECONDS });
+          return;
+        }
 
         // Mark job as failed
         await prisma.invoiceJobs.update({

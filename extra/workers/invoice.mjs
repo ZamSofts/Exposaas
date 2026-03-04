@@ -3,13 +3,7 @@ import { ensureQueue } from "../queues/pgBoss.mjs";
 import { splitAndUploadPages } from "../utils/pdfSplitter.mjs";
 import { downloadFile } from "../../src/lib/blob.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-async function streamToBuffer(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
+import { streamToBuffer } from "../utils/streamUtils.mjs";
 
 let boss;
 
@@ -69,8 +63,22 @@ let boss;
 
         }
       } catch (err) {
-
         if (err && err.meta) console.error("Prisma meta:", err.meta);
+
+        // Create a failed InvoiceJob so the error is visible in the documents page
+        try {
+          await prisma.invoiceJobs.create({
+            data: {
+              companyId,
+              DocumentURL: filePath,
+              docType: "invoice",
+              status: "failed",
+              Json: { error: err.message },
+            },
+          });
+        } catch (dbErr) {
+          console.error("Failed to save failed job record:", dbErr);
+        }
 
         throw err;
       }

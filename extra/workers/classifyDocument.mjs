@@ -15,7 +15,7 @@
  */
 
 import { ensureQueue } from "../queues/pgBoss.mjs";
-import { processPageWithGemini } from "./geminiProcess.mjs";
+import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile } from "../../src/lib/blob.mjs";
 import { splitAndUploadPages } from "../utils/pdfSplitter.mjs";
@@ -33,13 +33,8 @@ const classificationResponseConfig = {
   responseJsonSchema: zodToJsonSchema(ClassificationSchema),
 };
 
-async function streamToBuffer(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
+import { streamToBuffer } from "../utils/streamUtils.mjs";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.ts";
 
 let boss;
 
@@ -182,6 +177,13 @@ let boss;
 
       } catch (err) {
         console.error(`❌ Classification failed for ${fileUrl}:`, err.message);
+
+        if (err instanceof QuotaExhaustedError) {
+          // Daily quota hit — re-queue with 30-min delay instead of marking failed
+          console.warn(`⏳ Classification for ${fileUrl}: quota exhausted, re-queuing in 30 minutes`);
+          await boss.send("classify-document", job.data, { startAfter: QUOTA_REQUEUE_DELAY_SECONDS });
+          return;
+        }
 
         // Save as failed
         try {
