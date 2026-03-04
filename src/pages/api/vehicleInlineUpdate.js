@@ -168,7 +168,7 @@ export default async function handler(req, res) {
     const oldValue = vehicle[field];
 
     // Build update data
-    const updateData = { [field]: parsedValue, updatedById: session.id };
+    const updateData = { [field]: parsedValue, updatedById: parseInt(session.id, 10) || null };
 
     // Recalculate tax/total only for charge fields
     if (config.isCharge) {

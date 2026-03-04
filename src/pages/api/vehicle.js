@@ -279,7 +279,7 @@ export default async function handler(req, res) {
             brandId: Number(brandId),
             companyId: Number(companyId),
             customerId: customerId && customerId !== "" ? Number(customerId) : null,
-            createdById: session.id,
+            createdById: parseInt(session.id, 10) || null,
             ...chargeFields,
           },
         });
@@ -343,7 +343,7 @@ export default async function handler(req, res) {
           brandId: Number(brandId),
           companyId: Number(companyId),
           customerId: customerId && customerId !== "" ? Number(customerId) : null,
-          updatedById: session.id,
+          updatedById: parseInt(session.id, 10) || null,
           ...chargeFields,
         };
 

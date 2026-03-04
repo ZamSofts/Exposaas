@@ -78,7 +78,7 @@ export default async function handler(req, res) {
           isCorrect: autoIsCorrect,
           diffSummary,
           auctionHouse,
-          reviewedById: session.id,
+          reviewedById: parseInt(session.id, 10) || null,
           companyId,
           invoiceJobId: invoiceJobId || null,
         },
@@ -157,7 +157,7 @@ export default async function handler(req, res) {
                 brandId,
                 lotNumber,
                 auction,
-                createdById: session.id,
+                createdById: parseInt(session.id, 10) || null,
                 remarks: `Auto-added from payment confirmation`,
               },
             });

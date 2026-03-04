@@ -116,6 +116,7 @@ export default function DocumentsPage() {
     validExtensions: ["pdf", "csv"],
     validMimeTypes: ["application/pdf", "application/x-pdf", "text/csv", "application/vnd.ms-excel"],
     fileLabel: "PDF / CSV",
+    multiple: true,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["documents"] });
@@ -406,7 +407,9 @@ export default function DocumentsPage() {
           isOpen={uploadModalOpen}
           label="Upload PDF or CSV"
           accept=".pdf,.csv"
+          multiple
           file={docUpload.file}
+          files={docUpload.files}
           progress={docUpload.progress}
           error={docUpload.error}
           onFileChange={docUpload.validate}

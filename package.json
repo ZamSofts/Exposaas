@@ -9,6 +9,9 @@
     "start": "concurrently --restart-tries 3 --restart-after 5000 -n \"NEXT,WORKER,INVOICE,PAGE,CLASSIFY,DOCEXT,EMAIL\" -c \"blue,green,magenta,cyan,white,gray,yellow\" \"next start -p 3001 -H 0.0.0.0\" \"node -r dotenv/config extra/workers/vehicle.mjs\" \"node -r dotenv/config extra/workers/invoice.mjs\" \"node -r dotenv/config extra/workers/invoicePage.mjs\" \"node -r dotenv/config extra/workers/classifyDocument.mjs\" \"node -r dotenv/config extra/workers/documentExtract.mjs\" \"node -r dotenv/config extra/workers/emailIngestion.mjs\"",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -44,12 +47,14 @@
     "@types/node": "^25.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.0.18",
     "concurrently": "^9.2.1",
     "dotenv": "^17.2.1",
     "eslint": "^9",
     "eslint-config-next": "15.4.4",
     "tailwindcss": "^4",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   },
   "prisma": {
     "seed": "node prisma/seed.js"

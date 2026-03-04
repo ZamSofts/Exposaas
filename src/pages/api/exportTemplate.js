@@ -97,7 +97,7 @@ export default async function handler(req, res) {
           data: {
             name: name.trim(),
             companyId,
-            createdById: session.id,
+            createdById: parseInt(session.id, 10) || null,
             columns,
             computedColumns,
             footerRows,

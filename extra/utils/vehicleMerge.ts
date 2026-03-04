@@ -210,7 +210,7 @@ export async function mergeVehicles(
     absorbedChassisNumber: newData.chassisNumber || null,
     source: mergeSource || null,
   };
-  updateData.updatedById = actorId || null;
+  updateData.updatedById = actorId ? parseInt(String(actorId), 10) || null : null;
 
   // ── Relocate related records if absorbed vehicle exists in DB ──
   let docCount = 0;

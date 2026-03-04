@@ -28,10 +28,21 @@ export async function ensureQueue(queueName) {
   const b = await initBoss();
 
   try {
-    await b.createQueue(queueName);
-    console.log(`✅ ensured queue: ${queueName}`);
+    // Create Dead Letter Queue companion first
+    const dlqName = `${queueName}__dlq`;
+    await b.createQueue(dlqName);
+
+    // Create main queue with DLQ routing — failed jobs go to DLQ instead of expiring
+    await b.createQueue(queueName, { deadLetter: dlqName });
+    console.log(`✅ ensured queue: ${queueName} (DLQ: ${dlqName})`);
   } catch (err) {
-    console.error(`⚠️ failed to create queue ${queueName}:`, err && err.message ? err.message : err);
+    // Queue may already exist (createQueue is idempotent) — try without DLQ option as fallback
+    try {
+      await b.createQueue(queueName);
+      console.log(`✅ ensured queue: ${queueName} (DLQ skipped — queue may pre-exist)`);
+    } catch (innerErr) {
+      console.error(`⚠️ failed to create queue ${queueName}:`, innerErr && innerErr.message ? innerErr.message : innerErr);
+    }
   }
 
   return b;
