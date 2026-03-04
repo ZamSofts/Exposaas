@@ -103,7 +103,7 @@ export default function DocumentViewer({ data, onBack }) {
       if (res.error) {
         setSearchResults({ error: res.error });
       } else {
-        setSearchResults({ vehicles: res.data || [] });
+        setSearchResults({ vehicles: res.vehicles || [] });
       }
     } catch (err) {
       setSearchResults({ error: "Search failed" });

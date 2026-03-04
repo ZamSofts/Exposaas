@@ -48,7 +48,8 @@ export default async function handler(req, res) {
   const limit = Number(req.query.limit) || 10;
   const search = String(req.query.search || "").trim().toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
-  const col = req.query.col ? String(req.query.col).split(",") : null;
+  const FORBIDDEN_COLS = ["password"];
+  const col = req.query.col ? String(req.query.col).split(",").filter(c => !FORBIDDEN_COLS.includes(c)) : null;
   const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
 
   try {

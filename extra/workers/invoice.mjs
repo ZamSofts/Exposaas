@@ -18,6 +18,8 @@ let boss;
       boss.on("error", err => console.error("[pg-boss] error:", err));
     }
 
+    console.log("🚀 Invoice worker started and listening...");
+
     await boss.work("gemini-extract", async ([job]) => {
       let filePath = job && job.data && (job.data.fileUrl || job.data.filePath || job.data.path);
       let companyId = job && job.data && job.data.companyId;

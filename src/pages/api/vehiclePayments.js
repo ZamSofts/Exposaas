@@ -152,6 +152,11 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: "Payment not found" });
         }
 
+        // Tenant isolation: non-Sadmin can only see own company's payments
+        if (session.role !== "Sadmin" && payment.vehicle?.companyId !== session.companyId) {
+          return res.status(404).json({ error: "Payment not found" });
+        }
+
         // Remove vehicle data from response, keep only payment data
         const { vehicle, ...paymentData } = payment;
         return res.json(paymentData);
@@ -166,6 +171,11 @@ export default async function handler(req, res) {
         });
 
         if (!vehicle) {
+          return res.status(404).json({ error: "Vehicle not found or access denied" });
+        }
+
+        // Tenant isolation: non-Sadmin can only access own company's vehicles
+        if (session.role !== "Sadmin" && vehicle.companyId !== session.companyId) {
           return res.status(404).json({ error: "Vehicle not found or access denied" });
         }
 

@@ -25,6 +25,7 @@ import {
   isReviewDisabled,
   isActionDone,
 } from "@/lib/invoiceJobUtils";
+import { InvoiceDataViewer } from "@/hooks/wrapper";
 
 // Doc type configuration (mirrors classificationSchema.mjs for UI)
 const DOC_TYPES = {
@@ -209,7 +210,6 @@ export default function DocumentsPage() {
 
     if (isInvoice) {
       const data = buildViewerData(viewerData, viewerData._correctedJson);
-      const { InvoiceDataViewer } = require("@/hooks/wrapper");
       return <InvoiceDataViewer data={data} onBack={handleBackToList} />;
     }
 

@@ -165,7 +165,7 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: `Cannot retry job with status: ${job.status}` });
         }
 
-        const { queueName, payload, deleteAfterQueue } = getRetryQueueConfig(job, session.userId);
+        const { queueName, payload, deleteAfterQueue } = getRetryQueueConfig(job, session.id);
 
         // Re-queue the job for processing (dynamic import to avoid bundling pg-boss for GET requests)
         const { ensureQueue } = await import("../../../extra/queues/pgBoss.mjs");
@@ -207,7 +207,7 @@ export default async function handler(req, res) {
         let retried = 0;
 
         for (const fJob of failedJobs) {
-          const config = getRetryQueueConfig(fJob, session.userId);
+          const config = getRetryQueueConfig(fJob, session.id);
           const boss = await ensureQueue(config.queueName);
 
           if (config.deleteAfterQueue) {
