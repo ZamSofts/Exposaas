@@ -3,6 +3,7 @@ import React from "react";
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeContext, useThemeState } from "@/hooks/useTheme";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,7 +60,9 @@ export default function App({ Component, pageProps: { session, ...pageProps }, r
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider session={session}>
-        <AppContent Component={Component} pageProps={pageProps} router={router} />
+        <ErrorBoundary>
+          <AppContent Component={Component} pageProps={pageProps} router={router} />
+        </ErrorBoundary>
       </SessionProvider>
     </QueryClientProvider>
   );

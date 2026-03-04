@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
       if (!Json || typeof Json !== "object") return res.status(400).json({ error: "Missing or invalid Json payload for page" });
 
-      const companyId = CompanyID || session?.companyId || null;
+      const companyId = session.role === "Sadmin" ? (CompanyID || session?.companyId) : session?.companyId;
       if (!companyId) return res.status(400).json({ error: "Missing CompanyID and no company available in session" });
 
       const pageNum = typeof Page === "number" ? Page : parseInt(Page, 10);

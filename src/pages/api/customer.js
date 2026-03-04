@@ -1,4 +1,5 @@
 import { prisma, getSession } from "@/lib/useful";
+import { hashPassword } from "@/lib/password";
 
 export default async function handler(req, res) {
   const session = await getSession(req, res);
@@ -158,7 +159,7 @@ export default async function handler(req, res) {
 
         // Create user and customer in a transaction
         await prisma.$transaction(async tx => {
-          const user = await tx.user.create({ data: { username: username.trim(), password: password.trim(), companyId: Number(companyId) } });
+          const user = await tx.user.create({ data: { username: username.trim(), password: await hashPassword(password.trim()), companyId: Number(companyId) } });
           await tx.userRole.create({ data: { userId: user.id, roleId: customerRole.id } });
           await tx.customer.create({
             data: {
@@ -233,7 +234,7 @@ export default async function handler(req, res) {
           }
 
           const userUpdateData = { username: username.trim() };
-          if (password && password.trim() !== "") userUpdateData.password = password.trim();
+          if (password && password.trim() !== "") userUpdateData.password = await hashPassword(password.trim());
           await tx.user.update({ where: { id: currentCustomer.userId }, data: userUpdateData });
         }
 

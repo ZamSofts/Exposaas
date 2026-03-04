@@ -1,4 +1,5 @@
 import { prisma, getSession } from "@/lib/useful";
+import { hashPassword } from "@/lib/password";
 
 // Shared helper: get admin role IDs + check if current user is admin
 async function getAdminContext(session) {
@@ -157,7 +158,7 @@ export default async function handler(req, res) {
       await prisma.user.create({
         data: {
           username,
-          password,
+          password: await hashPassword(password),
           companyId: Number(companyId),
           roles: { create: rolesId.map(roleId => ({ roleId })) },
         },
@@ -179,7 +180,7 @@ export default async function handler(req, res) {
       const transactionOps = [
         prisma.user.update({
           where: { id },
-          data: { username, ...(password ? { password } : {}), companyId: Number(companyId) },
+          data: { username, ...(password ? { password: await hashPassword(password) } : {}), companyId: Number(companyId) },
         }),
       ];
 
