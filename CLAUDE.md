@@ -1,5 +1,8 @@
 # Exposaas Context
 
+**Production:** https://exposaas.dndsol.co
+**GitHub:** https://github.com/ZamSofts/Exposaas
+
 ## WHY: AI-Native Architecture
 
 **Problem:** Japanese car exporters manually copy data from auction invoices (PDFs) into Excel. Time-consuming, error-prone.
