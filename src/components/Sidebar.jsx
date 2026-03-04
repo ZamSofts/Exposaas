@@ -9,7 +9,6 @@ import {
   Building2,
   Shield,
   Car,
-  ReceiptText,
   BarChart3,
   FlaskConical,
   Sparkles,
@@ -130,15 +129,7 @@ const getAllSidebarSections = () => [
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
       },
-      {
-        id: "invoice-jobs",
-        label: "Invoice Jobs",
-        icon: <ReceiptText size={20} />,
-        href: "/InvoiceJobs",
-        roles: ["view:vehicle"],
-        excludeRoles: ["Sadmin"],
-      },
-      {
+{
         id: "documents",
         label: "Documents",
         icon: <FolderOpen size={20} />,

@@ -7,6 +7,7 @@ import useFileUpload from "@/hooks/useFileUpload";
 import FileUploadModal from "@/components/ui/FileUploadModal";
 import DocumentViewer from "@/components/DocumentViewer";
 import Sidebar from "@/components/Sidebar";
+import GmailSettings from "@/components/GmailSettings";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
   FileText,
@@ -169,6 +170,26 @@ export default function DocumentsPage() {
     }
   };
 
+  const [retryingAll, setRetryingAll] = useState(false);
+
+  const handleRetryAllFailed = async () => {
+    setRetryingAll(true);
+    try {
+      const res = await API("POST", "InvoiceJobs", { action: "retryAllFailed" });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        invalidate();
+      }
+    } catch (err) {
+      setError("Failed to retry jobs");
+    } finally {
+      setRetryingAll(false);
+    }
+  };
+
+  const hasFailedJobs = rows.some((r) => r.status === "failed");
+
   // Get vehicle link info from Json (for non-invoice docs)
   const getLinkedInfo = (row) => {
     const json = row.Json;
@@ -216,19 +237,34 @@ export default function DocumentsPage() {
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">Documents</h1>
               </div>
 
-              <button
-                onClick={() => setUploadModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg hover:bg-[var(--primary)]/90 transition-colors shadow-sm"
-              >
-                <Upload className="w-4 h-4" />
-                Upload File
-              </button>
+              <div className="flex items-center gap-2">
+                {hasFailedJobs && (
+                  <button
+                    onClick={handleRetryAllFailed}
+                    disabled={retryingAll}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg transition-colors text-sm"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${retryingAll ? "animate-spin" : ""}`} />
+                    {retryingAll ? "Retrying..." : "Retry All Failed"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setUploadModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg hover:bg-[var(--primary)]/90 transition-colors shadow-sm"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload File
+                </button>
+              </div>
             </div>
             <p className="text-[var(--secondary-foreground)]">
               Upload PDFs or CSVs — invoices, export certs, inspection certs, vehicle data, and more.
               Files are auto-classified and processed.
             </p>
           </div>
+
+          {/* Gmail Auto-Import Settings */}
+          <GmailSettings />
 
           <Error message={listError || error} />
 
@@ -257,6 +293,7 @@ export default function DocumentsPage() {
 
           {/* Data Table */}
           <DataTable
+            key={activeTab}
             data={rows}
             total={total}
             isLoading={isLoading}
@@ -297,8 +334,16 @@ export default function DocumentsPage() {
                       <DocTypeBadge docType={row.docType || "invoice"} />
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                       <StatusBadge status={row.status} />
+                      {row.status === "failed" && row.Json?.error && (
+                        <p
+                          className="text-xs text-red-400/80 mt-1 max-w-[200px] truncate"
+                          title={typeof row.Json.error === "string" ? row.Json.error : JSON.stringify(row.Json.error)}
+                        >
+                          {typeof row.Json.error === "string" ? row.Json.error : "See details"}
+                        </p>
+                      )}
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap">

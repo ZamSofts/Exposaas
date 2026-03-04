@@ -1,7 +1,7 @@
 import { API } from "@/hooks/wrapper";
 
 /**
- * Shared utilities for InvoiceJobs — used by both /documents and /InvoiceJobs pages.
+ * Shared utilities for InvoiceJobs — used by the /documents page.
  */
 
 // ---------------------------------------------------------------------------
