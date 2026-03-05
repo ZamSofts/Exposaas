@@ -6,7 +6,7 @@ import {
   parseChargeFieldsFromFlat,
   parseMetadataFromCSV,
   CHARGE_TYPE_MAP,
-} from "../chargeMapping";
+} from "../chargeMapping.mjs";
 
 describe("calculateTaxAndTotal", () => {
   it("calculates tax on all columns except recyclingFee", () => {

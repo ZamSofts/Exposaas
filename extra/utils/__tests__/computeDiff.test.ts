@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeDetailedDiff, computeScoredDiff } from "../computeDiff";
+import { computeDetailedDiff, computeScoredDiff } from "../computeDiff.mjs";
 
 describe("computeDetailedDiff", () => {
   it("returns exact_match for identical data", () => {
