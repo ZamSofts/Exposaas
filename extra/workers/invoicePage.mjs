@@ -3,8 +3,8 @@ import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs"
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { deleteFile } from "../../src/lib/blob.mjs";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { InvoicePageResponseSchema } from "../ai/zodSchemas.ts";
-import { MAX_VEHICLES_PER_PAGE, QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.ts";
+import { InvoicePageResponseSchema } from "../ai/zodSchemas.mjs";
+import { MAX_VEHICLES_PER_PAGE, QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.js";
 
 /** Structured Output config for invoice extraction */
 const invoiceResponseConfig = {

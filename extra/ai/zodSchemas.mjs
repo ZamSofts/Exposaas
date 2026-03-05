@@ -4,10 +4,6 @@
  * These schemas serve two purposes:
  * 1. Runtime validation of Gemini responses (safeParse)
  * 2. Structured Output schema generation via zod-to-json-schema
- *
- * Note: The prompt-facing schemas (schema.mjs, documentSchemas.mjs) remain
- * separate — they contain constraints/descriptions used in prompt text.
- * These Zod schemas define the expected JSON structure for validation.
  */
 
 import { z } from "zod";
@@ -26,7 +22,7 @@ export const CHARGE_TYPES = [
   "admin_fee",
   "other_fee",
   "discount",
-] as const;
+];
 
 /** Single charge item extracted from an invoice */
 export const ChargeSchema = z.object({
@@ -48,17 +44,12 @@ export const VehicleExtractionSchema = z.object({
 
 /**
  * Invoice page response — Gemini returns { page_1: [...vehicles] }.
- * Uses passthrough() to allow page_2, page_3 etc. without strict key enforcement.
  */
 export const InvoicePageResponseSchema = z
   .object({
     page_1: z.array(VehicleExtractionSchema),
   })
   .passthrough();
-
-export type InvoicePageResponse = z.infer<typeof InvoicePageResponseSchema>;
-export type VehicleExtraction = z.infer<typeof VehicleExtractionSchema>;
-export type Charge = z.infer<typeof ChargeSchema>;
 
 // ─── Document Classification ────────────────────────────────────
 
@@ -68,15 +59,13 @@ export const DOCUMENT_TYPE_KEYS = [
   "inspection_cert",
   "temp_cancel",
   "unknown",
-] as const;
+];
 
 /** Classification response from Gemini */
 export const ClassificationSchema = z.object({
   type: z.enum(DOCUMENT_TYPE_KEYS),
   confidence: z.number().min(0).max(1),
 });
-
-export type ClassificationResult = z.infer<typeof ClassificationSchema>;
 
 // ─── Certificate Extraction (Non-Invoice Documents) ─────────────
 
@@ -121,15 +110,11 @@ export const TempCancelSchema = z.object({
 });
 
 /** Map docType → Zod schema for Structured Output */
-export const DOC_ZOD_MAP: Record<string, z.ZodType> = {
+export const DOC_ZOD_MAP = {
   export_cert: ExportCertSchema,
   inspection_cert: InspectionCertSchema,
   temp_cancel: TempCancelSchema,
 };
-
-export type ExportCertResult = z.infer<typeof ExportCertSchema>;
-export type InspectionCertResult = z.infer<typeof InspectionCertSchema>;
-export type TempCancelResult = z.infer<typeof TempCancelSchema>;
 
 // ─── Optimizer Candidates ───────────────────────────────────────
 
@@ -142,5 +127,3 @@ export const OptimizerCandidateSchema = z.object({
 
 /** Full optimizer response (array of candidates) */
 export const OptimizerResponseSchema = z.array(OptimizerCandidateSchema);
-
-export type OptimizerCandidate = z.infer<typeof OptimizerCandidateSchema>;

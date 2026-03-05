@@ -2,10 +2,10 @@ import { initQueue } from "../queues/vehicle.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
-import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.ts";
-import { resolveBrands, resolveCustomers } from "../utils/vehicleDomain.ts";
-import { logVehicleAudit } from "../utils/auditLog.ts";
-import { findMergeCandidate, mergeVehicles } from "../utils/vehicleMerge.ts";
+import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.mjs";
+import { resolveBrands, resolveCustomers } from "../utils/vehicleDomain.mjs";
+import { logVehicleAudit } from "../utils/auditLog.mjs";
+import { findMergeCandidate, mergeVehicles } from "../utils/vehicleMerge.mjs";
 
 let boss;
 

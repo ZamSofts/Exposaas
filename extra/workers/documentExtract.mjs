@@ -22,10 +22,10 @@ import {
   buildDocumentExtractionPrompt,
 } from "../ai/documentSchemas.mjs";
 import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
-import { logVehicleAudit } from "../utils/auditLog.ts";
+import { logVehicleAudit } from "../utils/auditLog.mjs";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { DOC_ZOD_MAP } from "../ai/zodSchemas.ts";
-import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.ts";
+import { DOC_ZOD_MAP } from "../ai/zodSchemas.mjs";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.js";
 
 let boss;
 

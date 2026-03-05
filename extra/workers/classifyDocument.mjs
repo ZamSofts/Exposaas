@@ -25,7 +25,7 @@ import {
   DOCUMENT_TYPES,
 } from "../ai/classificationSchema.mjs";
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { ClassificationSchema } from "../ai/zodSchemas.ts";
+import { ClassificationSchema } from "../ai/zodSchemas.mjs";
 
 /** Structured Output config for classification */
 const classificationResponseConfig = {
@@ -34,7 +34,7 @@ const classificationResponseConfig = {
 };
 
 import { streamToBuffer } from "../utils/streamUtils.mjs";
-import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.ts";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.js";
 
 let boss;
 

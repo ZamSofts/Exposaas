@@ -8,48 +8,13 @@
  * never breaking the parent operation.
  */
 
-// Use a minimal interface instead of importing PrismaClient directly.
-// This avoids import path issues between src/ and extra/ while keeping type safety.
-interface AuditPrisma {
-  vehicleAuditLog: {
-    create: (args: { data: Record<string, any> }) => Promise<any>;
-    createMany: (args: { data: Record<string, any>[] }) => Promise<any>;
-  };
-}
-
-export interface VehicleAuditParams {
-  vehicleId: number;
-  action: "create" | "update" | "delete" | "link_document" | "payment_create" | "payment_update" | "payment_delete";
-  actor: "user" | "ai" | "system" | "csv_import";
-  actorId?: string | null;
-  field?: string | null;
-  oldValue?: any;
-  newValue?: any;
-  source?: string | null;
-  metadata?: Record<string, any> | null;
-}
-
-export interface FieldChange {
-  field: string;
-  oldValue: any;
-  newValue: any;
-}
-
-export interface VehicleFieldChangesParams {
-  vehicleId: number;
-  actor: string;
-  actorId?: string | null;
-  source?: string | null;
-  changes: FieldChange[];
-}
-
 /**
  * Log a single vehicle audit event.
  */
 export async function logVehicleAudit(
-  prisma: AuditPrisma,
-  { vehicleId, action, actor, actorId, field, oldValue, newValue, source, metadata }: VehicleAuditParams,
-): Promise<void> {
+  prisma,
+  { vehicleId, action, actor, actorId, field, oldValue, newValue, source, metadata },
+) {
   try {
     await prisma.vehicleAuditLog.create({
       data: {
@@ -64,7 +29,7 @@ export async function logVehicleAudit(
         metadata: metadata || undefined,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[audit] Failed to log:", err?.message || err);
   }
 }
@@ -74,9 +39,9 @@ export async function logVehicleAudit(
  * Filters out unchanged fields automatically.
  */
 export async function logVehicleFieldChanges(
-  prisma: AuditPrisma,
-  { vehicleId, actor, actorId, source, changes }: VehicleFieldChangesParams,
-): Promise<void> {
+  prisma,
+  { vehicleId, actor, actorId, source, changes },
+) {
   try {
     const data = changes
       .filter(c => String(c.oldValue ?? "") !== String(c.newValue ?? ""))
@@ -94,7 +59,7 @@ export async function logVehicleFieldChanges(
     if (data.length > 0) {
       await prisma.vehicleAuditLog.createMany({ data });
     }
-  } catch (err: any) {
+  } catch (err) {
     console.error("[audit] Failed to log batch:", err?.message || err);
   }
 }

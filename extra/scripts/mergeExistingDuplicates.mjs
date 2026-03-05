@@ -8,8 +8,8 @@
  * LIVE RUN: node -r dotenv/config extra/scripts/mergeExistingDuplicates.mjs --execute
  */
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import { extractChassisKey, mergeVehicles } from "../utils/vehicleMerge.ts";
-import { logVehicleAudit } from "../utils/auditLog.ts";
+import { extractChassisKey, mergeVehicles } from "../utils/vehicleMerge.mjs";
+import { logVehicleAudit } from "../utils/auditLog.mjs";
 
 const isDryRun = !process.argv.includes("--execute");
 

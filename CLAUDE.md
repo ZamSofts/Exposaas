@@ -18,6 +18,10 @@
 - Don't expect synchronous responses - use job queues (pg-boss)
 - Always include verification UI - never auto-save AI outputs without review
 
+**Strict rules:**
+- **NO TypeScript** — This project uses JavaScript only. Never create `.ts` files (except test files under `__tests__/`). Never convert `.js` files to `.ts`.
+- **Do NOT modify the Dockerfile** — The production Dockerfile is maintained by the engineer. Do not change it.
+
 ## WHAT: Tech Stack
 
 **Stack:** Next.js 15, Prisma (PostgreSQL), pg-boss, Azure Blob, Gemini AI

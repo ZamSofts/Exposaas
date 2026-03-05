@@ -7,13 +7,13 @@
 export const ACCURACY_THRESHOLDS = {
   HIGH: 0.85,
   MID: 0.60,
-} as const;
+};
 
 /** Same thresholds as percentages (0-100 scale) for display */
 export const ACCURACY_PCT = {
   HIGH: 85,
   MID: 60,
-} as const;
+};
 
 /** Minimum reviewed records before auto-switching to summary review mode */
 export const MIN_RECORDS_FOR_AUTO_MODE = 5;
@@ -32,14 +32,12 @@ export const CONFIDENCE_COLORS = {
   high: { color: "#22c55e", bg: "rgba(34,197,94,0.12)" },
   mid:  { color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
   low:  { color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
-} as const;
-
-export type ConfidenceLevel = "high" | "mid" | "low";
+};
 
 /**
  * Get confidence level label for a value (decimal 0-1).
  */
-export function getConfidenceLevel(value: number | null): ConfidenceLevel | null {
+export function getConfidenceLevel(value) {
   if (value == null) return null;
   if (value >= ACCURACY_THRESHOLDS.HIGH) return "high";
   if (value >= ACCURACY_THRESHOLDS.MID) return "mid";
@@ -49,7 +47,7 @@ export function getConfidenceLevel(value: number | null): ConfidenceLevel | null
 /**
  * Get hex color string for accuracy/confidence display.
  */
-export function getAccuracyColor(value: number): string {
+export function getAccuracyColor(value) {
   const level = getConfidenceLevel(value);
   return level ? CONFIDENCE_COLORS[level].color : "#ef4444";
 }
@@ -57,7 +55,7 @@ export function getAccuracyColor(value: number): string {
 /**
  * Get border style for confidence-highlighted input fields.
  */
-export function getConfidenceBorder(confidence: number | null): Record<string, string> {
+export function getConfidenceBorder(confidence) {
   const level = getConfidenceLevel(confidence);
   if (!level) return {};
   return { borderColor: CONFIDENCE_COLORS[level].color, borderWidth: "2px" };
