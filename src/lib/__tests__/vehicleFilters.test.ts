@@ -44,7 +44,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "auction", operator: "contains", value: "HAA" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND).toHaveLength(1);
     expect(result.AND[0].auction).toEqual({ contains: "HAA", mode: "insensitive" });
   });
@@ -54,7 +54,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "chassisNumber", operator: "is", value: "ABC-123" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND[0].chassisNumber).toEqual({ equals: "ABC-123", mode: "insensitive" });
   });
 
@@ -63,7 +63,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "bidAmount", operator: "isGreater", value: "100000" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND[0].bidAmount).toEqual({ gt: 100000 });
   });
 
@@ -72,7 +72,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "auction", operator: "isEmpty" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND[0].auction).toBeNull();
   });
 
@@ -81,7 +81,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "auction", operator: "isNotEmpty" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND[0].auction).toEqual({ not: null });
   });
 
@@ -93,7 +93,7 @@ describe("buildFilterWhere", () => {
         { field_name: "auction", operator: "is", value: "USS" },
       ],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.OR).toHaveLength(2);
   });
 
@@ -102,7 +102,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "brand.name", operator: "contains", value: "Toyota" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND[0].brand.name).toEqual({ contains: "Toyota", mode: "insensitive" });
   });
 
@@ -111,7 +111,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "customer.name", operator: "isEmpty" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND[0].customer).toEqual({ is: null });
   });
 
@@ -129,7 +129,7 @@ describe("buildFilterWhere", () => {
       conjunction: "and",
       conditions: [{ field_name: "auction", operator: "doesNotContain", value: "HAA" }],
     });
-    const result = buildFilterWhere(filters);
+    const result: any = buildFilterWhere(filters);
     expect(result.AND[0].NOT.auction).toEqual({ contains: "HAA", mode: "insensitive" });
   });
 
@@ -149,7 +149,7 @@ describe("getSearchFilter", () => {
   });
 
   it("builds OR filter across multiple fields", () => {
-    const result = getSearchFilter("toyota");
+    const result: any = getSearchFilter("toyota");
     expect(result.OR).toBeDefined();
     expect(result.OR.length).toBeGreaterThan(5);
     // Should include name, chassisNumber, auction, etc.
@@ -158,7 +158,7 @@ describe("getSearchFilter", () => {
   });
 
   it("includes relation fields (brand, customer)", () => {
-    const result = getSearchFilter("test");
+    const result: any = getSearchFilter("test");
     expect(result.OR.some((c: any) => c.brand?.name?.contains === "test")).toBe(true);
     expect(result.OR.some((c: any) => c.customer?.name?.contains === "test")).toBe(true);
   });

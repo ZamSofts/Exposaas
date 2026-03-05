@@ -103,7 +103,7 @@ describe("jsonToEmbeddingText", () => {
   });
 
   it("handles empty/null input", () => {
-    expect(jsonToEmbeddingText(null)).toContain("vehicles: 0");
+    expect(jsonToEmbeddingText(null as any)).toContain("vehicles: 0");
     expect(jsonToEmbeddingText({})).toContain("vehicles: 0");
   });
 
