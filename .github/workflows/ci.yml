@@ -12,8 +12,9 @@ concurrency:
 
 env:
   NODE_OPTIONS: '--max-old-space-size=4096'
-  # Dummy URL — prisma generate validates format only, never connects
+  # Dummy values — prisma generate and next build need these but never connect
   DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ci?schema=public'
+  NEXTAUTH_SECRET: 'ci-dummy-secret'
 
 jobs:
   ci:
