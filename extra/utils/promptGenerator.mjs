@@ -1,5 +1,5 @@
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import { ACCURACY_THRESHOLDS, SIMPLIFIED_PROMPT_THRESHOLD } from "../../src/config/aiConstants.js";
+import { ACCURACY_THRESHOLDS, SIMPLIFIED_PROMPT_THRESHOLD } from "../../src/config/aiConstants.mjs";
 
 /**
  * Generate prompt variations based on accuracy data and common correction patterns.

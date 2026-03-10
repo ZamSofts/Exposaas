@@ -25,7 +25,7 @@ import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
 import { logVehicleAudit } from "../utils/auditLog.mjs";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DOC_ZOD_MAP } from "../ai/zodSchemas.mjs";
-import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.js";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.mjs";
 
 let boss;
 

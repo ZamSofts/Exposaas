@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { MAX_VEHICLES_PER_PAGE } from "../../src/config/aiConstants.js";
+import { MAX_VEHICLES_PER_PAGE } from "../../src/config/aiConstants.mjs";
 
 // ─── Invoice Extraction ─────────────────────────────────────────
 

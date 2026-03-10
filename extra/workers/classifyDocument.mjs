@@ -34,7 +34,7 @@ const classificationResponseConfig = {
 };
 
 import { streamToBuffer } from "../utils/streamUtils.mjs";
-import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.js";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.mjs";
 
 let boss;
 
