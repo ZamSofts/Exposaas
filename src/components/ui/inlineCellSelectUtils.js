@@ -6,7 +6,7 @@ export function useAutoFocusSelect(selectRef) {
     if (selectRef.current) {
       selectRef.current.focus();
     }
-  }, []);
+  }, [selectRef]);
 }
 
 export function handleEscapeKey(onCancel) {

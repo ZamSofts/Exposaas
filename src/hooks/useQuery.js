@@ -265,5 +265,5 @@ export function useStaticOptions(queryKey, endpoint, transform, options = {}) {
     enabled,
   });
 
-  return useMemo(() => transform(data), [data]);
+  return useMemo(() => transform(data), [data, transform]);
 }

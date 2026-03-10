@@ -12,7 +12,7 @@
  *       -> For each new message with PDF attachment:
  *         -> Download attachment
  *         -> (USS) Decrypt with qpdf + stored password
- *         -> Upload to Azure Blob
+ *         -> Upload to Azure Blob Storage
  *         -> Dedup check (EmailMessage @@unique)
  *         -> Queue to "classify-document"
  *         -> Save EmailMessage record
@@ -165,7 +165,7 @@ async function processAccount(account) {
       );
 
       // USS detection: decrypt if password-protected
-      const isUss = fromAddress.includes(USS_SENDER);
+      const isUss = fromAddress === USS_SENDER;
       if (isUss || isEncryptedPdf(pdfBuffer)) {
         if (!account.ussPassword) {
           await prisma.emailMessage.create({
@@ -200,7 +200,7 @@ async function processAccount(account) {
         }
       }
 
-      // Upload to Azure Blob
+      // Upload to Azure Blob Storage
       const { url: blobUrl } = await putFile(
         {
           buffer: pdfBuffer,
@@ -248,7 +248,9 @@ async function processAccount(account) {
             skipReason: msgErr.message?.slice(0, 500),
           },
         });
-      } catch {}
+      } catch (recordErr) {
+        console.warn("Failed to record email error:", recordErr.message);
+      }
     }
   }
 

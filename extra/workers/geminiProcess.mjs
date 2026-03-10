@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { downloadFile as downloadFromAzure } from "../../src/lib/blob.mjs";
+import { downloadFile } from "../../src/lib/blob.mjs";
 
 const RETRY_CONFIG = {
   maxRetries: 5,
@@ -87,13 +87,13 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
   try {
     let stream;
     try {
-      stream = await downloadFromAzure(pageUrl);
+      stream = await downloadFile(pageUrl);
     } catch (err) {
-      throw new Error(`Failed to download page ${pageNumber} from Azure: ${err?.message || err}`);
+      throw new Error(`Failed to download page ${pageNumber} from storage: ${err?.message || err}`);
     }
 
     if (!stream) {
-      throw new Error(`Azure download returned null/undefined stream for page ${pageNumber}`);
+      throw new Error(`Storage download returned null/undefined stream for page ${pageNumber}`);
     }
 
     // Convert stream to buffer

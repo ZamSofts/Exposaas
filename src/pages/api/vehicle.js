@@ -55,8 +55,7 @@ const parseFormData = req =>
     });
   });
 
-//file upload function using putMultipleFiles
-const uploadFilesToAzure = async (files, vehicleId, folderPath = "vehicle/") => {
+const uploadFiles = async (files, vehicleId, folderPath = "vehicle/") => {
   if (!files || files.length === 0) {
     return { uploadedDocuments: [], documentsUploaded: 0, errors: [] };
   }
@@ -132,17 +131,17 @@ const getIncludeRelations = (includeDocuments = true) => {
   return base;
 };
 
-/** Delete documents from Azure Blob Storage. Returns { deleted, errors }. */
-const deleteDocumentsFromAzure = async (documents) => {
+/** Delete documents from storage. Returns { deleted, errors }. */
+const deleteDocuments = async (documents) => {
   let deleted = 0;
   const errors = [];
   for (const doc of documents) {
     try {
       await deleteFile(doc.Url);
       deleted++;
-      console.log(`✅ Deleted from Azure: ${doc.Url}`);
+      console.log(`✅ Deleted from storage: ${doc.Url}`);
     } catch (error) {
-      console.error(`❌ Failed to delete from Azure: ${doc.Url}`, error);
+      console.error(`❌ Failed to delete from storage: ${doc.Url}`, error);
       errors.push({ docUrl: doc.Url, error: error.message });
     }
   }
@@ -295,7 +294,7 @@ export default async function handler(req, res) {
 
         // Handle document uploads
         const documentFiles = req.files.documents || [];
-        const uploadResult = await uploadFilesToAzure(documentFiles, vehicle.id, "vehicle/");
+        const uploadResult = await uploadFiles(documentFiles, vehicle.id, "vehicle/");
 
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
@@ -383,8 +382,8 @@ export default async function handler(req, res) {
               });
               documentsDeleted = deleteResult.count;
 
-              const azureResult = await deleteDocumentsFromAzure(docsToDelete);
-              deletionErrors = azureResult.errors;
+              const storageResult = await deleteDocuments(docsToDelete);
+              deletionErrors = storageResult.errors;
             }
           } catch (error) {
             console.error("Error processing document deletions:", error);
@@ -394,7 +393,7 @@ export default async function handler(req, res) {
 
         // Handle new document uploads
         const documentFiles = req.files.documents || [];
-        const uploadResult = await uploadFilesToAzure(documentFiles, vehicleId, "vehicle/");
+        const uploadResult = await uploadFiles(documentFiles, vehicleId, "vehicle/");
 
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
@@ -450,8 +449,8 @@ export default async function handler(req, res) {
         // Delete the vehicle (cascade will automatically delete documents from database)
         await prisma.vehicle.delete({ where: { id } });
 
-        // Clean up documents from Azure Blob Storage
-        const { deleted: documentsDeleted, errors: deletionErrors } = await deleteDocumentsFromAzure(vehicleDocuments);
+        // Clean up documents from storage
+        const { deleted: documentsDeleted, errors: deletionErrors } = await deleteDocuments(vehicleDocuments);
 
         const response = {
           message: "Vehicle deleted successfully",

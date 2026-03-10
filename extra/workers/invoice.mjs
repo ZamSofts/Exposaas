@@ -31,6 +31,15 @@ let boss;
         throw new Error("Missing file path/url on job data");
       }
 
+      // Dedup: skip if InvoiceJobs already exist for this document
+      const existingJobs = await prisma.invoiceJobs.count({
+        where: { parentDocumentUrl: filePath, companyId }
+      });
+      if (existingJobs > 0) {
+        console.log(`⏭️ Skipping duplicate: ${existingJobs} InvoiceJob(s) already exist for ${filePath}`);
+        return;
+      }
+
       try {
         const pdfStream = await downloadFile(filePath);
         const pdfBuffer = await streamToBuffer(pdfStream);
