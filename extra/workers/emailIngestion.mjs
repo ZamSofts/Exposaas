@@ -165,7 +165,7 @@ async function processAccount(account) {
       );
 
       // USS detection: decrypt if password-protected
-      const isUss = fromAddress.includes(USS_SENDER);
+      const isUss = fromAddress === USS_SENDER;
       if (isUss || isEncryptedPdf(pdfBuffer)) {
         if (!account.ussPassword) {
           await prisma.emailMessage.create({
@@ -248,7 +248,9 @@ async function processAccount(account) {
             skipReason: msgErr.message?.slice(0, 500),
           },
         });
-      } catch {}
+      } catch (recordErr) {
+        console.warn("Failed to record email error:", recordErr.message);
+      }
     }
   }
 
