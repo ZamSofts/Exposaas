@@ -79,6 +79,11 @@ Data Matching:
 - Handle stacked/multi-line cells: extract top/base value only, skip tax values
 - Detect quantities if present and multiply if needed (unit price × qty = subtotal)
 
+Vehicle Count:
+- A typical auction invoice page contains 1-15 vehicles MAXIMUM
+- NEVER return more than 20 vehicles per page — if you detect more, you are likely hallucinating
+- Count actual vehicle rows in the PDF before extracting. Double-check the count.
+
 Global Rules:
 - NEVER include company names, addresses, phone numbers, bank details
 - NEVER include tax breakdowns (taxable amounts, consumption tax)

@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { MAX_VEHICLES_PER_PAGE } from "../../src/config/aiConstants.js";
 
 // ─── Invoice Extraction ─────────────────────────────────────────
 
@@ -47,7 +48,7 @@ export const VehicleExtractionSchema = z.object({
  */
 export const InvoicePageResponseSchema = z
   .object({
-    page_1: z.array(VehicleExtractionSchema),
+    page_1: z.array(VehicleExtractionSchema).max(MAX_VEHICLES_PER_PAGE),
   })
   .passthrough();
 

@@ -80,7 +80,14 @@ let boss;
           );
 
           // If auth fails, deactivate account until user re-authenticates
-          if (err.code === 401 || err.code === 403) {
+          // Google OAuth returns invalid_grant (HTTP 400) when refresh token is
+          // revoked, expired, or the app is in "Testing" mode (7-day token expiry).
+          const isAuthError =
+            err.code === 401 ||
+            err.code === 403 ||
+            err.message?.includes("invalid_grant") ||
+            err.message?.includes("Token has been expired or revoked");
+          if (isAuthError) {
             await prisma.gmailAccount.update({
               where: { id: account.id },
               data: { isActive: false },
