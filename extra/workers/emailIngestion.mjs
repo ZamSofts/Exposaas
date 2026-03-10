@@ -12,7 +12,7 @@
  *       -> For each new message with PDF attachment:
  *         -> Download attachment
  *         -> (USS) Decrypt with qpdf + stored password
- *         -> Upload to Azure Blob
+ *         -> Upload to Azure Blob Storage
  *         -> Dedup check (EmailMessage @@unique)
  *         -> Queue to "classify-document"
  *         -> Save EmailMessage record
@@ -200,7 +200,7 @@ async function processAccount(account) {
         }
       }
 
-      // Upload to Azure Blob
+      // Upload to Azure Blob Storage
       const { url: blobUrl } = await putFile(
         {
           buffer: pdfBuffer,

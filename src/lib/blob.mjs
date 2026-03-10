@@ -1,123 +1,124 @@
-import { createClient } from "@supabase/supabase-js";
-import { Readable } from "stream";
+import { BlobServiceClient, StorageSharedKeyCredential } from "@azure/storage-blob";
 import { v4 as uuidv4 } from "uuid";
 
-const BUCKET = "exposaasbpo";
+// Initialize Azure Blob Service Client
+const getBlobServiceClient = () => {
+  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+  const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
 
-const getSupabaseClient = () => {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    throw new Error("Supabase credentials are not configured");
+  if (!accountName || !accountKey) {
+    throw new Error("Azure Storage credentials are not configured");
   }
 
-  return createClient(url, key);
+  const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+  return new BlobServiceClient(`https://${accountName}.blob.core.windows.net`, sharedKeyCredential);
 };
 
 /**
- * Extract the storage path from a full Supabase Storage URL.
- * URL format: https://<ref>.supabase.co/storage/v1/object/public/exposaas/<path>
- */
-const extractStoragePath = (fileUrl) => {
-  const url = new URL(fileUrl);
-  const prefix = `/storage/v1/object/public/${BUCKET}/`;
-  const storagePath = url.pathname.startsWith(prefix)
-    ? url.pathname.slice(prefix.length)
-    : url.pathname.split(`/${BUCKET}/`).pop();
-  return decodeURIComponent(storagePath);
-};
-
-/**
- * Upload a file to Supabase Storage
+ * Upload a file to Azure Blob Storage
  * @param {Buffer|File} file - The file to upload
  * @param {string} path - The path where to save (e.g., "csv/" or "vehicle/")
- * @returns {Object} - Object containing fileName and url
+ * @returns {Object} - Object containing fileName and blobUrl
  */
 export const putFile = async (file, path) => {
-  const supabase = getSupabaseClient();
+  const blobServiceClient = getBlobServiceClient();
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
+  const containerClient = blobServiceClient.getContainerClient(containerName);
 
-  // Generate unique filename (same convention as before)
+  // Generate unique filename
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const uniqueId = uuidv4().slice(0, 8);
   const fileExtension = file.originalname ? file.originalname.split(".").pop() : "bin";
   const fileName = `${path}${timestamp}-${uniqueId}.${fileExtension}`;
 
+  const blockBlobClient = containerClient.getBlockBlobClient(fileName);
+
+  // Upload file
   const fileBuffer = file.buffer || file;
-  const contentType = file.mimetype || "application/octet-stream";
-
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(fileName, fileBuffer, {
-      contentType,
-      upsert: false,
-    });
-
-  if (error) {
-    throw new Error(`Supabase upload failed: ${error.message}`);
-  }
-
-  const { data: urlData } = supabase.storage
-    .from(BUCKET)
-    .getPublicUrl(fileName);
+  const fileSize = fileBuffer.length;
+  // Upload to Azure Blob Storage
+  await blockBlobClient.upload(fileBuffer, fileSize, {
+    blobHTTPHeaders: {
+      blobContentType: file.mimetype || "application/octet-stream",
+    },
+  });
 
   return {
     fileName,
-    url: urlData.publicUrl,
+    url: blockBlobClient.url,
   };
 };
 
 /**
- * Upload multiple files to Supabase Storage
+ * Upload multiple files to Azure Blob Storage
  * @param {Array} files - Array of file objects to upload
  * @param {string} path - The path where to save (e.g., "csv/" or "vehicle/")
  * @returns {Array} - Array of objects containing fileName and url for each uploaded file
  */
 export const putMultipleFiles = async (files, path) => {
+  const blobServiceClient = getBlobServiceClient();
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+
   const uploadResults = [];
 
   for (const file of files) {
-    const result = await putFile(file, path);
-    uploadResults.push(result);
+    // Generate unique filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const uniqueId = uuidv4().slice(0, 8);
+    const fileExtension = file.originalname ? file.originalname.split(".").pop() : "bin";
+    const fileName = `${path}${timestamp}-${uniqueId}.${fileExtension}`;
+
+    const blockBlobClient = containerClient.getBlockBlobClient(fileName);
+
+    // Upload file
+    const fileBuffer = file.buffer || file;
+    const fileSize = fileBuffer.length;
+    // Upload to Azure Blob Storage
+    await blockBlobClient.upload(fileBuffer, fileSize, {
+      blobHTTPHeaders: {
+        blobContentType: file.mimetype || "application/octet-stream",
+      },
+    });
+
+    uploadResults.push({
+      fileName,
+      url: blockBlobClient.url,
+    });
   }
 
   return uploadResults;
 };
 
 /**
- * Download a file from Supabase Storage
- * @param {string} fileUrl - The full Supabase storage URL
- * @returns {ReadableStream} - The file content as a Node.js readable stream
+ * Download a file from Azure Blob Storage
+ * @param {string} fileUrl - The full Azure blob URL (e.g., "https://account.blob.core.windows.net/container/csv/example.csv")
+ * @returns {ReadableStream} - The file content as a readable stream
  */
-export const downloadFile = async (fileUrl) => {
-  const supabase = getSupabaseClient();
-  const storagePath = extractStoragePath(fileUrl);
+export const downloadFile = async fileUrl => {
+  const blobServiceClient = getBlobServiceClient();
 
-  const { data, error } = await supabase.storage
-    .from(BUCKET)
-    .download(storagePath);
+  // Extract container and blob path from full URL
+  const url = new URL(fileUrl);
+  const pathParts = url.pathname.split("/");
+  const containerName = pathParts[1]; // First part after domain
+  const blobPath = pathParts.slice(2).join("/"); // Rest is the blob path
 
-  if (error) {
-    throw new Error(`Supabase download failed: ${error.message}`);
-  }
+  const containerClient = blobServiceClient.getContainerClient(containerName);
+  const blockBlobClient = containerClient.getBlockBlobClient(blobPath);
 
-  // Convert Web API Blob to Node.js Readable stream for .pipe() compatibility
-  return Readable.fromWeb(data.stream());
+  const downloadResponse = await blockBlobClient.download();
+  return downloadResponse.readableStreamBody;
 };
 
 /**
- * Delete a file from Supabase Storage
- * @param {string} fileUrl - The full Supabase storage URL
+ * Delete a file from Azure Blob Storage
+ * @param {string} fileUrl - The full Azure blob URL (e.g., "https://account.blob.core.windows.net/container/csv/example.csv")
  */
-export const deleteFile = async (fileUrl) => {
-  const supabase = getSupabaseClient();
-  const storagePath = extractStoragePath(fileUrl);
+export const deleteFile = async fileUrl => {
+  const blobServiceClient = getBlobServiceClient();
+  const url = new URL(fileUrl);
+  const pathParts = url.pathname.split("/");
 
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .remove([storagePath]);
-
-  if (error) {
-    throw new Error(`Supabase delete failed: ${error.message}`);
-  }
+  await blobServiceClient.getContainerClient(pathParts[1]).getBlockBlobClient(pathParts.slice(2).join("/")).delete();
 };
