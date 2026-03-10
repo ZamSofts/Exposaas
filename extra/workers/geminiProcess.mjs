@@ -227,11 +227,28 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
       return parsed;
     }
 
+    let vehicles;
     if (Array.isArray(parsed)) {
-      return parsed;
+      vehicles = parsed;
+    } else {
+      vehicles = parsed["page_1"] || parsed["page_2"] || parsed["items"] || [];
     }
 
-    const vehicles = parsed["page_1"] || parsed["page_2"] || parsed["items"] || [];
+    // Normalize: if Gemini returned string elements instead of objects, try to parse them.
+    // This handles cases where Structured Output wraps vehicle data as JSON strings.
+    vehicles = vehicles.flatMap(item => {
+      if (typeof item === "string") {
+        try {
+          const inner = JSON.parse(item.startsWith("[") ? item : `[${item}]`);
+          return Array.isArray(inner) ? inner : [inner];
+        } catch {
+          console.warn("[gemini] Skipping unparseable string element in vehicles array");
+          return [];
+        }
+      }
+      return [item];
+    });
+
     return vehicles;
 
   } catch (error) {
