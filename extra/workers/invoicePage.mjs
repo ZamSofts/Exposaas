@@ -42,7 +42,7 @@ let boss;
         // Soft Zod validation — log warnings but don't reject (Gemini Structured Output enforces schema)
         if (Array.isArray(vehicles)) {
           for (let i = 0; i < vehicles.length; i++) {
-            const parsed = InvoicePageResponseSchema.shape.page_1.unwrap().element.safeParse(vehicles[i]);
+            const parsed = InvoicePageResponseSchema.shape.page_1.element.safeParse(vehicles[i]);
             if (!parsed.success) {
               console.warn(
                 `[invoicePage] Zod validation warning for vehicle ${i + 1} in InvoiceJob #${invoiceJobId}:`,

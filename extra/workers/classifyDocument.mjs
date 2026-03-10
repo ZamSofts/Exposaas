@@ -59,6 +59,21 @@ let boss;
         return;
       }
 
+      // Dedup: skip if this document was already processed (exists as DocumentURL or parentDocumentUrl)
+      const alreadyProcessed = await prisma.invoiceJobs.count({
+        where: {
+          companyId,
+          OR: [
+            { DocumentURL: fileUrl },
+            { parentDocumentUrl: fileUrl },
+          ],
+        },
+      });
+      if (alreadyProcessed > 0) {
+        console.log(`⏭️ Skipping classification: ${alreadyProcessed} job(s) already exist for ${fileUrl}`);
+        return;
+      }
+
       try {
         // Step 1: Download the PDF and extract page 1 for classification
         const pdfStream = await downloadFile(fileUrl);
