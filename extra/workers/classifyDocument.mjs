@@ -15,7 +15,7 @@
  */
 
 import { ensureQueue } from "../queues/pgBoss.mjs";
-import { processPageWithGemini } from "./geminiProcess.mjs";
+import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile } from "../../src/lib/blob.mjs";
 import { splitAndUploadPages } from "../utils/pdfSplitter.mjs";
@@ -24,14 +24,17 @@ import {
   CLASSIFICATION_CONFIDENCE_THRESHOLD,
   DOCUMENT_TYPES,
 } from "../ai/classificationSchema.mjs";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { ClassificationSchema } from "../ai/zodSchemas.mjs";
 
-async function streamToBuffer(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
+/** Structured Output config for classification */
+const classificationResponseConfig = {
+  responseMimeType: "application/json",
+  responseJsonSchema: zodToJsonSchema(ClassificationSchema),
+};
+
+import { streamToBuffer } from "../utils/streamUtils.mjs";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.js";
 
 let boss;
 
@@ -53,6 +56,21 @@ let boss;
 
       if (!fileUrl) {
         console.error("❌ Missing fileUrl in classify-document job");
+        return;
+      }
+
+      // Dedup: skip if this document was already processed (exists as DocumentURL or parentDocumentUrl)
+      const alreadyProcessed = await prisma.invoiceJobs.count({
+        where: {
+          companyId,
+          OR: [
+            { DocumentURL: fileUrl },
+            { parentDocumentUrl: fileUrl },
+          ],
+        },
+      });
+      if (alreadyProcessed > 0) {
+        console.log(`⏭️ Skipping classification: ${alreadyProcessed} job(s) already exist for ${fileUrl}`);
         return;
       }
 
@@ -82,18 +100,32 @@ let boss;
           "documents/temp/"
         );
 
-        // Step 3: Classify with Gemini
+        // Step 3: Classify with Gemini (Structured Output ensures valid JSON)
         const classificationResult = await processPageWithGemini(
           tempUpload.url,
           1,
           {
             customPrompt: CLASSIFICATION_PROMPT,
             rawJsonResponse: true,
+            responseConfig: classificationResponseConfig,
           }
         );
 
-        const docType = classificationResult?.type || "unknown";
-        const confidence = classificationResult?.confidence || 0;
+        // Cleanup: delete temporary page-1 blob (fire-and-forget)
+        try {
+          const { deleteFile } = await import("../../src/lib/blob.mjs");
+          await deleteFile(tempUpload.url);
+        } catch (cleanupErr) {
+          console.warn("[classify] Failed to delete temp blob:", cleanupErr.message);
+        }
+
+        // Validate with Zod (safeParse for graceful fallback)
+        const parsed = ClassificationSchema.safeParse(classificationResult);
+        const docType = parsed.success ? parsed.data.type : (classificationResult?.type || "unknown");
+        const confidence = parsed.success ? parsed.data.confidence : (classificationResult?.confidence || 0);
+        if (!parsed.success) {
+          console.warn(`[classify] Zod validation failed:`, parsed.error.issues);
+        }
 
         console.log(`📋 Classification result: type=${docType}, confidence=${confidence}`);
 
@@ -168,6 +200,13 @@ let boss;
 
       } catch (err) {
         console.error(`❌ Classification failed for ${fileUrl}:`, err.message);
+
+        if (err instanceof QuotaExhaustedError) {
+          // Daily quota hit — re-queue with 30-min delay instead of marking failed
+          console.warn(`⏳ Classification for ${fileUrl}: quota exhausted, re-queuing in 30 minutes`);
+          await boss.send("classify-document", job.data, { startAfter: QUOTA_REQUEUE_DELAY_SECONDS });
+          return;
+        }
 
         // Save as failed
         try {

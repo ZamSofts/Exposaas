@@ -1,4 +1,5 @@
 import { prisma, getSession } from "@/lib/useful";
+import { hashPassword } from "@/lib/password";
 
 // Shared helper: get admin role IDs + check if current user is admin
 async function getAdminContext(session) {
@@ -47,7 +48,8 @@ export default async function handler(req, res) {
   const limit = Number(req.query.limit) || 10;
   const search = String(req.query.search || "").trim().toLowerCase();
   const { sortBy = "id", sortOrder = "asc" } = req.query;
-  const col = req.query.col ? String(req.query.col).split(",") : null;
+  const FORBIDDEN_COLS = ["password"];
+  const col = req.query.col ? String(req.query.col).split(",").filter(c => !FORBIDDEN_COLS.includes(c)) : null;
   const selectFields = col && col.length > 0 ? Object.fromEntries(col.map(c => [c, true])) : undefined;
 
   try {
@@ -157,7 +159,7 @@ export default async function handler(req, res) {
       await prisma.user.create({
         data: {
           username,
-          password,
+          password: await hashPassword(password),
           companyId: Number(companyId),
           roles: { create: rolesId.map(roleId => ({ roleId })) },
         },
@@ -179,7 +181,7 @@ export default async function handler(req, res) {
       const transactionOps = [
         prisma.user.update({
           where: { id },
-          data: { username, ...(password ? { password } : {}), companyId: Number(companyId) },
+          data: { username, ...(password ? { password: await hashPassword(password) } : {}), companyId: Number(companyId) },
         }),
       ];
 

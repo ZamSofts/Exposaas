@@ -1,5 +1,13 @@
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/useful";
+import { verifyPassword, hashPassword } from "@/lib/password";
+
+if (!process.env.NEXTAUTH_SECRET && typeof window === "undefined") {
+  console.error(
+    "WARNING: NEXTAUTH_SECRET environment variable is not set. " +
+    "Generate one with: openssl rand -base64 32"
+  );
+}
 
 export const authOptions = {
   providers: [
@@ -11,7 +19,11 @@ export const authOptions = {
       },
       async authorize(credentials) {
         try {
-          if (credentials?.username === "ad" && credentials?.password === "p") {
+          const sadminUser = process.env.SADMIN_USERNAME;
+          const sadminPass = process.env.SADMIN_PASSWORD;
+          if (sadminUser && sadminPass &&
+              credentials?.username === sadminUser &&
+              credentials?.password === sadminPass) {
             const permissions=await prisma.permission.findMany({
               select: { name: true },
             });
@@ -47,7 +59,15 @@ export const authOptions = {
               },
             });
 
-            if (!user || credentials.password !== user.password) return null;
+            if (!user) return null;
+            const { valid, needsRehash } = await verifyPassword(credentials.password, user.password);
+            if (!valid) return null;
+
+            // Auto-rehash legacy plaintext passwords on successful login
+            if (needsRehash) {
+              const hashed = await hashPassword(credentials.password);
+              await prisma.user.update({ where: { id: user.id }, data: { password: hashed } });
+            }
 
             const roleNames = user.roles.map((ur) => ur.role.name);
             const userPermissions = user.roles.flatMap((ur) => ur.role.permissions.map((rp) => rp.permission.name));
@@ -101,5 +121,5 @@ export const authOptions = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  secret: process.env.NEXTAUTH_SECRET || "expoSAASDndDanish!2", // You should use a real secret in .env
+  secret: process.env.NEXTAUTH_SECRET,
 };

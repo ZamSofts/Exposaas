@@ -21,6 +21,12 @@ export const MIN_RECORDS_FOR_AUTO_MODE = 5;
 /** Accuracy threshold for simplified prompt generation */
 export const SIMPLIFIED_PROMPT_THRESHOLD = 0.90;
 
+/** Max vehicles per invoice page — anything above is treated as AI hallucination */
+export const MAX_VEHICLES_PER_PAGE = 20;
+
+/** Delay (seconds) before re-queuing a job after Gemini daily quota exhaustion */
+export const QUOTA_REQUEUE_DELAY_SECONDS = 30 * 60;
+
 /** Confidence/accuracy color palette with foreground and background */
 export const CONFIDENCE_COLORS = {
   high: { color: "#22c55e", bg: "rgba(34,197,94,0.12)" },
@@ -30,8 +36,6 @@ export const CONFIDENCE_COLORS = {
 
 /**
  * Get confidence level label for a value (decimal 0-1).
- * @param {number|null} value
- * @returns {"high"|"mid"|"low"|null}
  */
 export function getConfidenceLevel(value) {
   if (value == null) return null;
@@ -42,8 +46,6 @@ export function getConfidenceLevel(value) {
 
 /**
  * Get hex color string for accuracy/confidence display.
- * @param {number} value - decimal 0-1
- * @returns {string} hex color
  */
 export function getAccuracyColor(value) {
   const level = getConfidenceLevel(value);
@@ -52,8 +54,6 @@ export function getAccuracyColor(value) {
 
 /**
  * Get border style for confidence-highlighted input fields.
- * @param {number|null} confidence
- * @returns {object} CSS style object
  */
 export function getConfidenceBorder(confidence) {
   const level = getConfidenceLevel(confidence);

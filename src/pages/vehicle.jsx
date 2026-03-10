@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Head from "next/head";
-import { useAuth, useConfirm, API, Error, DataTable, isAllowed, Toast, Loader, EditVehicle, FilePreviewer } from "@/hooks/wrapper";
+import { useAuth, useConfirm, API, Error, DataTable, isAllowed, Toast, Loader, EditVehicle, FilePreviewer, usePaginatedList, useStaticOptions, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import { Plus, Search, Filter } from "lucide-react";
 import VehicleRow from "@/components/VehicleRow";
 import VehicleFilters from "@/components/VehicleFilters";
+import ExportDropdown from "@/components/export/ExportDropdown";
 import { VEHICLE_COLUMNS } from "@/config/vehicleColumns";
 
 export default function VehiclesPage() {
@@ -12,157 +14,216 @@ export default function VehiclesPage() {
   const canEditCharges = isAllowed(["edit:vehicle"], session);
 
   const { confirm, ConfirmComponent } = useConfirm();
+  const queryClient = useQueryClient();
 
-  const [vehicles, setVehicles] = useState([]);
+  // ── Filter state (lives outside usePaginatedList) ──
+  const [filters, setFilters] = useState([]);
+  const [conjunction, setConjunction] = useState("and");
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Filter is "active" when it has field + operator + value (or isEmpty/isNotEmpty which need no value)
+  const isFilterActive = (f) =>
+    f.field && f.operator && (["isEmpty", "isNotEmpty"].includes(f.operator) || (f.value !== "" && f.value != null));
+  const activeFilterCount = filters.filter(isFilterActive).length;
+
+  // ── Build extra params (filters) ──
+  const buildParams = useCallback(
+    (urlParams) => {
+      const activeFilters = filters.filter(isFilterActive);
+      if (activeFilters.length > 0) {
+        urlParams.set(
+          "filters",
+          JSON.stringify({
+            conjunction,
+            conditions: activeFilters.map((f) => ({
+              field_name: f.field,
+              operator: f.operator,
+              value: f.value,
+            })),
+          })
+        );
+      }
+    },
+    [filters, conjunction]
+  );
+
+  // Custom queryKey includes filters + conjunction so changes trigger refetch
+  const vehicleKeyFn = useCallback(
+    (params) => ["vehicles", { ...params, filters, conjunction }],
+    [filters, conjunction]
+  );
+
+  // ── Data fetching (React Query) ──
+  const {
+    items: vehicles, total, isLoading, error: listError,
+    handleSort, handleSearch, handlePageChange, sortBy, sortOrder, setPage,
+  } = usePaginatedList(vehicleKeyFn, "vehicle", {
+    defaultPerPage: 25,
+    defaultOrder: "desc",
+    debounceMs: 400,
+    buildParams,
+    select: (res) => ({
+      items: res.vehicles || [],
+      total: res.total || 0,
+    }),
+  });
+
+  // ── Static options (React Query — cached indefinitely) ──
+  const brandOptions = useStaticOptions(
+    queryKeys.brands(),
+    "brand",
+    (data) => {
+      if (!data || data.error) return [];
+      return (Array.isArray(data) ? data : []).map((b) => ({ value: b.id, label: b.name }));
+    }
+  );
+
+  const customerOptions = useStaticOptions(
+    queryKeys.customerOptions(),
+    "customer?col=id,name,uniqueId",
+    (data) => {
+      if (!data || data.error) return [];
+      return (Array.isArray(data) ? data : []).map((c) => ({
+        value: c.id,
+        label: /^(CSV-|auto-)/.test(c.uniqueId || "") ? c.name : `${c.name}-${c.uniqueId}`,
+      }));
+    }
+  );
+
+  const suggestions = useStaticOptions(
+    queryKeys.suggestions("auction,transportCompany,deliverTo,documentStatus"),
+    "vehicleSuggestions?fields=auction,transportCompany,deliverTo,documentStatus",
+    (data) => {
+      if (!data || data.error) return {};
+      return data;
+    }
+  );
+
+  // ── Export templates (cached) ──
+  const exportTemplates = useStaticOptions(
+    queryKeys.exportTemplates(),
+    "exportTemplate",
+    (data) => {
+      if (!data || data.error) return [];
+      return data.templates || [];
+    }
+  );
+
+  // ── Local UI state ──
   const [error, setError] = useState("");
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
   const [edit, setEdit] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
+  const [mergeInfoVehicle, setMergeInfoVehicle] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Dropdown / combobox options for inline editing
-  const [brandOptions, setBrandOptions] = useState([]);
-  const [customerOptions, setCustomerOptions] = useState([]);
-  const [suggestions, setSuggestions] = useState({});
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["vehicles"] });
 
   // Memoize dropdown options object so VehicleRow memo isn't broken
   const dropdownOpts = useMemo(() => ({ brandOptions, customerOptions }), [brandOptions, customerOptions]);
 
-  // Pagination and search states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(25);
-  const [search, setSearch] = useState("");
-  const [searchInput, setSearchInput] = useState("");
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("desc");
-
-  // Filter state
-  const [filters, setFilters] = useState([]);
-  const [conjunction, setConjunction] = useState("and");
-  const [showFilters, setShowFilters] = useState(false);
-  const filterTimeoutRef = useRef(null);
-
-  // Toast state
-  const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
-
-  useEffect(() => {
-    loadOptions();
-  }, []);
-
-  useEffect(() => {
-    clearTimeout(filterTimeoutRef.current);
-    filterTimeoutRef.current = setTimeout(
-      () => {
-        loadData();
-      },
-      filters.length > 0 ? 400 : 0
-    );
-    return () => clearTimeout(filterTimeoutRef.current);
-  }, [currentPage, perPage, search, sortBy, sortOrder, filters, conjunction]);
+  // Build combobox options from suggestions (memoized per field)
+  const comboOpts = useCallback(
+    (field) => (suggestions[field] || []).map((v) => ({ value: v, label: v })),
+    [suggestions]
+  );
 
   const showToast = useCallback((message, type = "success") => {
     setToast({ id: Date.now(), message, type });
   }, []);
 
-  const loadOptions = async () => {
-    const [brandData, customerData, suggestionsData] = await Promise.all([
-      API("GET", "brand"),
-      API("GET", "customer?col=id,name,uniqueId"),
-      API("GET", "vehicleSuggestions?fields=auction,transportCompany,deliverTo,documentStatus"),
-    ]);
-    if (!brandData.error) {
-      setBrandOptions(brandData.map(b => ({ value: b.id, label: b.name })));
-    }
-    if (!customerData.error) {
-      setCustomerOptions(customerData.map(c => ({ value: c.id, label: `${c.name}-${c.uniqueId}` })));
-    }
-    if (!suggestionsData.error) {
-      setSuggestions(suggestionsData);
-    }
-  };
-
+  // ── Inline editing: optimistic update via queryClient cache ──
   const handleInlineSave = useCallback(
     (vehicleId, updatedVehicle) => {
-      setVehicles(prev => prev.map(v => (v.id === vehicleId ? { ...v, ...updatedVehicle } : v)));
+      // Optimistically update the React Query cache
+      queryClient.setQueriesData({ queryKey: ["vehicles"] }, (old) => {
+        if (!old || !old.vehicles) return old;
+        return {
+          ...old,
+          vehicles: old.vehicles.map((v) =>
+            v.id === vehicleId ? { ...v, ...updatedVehicle } : v
+          ),
+        };
+      });
       showToast("Updated", "success");
     },
-    [showToast]
+    [queryClient, showToast]
   );
 
   const handleInlineError = useCallback(
-    msg => {
+    (msg) => {
       showToast(msg || "Failed to update", "error");
     },
     [showToast]
   );
 
-  // Build combobox options from suggestions (memoized per field)
-  const comboOpts = useCallback(field => (suggestions[field] || []).map(v => ({ value: v, label: v })), [suggestions]);
+  // ── Filter change handler ──
+  const handleFiltersChange = useCallback((newFilters) => {
+    setFilters(newFilters);
+    setPage(1);
+  }, [setPage]);
 
-  // Filter is "active" when it has field + operator + value (or isEmpty/isNotEmpty which need no value)
-  const isFilterActive = f => f.field && f.operator && (["isEmpty", "isNotEmpty"].includes(f.operator) || (f.value !== "" && f.value != null));
-
-  const activeFilterCount = filters.filter(isFilterActive).length;
-
-  const loadData = async () => {
-    setIsLoading(true);
-    setError("");
-    const params = new URLSearchParams({
-      page: currentPage,
-      limit: perPage,
-      search,
-      sortBy,
-      sortOrder,
-    });
-
-    const activeFilters = filters.filter(isFilterActive);
-    if (activeFilters.length > 0) {
-      params.set(
-        "filters",
-        JSON.stringify({
+  // ── Export handler ──
+  const handleExport = useCallback(async (templateId, exportFilename) => {
+    setIsExporting(true);
+    try {
+      const activeFilters = filters.filter(isFilterActive);
+      const payload = {
+        templateId,
+        filename: exportFilename || undefined,
+        search: searchInput.trim() || undefined,
+        sortBy,
+        sortOrder,
+      };
+      if (activeFilters.length > 0) {
+        payload.filters = {
           conjunction,
-          conditions: activeFilters.map(f => ({
+          conditions: activeFilters.map((f) => ({
             field_name: f.field,
             operator: f.operator,
             value: f.value,
           })),
-        })
-      );
+        };
+      }
+
+      const response = await fetch("/api/vehicleExport", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || "Export failed");
+      }
+
+      // Download the file
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? decodeURIComponent(match[1]) : "export.xlsx";
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast("エクスポート完了", "success");
+    } catch (err) {
+      showToast(err.message || "エクスポートに失敗しました", "error");
+    } finally {
+      setIsExporting(false);
     }
+  }, [filters, conjunction, searchInput, sortBy, sortOrder, showToast]);
 
-    const data = await API("GET", `vehicle?${params}`);
-    if (data.error) {
-      setError(data.error);
-      setIsLoading(false);
-      return;
-    }
-    setVehicles(data.vehicles || []);
-    setTotal(data.total || 0);
-    setIsLoading(false);
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handleSearch = value => {
-    setSearch(value);
-    setCurrentPage(1);
-  };
-
-  const handleFiltersChange = useCallback(newFilters => {
-    setFilters(newFilters);
-    setCurrentPage(1);
-  }, []);
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
-  };
-
-  const deleteIt = async id => {
+  // ── Delete vehicle ──
+  const deleteIt = async (id) => {
     const confirmed = await confirm({
       title: "Delete Vehicle",
       message: "Are you sure you want to delete this vehicle? This will also permanently delete all associated documents and Payments. This action cannot be undone.",
@@ -183,27 +244,21 @@ export default function VehiclesPage() {
     setCustomLoader(false);
     const documentsDeletedText = data.documentsDeleted > 0 ? ` ${data.documentsDeleted} associated document(s) were also removed.` : "";
     showToast(`Vehicle deleted successfully!${documentsDeletedText}`, "success");
-    loadData();
+    invalidate();
   };
 
-  const resetForm = () => {
-    setError("");
-    setEdit(null);
-    setCustomLoader(false);
-  };
-
-  // View management functions
+  // ── View management ──
   const handleAddVehicle = () => {
-    setEdit(0); // 0 for new vehicle
+    setEdit(0);
   };
 
-  const handleEditVehicle = useCallback(vehicleId => {
+  const handleEditVehicle = useCallback((vehicleId) => {
     setEdit(vehicleId);
   }, []);
 
   const handleBackToList = () => {
     setEdit(null);
-    loadData();
+    invalidate();
   };
 
   const handleFormSuccess = () => {
@@ -221,7 +276,7 @@ export default function VehiclesPage() {
       </Head>
       <Sidebar>
         <div className="p-2 bg-[var(--background)] min-h-screen">
-          <Error message={error} />
+          <Error message={listError || error} />
           {customLoader && <Loader />}
 
           {/* Spreadsheet Toolbar */}
@@ -234,8 +289,8 @@ export default function VehiclesPage() {
                   type="text"
                   placeholder="Search..."
                   value={searchInput}
-                  onChange={e => setSearchInput(e.target.value)}
-                  onKeyDown={e => {
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") handleSearch(searchInput);
                   }}
                   className="pl-7 pr-2 py-1 text-xs bg-[var(--input)] border border-[var(--border)] rounded
@@ -253,6 +308,11 @@ export default function VehiclesPage() {
                 <Filter className="w-3.5 h-3.5" />
                 Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
               </button>
+              <ExportDropdown
+                templates={exportTemplates}
+                onExport={handleExport}
+                isExporting={isExporting}
+              />
               {isAllowed(["add:vehicle"], session) && (
                 <button
                   onClick={handleAddVehicle}
@@ -293,7 +353,7 @@ export default function VehiclesPage() {
             >
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  {VEHICLE_COLUMNS.map(col => {
+                  {VEHICLE_COLUMNS.map((col) => {
                     if (col.type === "actions" && !isAllowed(col.requirePermission, session)) return null;
                     return (
                       <th key={col.id} id={col.id} style={{ width: col.width }}>
@@ -304,7 +364,7 @@ export default function VehiclesPage() {
                 </tr>
               </thead>
               <tbody>
-                {vehicles.map(v => (
+                {vehicles.map((v) => (
                   <VehicleRow
                     key={v.id}
                     vehicle={v}
@@ -316,6 +376,7 @@ export default function VehiclesPage() {
                     onEdit={handleEditVehicle}
                     onDelete={deleteIt}
                     setDocumentPreview={setDocumentPreview}
+                    onShowMergeInfo={setMergeInfoVehicle}
                     session={session}
                   />
                 ))}
@@ -328,6 +389,90 @@ export default function VehiclesPage() {
 
       <ConfirmComponent />
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
+
+      {/* Merge Info Popup */}
+      {mergeInfoVehicle && (
+        <MergeInfoPopup vehicle={mergeInfoVehicle} onClose={() => setMergeInfoVehicle(null)} />
+      )}
     </>
+  );
+}
+
+// ── Merge Info Popup ──
+
+const MERGE_FIELD_LABELS = {
+  chassisNumber: "車台番号", lotNumber: "ロット番号", auction: "オークション",
+  auctionDate: "オークション日", brandId: "ブランド", customerId: "顧客",
+  name: "名前", remarks: "備考", bidAmount: "落札額", auctionFee: "オークション手数料",
+  insuranceFee: "保険料", recyclingFee: "リサイクル料", transportFee: "輸送費",
+  otherFees: "その他費用", taxSum: "消費税", totalCost: "合計",
+  session: "セッション", transportCompany: "輸送会社", deliverTo: "納車先",
+  numberPlate: "ナンバープレート", titleTransferDeadline: "名義変更期限",
+  containerNumber: "コンテナ番号", etd: "ETD", documentStatus: "書類状況",
+  memo: "メモ", length: "長さ", width: "幅", height: "高さ", m3: "m³",
+  sourceInvoiceJobId: "請求書ジョブ",
+};
+
+function MergeInfoPopup({ vehicle, onClose }) {
+  const merged = vehicle.mergedFields;
+  if (!merged) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/30" />
+      <div
+        className="relative bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl p-5 w-80 max-h-[80vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-sm font-semibold text-[var(--foreground)] mb-3">統合情報</h4>
+
+        <div className="text-xs space-y-2 text-[var(--secondary-foreground)]">
+          <div className="flex justify-between">
+            <span>統合日</span>
+            <span className="text-[var(--foreground)]">{new Date(vehicle.mergedAt).toLocaleDateString()}</span>
+          </div>
+          {vehicle.mergedFromId && (
+            <div className="flex justify-between">
+              <span>元車両ID</span>
+              <span className="text-[var(--foreground)]">#{vehicle.mergedFromId}</span>
+            </div>
+          )}
+          {merged.absorbedChassisNumber && (
+            <div className="flex justify-between">
+              <span>元車台番号</span>
+              <span className="text-[var(--foreground)] font-mono">{merged.absorbedChassisNumber}</span>
+            </div>
+          )}
+          <div className="flex justify-between">
+            <span>費用ソース</span>
+            <span className="text-[var(--foreground)]">{merged.chargeSource === "invoice" ? "請求書" : "CSV"}</span>
+          </div>
+
+          {merged.fieldsChanged?.length > 0 && (
+            <div className="pt-2 border-t border-[var(--border)]">
+              <p className="mb-1 font-medium text-[var(--foreground)]">変更フィールド:</p>
+              <div className="flex flex-wrap gap-1">
+                {merged.fieldsChanged.map((f) => (
+                  <span key={f} className="px-1.5 py-0.5 bg-[var(--input)] rounded text-[10px]">
+                    {MERGE_FIELD_LABELS[f] || f}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 pt-2 border-t border-[var(--border)]">
+          <p className="text-xs text-amber-500 font-medium">費用を確認してください</p>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-[var(--secondary-foreground)] hover:text-[var(--foreground)] text-lg leading-none"
+        >
+          &times;
+        </button>
+      </div>
+    </div>
   );
 }

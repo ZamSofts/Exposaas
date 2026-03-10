@@ -31,7 +31,7 @@ export const useAuth = (roles = [], excludeRoles = []) => {
         return;
       }
     }
-  }, [status, session, router]);
+  }, [status, session, router, roles, excludeRoles]);
 
   return { session: session?.user, status };
 };

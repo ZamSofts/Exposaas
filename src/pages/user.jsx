@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import {useConfirm,useAuth, API, CustomSelect, MultiSelect, CustomButton, Loader, Toast, Error,DataTable } from "@/hooks/wrapper";
+import { useConfirm, useAuth, API, CustomSelect, MultiSelect, CustomButton, Loader, Toast, Error, DataTable, usePaginatedList, useStaticOptions, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
 
@@ -9,12 +10,42 @@ export default function Userss() {
   const { session, status } = useAuth(["Sadmin", "Admin", "view:user"]);
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
+  const queryClient = useQueryClient();
 
-  const [companies, setCompanies] = useState([]);
-  const [users, setUser] = useState([]);
+  // ── Data fetching (React Query) ──
+  const {
+    items: users, total, isLoading, error: listError,
+    handleSearch, handleSort, handlePageChange, sortBy, sortOrder,
+  } = usePaginatedList(queryKeys.users, "user", {
+    select: (res) => ({
+      items: res.user || [],
+      total: res.total || 0,
+    }),
+  });
 
-  const [roles, setRoles] = useState([]);
+  // ── Static options (React Query — cached indefinitely) ──
+  const companies = useStaticOptions(
+    queryKeys.companyOptions(),
+    "company?col=id,name",
+    (data) => {
+      if (data?.error || !data) return [];
+      // company?col=id,name returns array directly or { company: [...] }
+      return Array.isArray(data) ? data : (data.company || data || []);
+    },
+    { enabled: status === "authenticated" && !!session },
+  );
 
+  const roles = useStaticOptions(
+    queryKeys.roleOptions(),
+    "role",
+    (data) => {
+      if (data?.error || !data) return [];
+      return data.role || [];
+    },
+    { enabled: status === "authenticated" && !!session },
+  );
+
+  // ── Form state ──
   const [username, setUserName] = useState("");
   const [companyId, setCompanyId] = useState();
   const [rolesId, setRolesId] = useState([]);
@@ -25,88 +56,13 @@ export default function Userss() {
 
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
-  // Pagination and search states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(5);
-  const [search, setSearch] = useState("");
-
-  // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("asc");
-
-  // Reload data when pagination, search, or sorting changes
-  useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, search, sortBy, sortOrder]);
-
-  useEffect(() => {
-    if (status !== "authenticated" || !session) return;
-    loadInitialData();
-  }, [status, session]);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["users"] });
 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
-  };
-  const loadInitialData = async () => {
-    try {
-      setIsLoading(true);
-      setError("");
-
-      const [companyData, roleData] = await Promise.all([API("GET", "company?col=id,name"), API("GET", "role")]);
-      setRoles(!roleData.error ? roleData.role : []);
-      if (!companyData.error) {
-        setCompanies(companyData ?? []);
-      } else {
-        setCompanies([]);
-        setCompanyId(session?.companyId ?? "");
-      }
-    } catch (err) {
-      setError("Something went wrong");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadData = async () => {
-    setIsLoading(true);
-    const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      search: search.toString(),
-      sortBy: sortBy.toString(),
-      sortOrder: sortOrder.toString(),
-    });
-
-    const data = await API("GET", `user?${params}`);
-    if (data.error) {
-      setError(data.error);
-      setIsLoading(false);
-      return;
-    }
-    setError("");
-    setUser(data.user);
-    setTotal(data.total);
-    setIsLoading(false);
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handleSearch = search => {
-    setSearch(search);
-    setCurrentPage(1); // Reset to first page on search
-  };
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
   };
 
   const editData = async () => {
@@ -144,7 +100,7 @@ export default function Userss() {
     }
 
     resetForm();
-    loadData();
+    invalidate();
   };
 
   const loadEdit = async id => {
@@ -155,7 +111,6 @@ export default function Userss() {
       setCustomLoader(false);
       return;
     }
-    setIsLoading(false);
     setUserName(data.username);
     setPassword("");
     setCompanyId(data.companyId);
@@ -181,7 +136,7 @@ export default function Userss() {
       return;
     }
     showToast(data.message, 'success');
-    loadData();
+    invalidate();
     setCustomLoader(false);
   };
 
@@ -197,7 +152,6 @@ export default function Userss() {
     setRolesId([]);
     setEdit(null);
     setCustomLoader(false);
-    setIsLoading(false);
   };
 
   return (
@@ -219,7 +173,6 @@ export default function Userss() {
                 </div>
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">Users Management</h1>
               </div>
-              {/* Add Company Button */}
               <CustomButton title="Add Users" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
             </div>
             <p className="text-[var(--secondary-foreground)]">Manage and oversee all registered users in your platform</p>
@@ -246,7 +199,7 @@ export default function Userss() {
                       className="input-style"
                       autoFocus
                     />
-                    
+
                     {session.role === "Sadmin" && (
                       <>
                         <label className="input-label">Select Company</label>
@@ -308,10 +261,9 @@ export default function Userss() {
               </div>
             </div>
           </div>
-          <Error message={error} />
+          <Error message={listError || error} />
           {customLoader && <Loader />}
 
-          {/* DataTable with JSX children */}
           <DataTable
             data={users}
             total={total}
@@ -323,9 +275,8 @@ export default function Userss() {
             title="Users"
             sortBy={sortBy}
             sortOrder={sortOrder}
-           
+
           >
-            {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
                 <th id="id">ID</th>
@@ -338,7 +289,6 @@ export default function Userss() {
               </tr>
             </thead>
 
-            {/* Table Body with data rows */}
             <tbody>
               {users.map(user => (
                 <tr key={user.id} className="hover:bg-[var(--input)] transition-colors duration-200">
@@ -373,14 +323,14 @@ export default function Userss() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => loadEdit(user.id)}
-                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)]
                                  hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(user.id)}
-                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)]
                                hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -394,7 +344,6 @@ export default function Userss() {
         </div>
       </Sidebar>
 
-      {/* Confirmation Modal */}
       <ConfirmComponent />
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
     </>

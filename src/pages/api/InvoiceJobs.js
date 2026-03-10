@@ -1,5 +1,50 @@
 import { prisma, getSession } from "@/lib/useful";
 
+/**
+ * Determine the correct queue and payload for retrying a job based on its docType.
+ */
+function getRetryQueueConfig(job, userId) {
+  const docType = job.docType || "invoice";
+
+  if (docType === "invoice") {
+    return {
+      queueName: "gemini-extract-page",
+      payload: {
+        invoiceJobId: job.id,
+        pageUrl: job.DocumentURL,
+        pageNumber: job.pageNumber || 1,
+        totalPages: job.originalTotalPages || 1,
+        companyId: job.companyId,
+        userId,
+      },
+    };
+  }
+
+  if (["export_cert", "inspection_cert", "temp_cancel"].includes(docType)) {
+    return {
+      queueName: "extract-document",
+      payload: {
+        invoiceJobId: job.id,
+        fileUrl: job.DocumentURL,
+        docType,
+        companyId: job.companyId,
+        userId,
+      },
+    };
+  }
+
+  // unknown / needs_classification → re-classify from the original document
+  return {
+    queueName: "classify-document",
+    payload: {
+      fileUrl: job.parentDocumentUrl || job.DocumentURL,
+      companyId: job.companyId,
+      userId,
+    },
+    deleteAfterQueue: true, // classify worker creates new rows
+  };
+}
+
 export default async function handler(req, res) {
   const session = await getSession(req, res);
 
@@ -120,34 +165,66 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: `Cannot retry job with status: ${job.status}` });
         }
 
-        // Reset job status to pending
-        await prisma.invoiceJobs.update({
-          where: { id: Number(id) },
-          data: {
-            status: "pending",
-            Json: null  // Clear previous error
-          }
-        });
+        const { queueName, payload, deleteAfterQueue } = getRetryQueueConfig(job, session.id);
 
         // Re-queue the job for processing (dynamic import to avoid bundling pg-boss for GET requests)
         const { ensureQueue } = await import("../../../extra/queues/pgBoss.mjs");
-        const boss = await ensureQueue("gemini-extract-page");
-        await boss.send("gemini-extract-page", {
-          invoiceJobId: job.id,
-          pageUrl: job.DocumentURL,
-          pageNumber: job.pageNumber || 1,
-          totalPages: job.originalTotalPages || 1,
-          companyId: job.companyId,
-          userId: session.userId
-        });
+        const boss = await ensureQueue(queueName);
 
-        console.log(`🔄 Retrying InvoiceJob #${job.id} (page ${job.pageNumber})`);
+        if (deleteAfterQueue) {
+          // For re-classification: delete old row (classify worker creates new ones)
+          await prisma.invoiceJobs.delete({ where: { id: Number(id) } });
+        } else {
+          await prisma.invoiceJobs.update({
+            where: { id: Number(id) },
+            data: { status: "pending", Json: null },
+          });
+        }
+
+        await boss.send(queueName, payload);
+        console.log(`🔄 Retrying InvoiceJob #${job.id} → ${queueName}`);
 
         return res.status(200).json({
           success: true,
-          message: `Job #${job.id} queued for retry`,
-          jobId: job.id
+          message: `Job #${job.id} queued for retry via ${queueName}`,
+          jobId: job.id,
         });
+      }
+
+      // Bulk retry all failed jobs
+      if (action === "retryAllFailed") {
+        const userFilter = session.role === "Sadmin" ? {} : { companyId: session.companyId };
+        const failedJobs = await prisma.invoiceJobs.findMany({
+          where: { ...userFilter, status: "failed" },
+          select: {
+            id: true, docType: true, DocumentURL: true, parentDocumentUrl: true,
+            pageNumber: true, originalTotalPages: true, companyId: true,
+          },
+          take: 50, // Limit to prevent overwhelming Gemini API
+        });
+
+        const { ensureQueue } = await import("../../../extra/queues/pgBoss.mjs");
+        let retried = 0;
+
+        for (const fJob of failedJobs) {
+          const config = getRetryQueueConfig(fJob, session.id);
+          const boss = await ensureQueue(config.queueName);
+
+          if (config.deleteAfterQueue) {
+            await prisma.invoiceJobs.delete({ where: { id: fJob.id } });
+          } else {
+            await prisma.invoiceJobs.update({
+              where: { id: fJob.id },
+              data: { status: "pending", Json: null },
+            });
+          }
+
+          await boss.send(config.queueName, config.payload);
+          retried++;
+        }
+
+        console.log(`🔄 Bulk retry: ${retried} jobs re-queued`);
+        return res.json({ success: true, retriedCount: retried, total: failedJobs.length });
       }
 
       return res.status(400).json({ error: "Invalid action" });

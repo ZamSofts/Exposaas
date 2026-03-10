@@ -1,5 +1,5 @@
 import React from "react";
-import { Edit, Trash2, FileText, ShieldCheck, ClipboardCheck, FileX } from "lucide-react";
+import { Edit, Trash2, FileText, ShieldCheck, ClipboardCheck, FileX, GitMerge } from "lucide-react";
 import EditableCell from "@/components/ui/EditableCell";
 import { VEHICLE_COLUMNS, formatCurrency } from "@/config/vehicleColumns";
 import { isAllowed } from "@/hooks/wrapper";
@@ -14,6 +14,7 @@ const VehicleRow = React.memo(function VehicleRow({
   onEdit,
   onDelete,
   setDocumentPreview,
+  onShowMergeInfo,
   session,
 }) {
   return (
@@ -46,7 +47,7 @@ const VehicleRow = React.memo(function VehicleRow({
         if (col.type === "static") {
           return (
             <td key={col.id} className="px-2 py-1 whitespace-nowrap border border-[var(--border)] overflow-hidden text-ellipsis">
-              {renderStaticCell(col, v, { setDocumentPreview })}
+              {renderStaticCell(col, v, { setDocumentPreview, onShowMergeInfo })}
             </td>
           );
         }
@@ -98,7 +99,19 @@ function renderStaticCell(col, v, ctx) {
   switch (col.id) {
     case "id":
       return (
-        <span className="text-sm font-mono tabular-nums text-[var(--secondary-foreground)] text-right block">
+        <span className="text-sm font-mono tabular-nums text-[var(--secondary-foreground)] text-right block flex items-center justify-end gap-1">
+          {v.mergedAt && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                ctx.onShowMergeInfo?.(v);
+              }}
+              className="inline-flex items-center px-1 py-0.5 bg-amber-500/10 text-amber-500 rounded hover:bg-amber-500/20 transition-colors"
+              title={`統合済み — ${new Date(v.mergedAt).toLocaleDateString()}`}
+            >
+              <GitMerge className="w-3 h-3" />
+            </button>
+          )}
           #{v.id}
         </span>
       );

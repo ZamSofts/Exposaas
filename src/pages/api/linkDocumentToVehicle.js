@@ -9,7 +9,7 @@
  */
 
 import { prisma, getSession } from "@/lib/useful";
-import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
+import { logVehicleAudit } from "../../../extra/utils/auditLog";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {

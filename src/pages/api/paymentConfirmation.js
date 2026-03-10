@@ -1,6 +1,7 @@
 import { prisma, getSession } from "@/lib/useful";
-import { computeDetailedDiff } from "../../../extra/utils/computeDiff.mjs";
-import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
+import { computeDetailedDiff } from "../../../extra/utils/computeDiff";
+import { resolveBrands } from "../../../extra/utils/vehicleDomain";
+import { logVehicleAudit } from "../../../extra/utils/auditLog";
 
 /**
  * Payment Confirmation API handler.
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
 
       if (!Json || typeof Json !== "object") return res.status(400).json({ error: "Missing or invalid Json payload for page" });
 
-      const companyId = CompanyID || session?.companyId || null;
+      const companyId = session.role === "Sadmin" ? (CompanyID || session?.companyId) : session?.companyId;
       if (!companyId) return res.status(400).json({ error: "Missing CompanyID and no company available in session" });
 
       const pageNum = typeof Page === "number" ? Page : parseInt(Page, 10);
@@ -77,7 +78,7 @@ export default async function handler(req, res) {
           isCorrect: autoIsCorrect,
           diffSummary,
           auctionHouse,
-          reviewedById: session.id,
+          reviewedById: parseInt(session.id, 10) || null,
           companyId,
           invoiceJobId: invoiceJobId || null,
         },
@@ -134,20 +135,8 @@ export default async function handler(req, res) {
       });
       const vehicleMap = new Map(existingVehicles.map(v => [v.chassisNumber, v]));
 
-      // Batch load/create brands
-      const existingBrands = await prisma.brand.findMany({
-        where: { name: { in: uniqueBrandNames } },
-        select: { id: true, name: true },
-      });
-      const brandMap = new Map(existingBrands.map(b => [b.name, b.id]));
-
-      // Create any missing brands
-      for (const name of uniqueBrandNames) {
-        if (!brandMap.has(name)) {
-          const created = await prisma.brand.create({ data: { name } });
-          brandMap.set(name, created.id);
-        }
-      }
+      // Resolve brands (shared domain logic, with race condition protection)
+      const { brandMap } = await resolveBrands(prisma, uniqueBrandNames);
 
       for (const ch of charges) {
         try {
@@ -168,7 +157,7 @@ export default async function handler(req, res) {
                 brandId,
                 lotNumber,
                 auction,
-                createdById: session.id,
+                createdById: parseInt(session.id, 10) || null,
                 remarks: `Auto-added from payment confirmation`,
               },
             });

@@ -128,6 +128,19 @@ function ActionDescription({ log }) {
     );
   }
 
+  if (action === "merge" && metadata) {
+    return (
+      <span>
+        {actionLabel}: #{metadata.absorbedId} ({metadata.absorbedChassis || "—"})
+        {metadata.relocationCounts && (
+          <span className="text-[var(--secondary-foreground)] text-xs ml-1">
+            (書類: {metadata.relocationCounts.documents}, 支払: {metadata.relocationCounts.payments})
+          </span>
+        )}
+      </span>
+    );
+  }
+
   return <span>{actionLabel}</span>;
 }
 

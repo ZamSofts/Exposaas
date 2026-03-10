@@ -14,14 +14,18 @@
  */
 
 import { ensureQueue } from "../queues/pgBoss.mjs";
-import { processPageWithGemini } from "./geminiProcess.mjs";
+import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
+import { deleteFile } from "../../src/lib/blob.mjs";
 import {
   DOCUMENT_SCHEMA_MAP,
   buildDocumentExtractionPrompt,
 } from "../ai/documentSchemas.mjs";
 import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
 import { logVehicleAudit } from "../utils/auditLog.mjs";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { DOC_ZOD_MAP } from "../ai/zodSchemas.mjs";
+import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.js";
 
 let boss;
 
@@ -54,11 +58,26 @@ let boss;
         // Build the extraction prompt
         const extractionPrompt = buildDocumentExtractionPrompt(schema);
 
+        // Build Structured Output config if Zod schema exists for this docType
+        const zodSchema = DOC_ZOD_MAP[docType];
+        const responseConfig = zodSchema
+          ? { responseMimeType: "application/json", responseJsonSchema: zodToJsonSchema(zodSchema) }
+          : {};
+
         // Process with Gemini — single page, flat JSON response
         const extracted = await processPageWithGemini(fileUrl, 1, {
           customPrompt: extractionPrompt,
           rawJsonResponse: true,
+          responseConfig,
         });
+
+        // Validate with Zod (soft — log warning, don't block extraction)
+        if (zodSchema && extracted) {
+          const validationResult = zodSchema.safeParse(extracted);
+          if (!validationResult.success) {
+            console.warn(`[docExtract] Zod validation warning for ${docType}:`, validationResult.error.issues);
+          }
+        }
 
         if (!extracted) {
           // Empty extraction
@@ -83,6 +102,12 @@ let boss;
 
         console.log(`✅ Extraction complete for InvoiceJob #${invoiceJobId}:`, JSON.stringify(extracted));
 
+        // Cleanup: delete the split-page blob (fire-and-forget)
+        if (fileUrl) {
+          try { await deleteFile(fileUrl); }
+          catch (cleanupErr) { console.warn(`[docExtract] Failed to delete page blob:`, cleanupErr.message); }
+        }
+
         // Auto-link to vehicle by chassis number
         const chassisNumber = extracted.chassis_number;
         if (chassisNumber) {
@@ -96,15 +121,19 @@ let boss;
               },
             });
 
-            // 2nd try: strip all dashes/spaces and partial match (fallback for format differences)
+            // 2nd try: strip all dashes/spaces and exact normalized match
             if (!vehicle) {
-              const stripped = chassisNumber.replace(/[\s-]/g, "");
-              vehicle = await prisma.vehicle.findFirst({
+              const stripped = chassisNumber.replace(/[\s-]/g, "").toLowerCase();
+              const candidates = await prisma.vehicle.findMany({
                 where: {
                   companyId,
                   chassisNumber: { contains: stripped, mode: "insensitive" },
                 },
+                select: { id: true, chassisNumber: true },
               });
+              vehicle = candidates.find(
+                (v) => v.chassisNumber.replace(/[\s-]/g, "").toLowerCase() === stripped
+              ) || null;
             }
 
             if (vehicle) {
@@ -186,6 +215,16 @@ let boss;
 
       } catch (err) {
         console.error(`❌ Document extraction failed for InvoiceJob #${invoiceJobId}:`, err.message);
+
+        if (err instanceof QuotaExhaustedError) {
+          console.warn(`⏳ InvoiceJob #${invoiceJobId}: quota exhausted, re-queuing in 30 minutes`);
+          await prisma.invoiceJobs.update({
+            where: { id: invoiceJobId },
+            data: { status: "pending" },
+          });
+          await boss.send("extract-document", job.data, { startAfter: QUOTA_REQUEUE_DELAY_SECONDS });
+          return;
+        }
 
         // Mark job as failed
         await prisma.invoiceJobs.update({

@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, shahmir]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_OPTIONS: '--max-old-space-size=4096'
+  # Dummy values — prisma generate and next build need these but never connect
+  DATABASE_URL: 'postgresql://ci:ci@localhost:5432/ci?schema=public'
+  NEXTAUTH_SECRET: 'ci-dummy-secret'
+
+jobs:
+  ci:
+    name: Lint, Test, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build

@@ -1,243 +1,50 @@
+// ── Functions ──
+
 export const formatCurrency = (value) => {
   if (value === null || value === undefined) return "-";
-  const num = parseFloat(value);
+  const num = parseFloat(String(value));
   if (isNaN(num)) return "-";
   return `¥${num.toLocaleString()}`;
 };
 
+// ── Column Definitions ──
+
 export const VEHICLE_COLUMNS = [
-  {
-    id: "id",
-    label: "ID",
-    width: 60,
-    type: "static",
-  },
-  {
-    id: "chassisNumber",
-    label: "Chassis",
-    width: 170,
-    type: "text",
-    field: "chassisNumber",
-  },
-  {
-    id: "brand",
-    label: "Brand",
-    width: 120,
-    type: "combobox",
-    field: "brandId",
-    displayValueFn: (v) => v.brand?.name,
-    optionsKey: "brandOptions",
-    isRelation: true,
-  },
-  {
-    id: "lotNumber",
-    label: "Lot #",
-    width: 80,
-    type: "text",
-    field: "lotNumber",
-  },
-  {
-    id: "auctionDate",
-    label: "Date",
-    width: 100,
-    type: "text",
-    field: "auctionDate",
-  },
-  {
-    id: "session",
-    label: "Session",
-    width: 90,
-    type: "text",
-    field: "session",
-  },
-  {
-    id: "auction",
-    label: "Auction",
-    width: 140,
-    type: "combobox",
-    field: "auction",
-    optionsKey: "auction",
-  },
-  {
-    id: "invoice",
-    label: "Inv.",
-    width: 60,
-    type: "static",
-  },
-  {
-    id: "docs",
-    label: "Docs",
-    width: 90,
-    type: "static",
-  },
-  {
-    id: "bidAmount",
-    label: "Bid ¥",
-    width: 120,
-    type: "number",
-    field: "bidAmount",
-  },
-  {
-    id: "auctionFee",
-    label: "Auc. Fee ¥",
-    width: 115,
-    type: "number",
-    field: "auctionFee",
-  },
-  {
-    id: "insuranceFee",
-    label: "Insur. ¥",
-    width: 105,
-    type: "number",
-    field: "insuranceFee",
-  },
-  {
-    id: "recyclingFee",
-    label: "Recycle ¥",
-    width: 110,
-    type: "number",
-    field: "recyclingFee",
-  },
-  {
-    id: "transportFee",
-    label: "Trans. ¥",
-    width: 105,
-    type: "number",
-    field: "transportFee",
-  },
-  {
-    id: "otherFees",
-    label: "Other ¥",
-    width: 100,
-    type: "number",
-    field: "otherFees",
-  },
-  {
-    id: "taxSum",
-    label: "Tax ¥",
-    width: 110,
-    type: "readonly-currency",
-    field: "taxSum",
-  },
-  {
-    id: "totalCost",
-    label: "Total ¥",
-    width: 120,
-    type: "readonly-currency-primary",
-    field: "totalCost",
-  },
-  {
-    id: "length",
-    label: "L (cm)",
-    width: 80,
-    type: "number",
-    field: "length",
-  },
-  {
-    id: "width",
-    label: "W (cm)",
-    width: 80,
-    type: "number",
-    field: "width",
-  },
-  {
-    id: "height",
-    label: "H (cm)",
-    width: 80,
-    type: "number",
-    field: "height",
-  },
-  {
-    id: "m3",
-    label: "M3",
-    width: 80,
-    type: "number",
-    field: "m3",
-  },
-  {
-    id: "customer",
-    label: "Customer",
-    width: 130,
-    type: "combobox",
-    field: "customerId",
-    displayValueFn: (v) => v.customer?.name,
-    optionsKey: "customerOptions",
-    isClearable: true,
-    isRelation: true,
-  },
-  {
-    id: "transportCompany",
-    label: "Transport",
-    width: 120,
-    type: "combobox",
-    field: "transportCompany",
-    optionsKey: "transportCompany",
-  },
-  {
-    id: "deliverTo",
-    label: "Deliver To",
-    width: 120,
-    type: "combobox",
-    field: "deliverTo",
-    optionsKey: "deliverTo",
-  },
-  {
-    id: "numberPlate",
-    label: "Plate #",
-    width: 100,
-    type: "text",
-    field: "numberPlate",
-  },
-  {
-    id: "titleTransferDeadline",
-    label: "Title Deadline",
-    width: 130,
-    type: "date",
-    field: "titleTransferDeadline",
-  },
-  {
-    id: "containerNumber",
-    label: "Container",
-    width: 115,
-    type: "text",
-    field: "containerNumber",
-  },
-  {
-    id: "etd",
-    label: "ETD",
-    width: 90,
-    type: "text",
-    field: "etd",
-  },
-  {
-    id: "documentStatus",
-    label: "Doc Status",
-    width: 120,
-    type: "combobox",
-    field: "documentStatus",
-    optionsKey: "documentStatus",
-  },
-  {
-    id: "memo",
-    label: "Memo",
-    width: 150,
-    type: "text",
-    field: "memo",
-  },
-  {
-    id: "createdAt",
-    label: "Created",
-    width: 100,
-    type: "static",
-  },
-  {
-    id: "actions",
-    label: "",
-    width: 70,
-    type: "actions",
-    requirePermission: ["edit:vehicle"],
-  },
+  { id: "id", label: "ID", width: 60, type: "static" },
+  { id: "chassisNumber", label: "Chassis", width: 170, type: "text", field: "chassisNumber" },
+  { id: "brand", label: "Brand", width: 120, type: "combobox", field: "brandId", displayValueFn: (v) => v.brand?.name, optionsKey: "brandOptions", isRelation: true },
+  { id: "lotNumber", label: "Lot #", width: 80, type: "text", field: "lotNumber" },
+  { id: "auctionDate", label: "Date", width: 100, type: "text", field: "auctionDate" },
+  { id: "session", label: "Session", width: 90, type: "text", field: "session" },
+  { id: "auction", label: "Auction", width: 140, type: "combobox", field: "auction", optionsKey: "auction" },
+  { id: "invoice", label: "Inv.", width: 60, type: "static" },
+  { id: "docs", label: "Docs", width: 90, type: "static" },
+  { id: "bidAmount", label: "Bid ¥", width: 120, type: "number", field: "bidAmount" },
+  { id: "auctionFee", label: "Auc. Fee ¥", width: 115, type: "number", field: "auctionFee" },
+  { id: "insuranceFee", label: "Insur. ¥", width: 105, type: "number", field: "insuranceFee" },
+  { id: "recyclingFee", label: "Recycle ¥", width: 110, type: "number", field: "recyclingFee" },
+  { id: "transportFee", label: "Trans. ¥", width: 105, type: "number", field: "transportFee" },
+  { id: "otherFees", label: "Other ¥", width: 100, type: "number", field: "otherFees" },
+  { id: "taxSum", label: "Tax ¥", width: 110, type: "readonly-currency", field: "taxSum" },
+  { id: "totalCost", label: "Total ¥", width: 120, type: "readonly-currency-primary", field: "totalCost" },
+  { id: "length", label: "L (cm)", width: 80, type: "number", field: "length" },
+  { id: "width", label: "W (cm)", width: 80, type: "number", field: "width" },
+  { id: "height", label: "H (cm)", width: 80, type: "number", field: "height" },
+  { id: "m3", label: "M3", width: 80, type: "number", field: "m3" },
+  { id: "customer", label: "Customer", width: 130, type: "combobox", field: "customerId", displayValueFn: (v) => v.customer?.name, optionsKey: "customerOptions", isClearable: true, isRelation: true },
+  { id: "transportCompany", label: "Transport", width: 120, type: "combobox", field: "transportCompany", optionsKey: "transportCompany" },
+  { id: "deliverTo", label: "Deliver To", width: 120, type: "combobox", field: "deliverTo", optionsKey: "deliverTo" },
+  { id: "numberPlate", label: "Plate #", width: 100, type: "text", field: "numberPlate" },
+  { id: "titleTransferDeadline", label: "Title Deadline", width: 130, type: "date", field: "titleTransferDeadline" },
+  { id: "containerNumber", label: "Container", width: 115, type: "text", field: "containerNumber" },
+  { id: "etd", label: "ETD", width: 90, type: "text", field: "etd" },
+  { id: "documentStatus", label: "Doc Status", width: 120, type: "combobox", field: "documentStatus", optionsKey: "documentStatus" },
+  { id: "memo", label: "Memo", width: 150, type: "text", field: "memo" },
+  { id: "createdAt", label: "Created", width: 100, type: "static" },
+  { id: "actions", label: "", width: 70, type: "actions", requirePermission: ["edit:vehicle"] },
 ];
+
+// ── Filter Operators ──
 
 export const FILTER_OPERATORS = {
   text: [
@@ -283,6 +90,8 @@ export const FILTER_OPERATORS = {
     { value: "isNotEmpty", label: "Is not empty" },
   ],
 };
+
+// ── Filterable Columns (derived) ──
 
 export const FILTERABLE_COLUMNS = VEHICLE_COLUMNS
   .filter(col => !["static", "actions"].includes(col.type))

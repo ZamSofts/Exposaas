@@ -1,11 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import Head from "next/head";
 import { useAuth } from "@/hooks/useAuth";
-import { Error, API, DataTable } from "@/hooks/wrapper";
+import { Error, API, DataTable, usePaginatedList, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import useFileUpload from "@/hooks/useFileUpload";
 import FileUploadModal from "@/components/ui/FileUploadModal";
 import DocumentViewer from "@/components/DocumentViewer";
 import Sidebar from "@/components/Sidebar";
+import GmailSettings from "@/components/GmailSettings";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
   FileText,
@@ -23,6 +25,7 @@ import {
   isReviewDisabled,
   isActionDone,
 } from "@/lib/invoiceJobUtils";
+import { InvoiceDataViewer } from "@/hooks/wrapper";
 
 // Doc type configuration (mirrors classificationSchema.mjs for UI)
 const DOC_TYPES = {
@@ -62,19 +65,38 @@ function DocTypeBadge({ docType }) {
 // ---------------------------------------------------------------------------
 export default function DocumentsPage() {
   const { session } = useAuth();
-
-  const [error, setError] = useState("");
-  const [rows, setRows] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(10);
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const queryClient = useQueryClient();
 
   // Filter by docType tab
   const [activeTab, setActiveTab] = useState("all");
+
+  // ── Data fetching (React Query) ──
+  const buildDocParams = useCallback((urlParams) => {
+    if (activeTab !== "all") {
+      urlParams.set("docType", activeTab);
+    }
+  }, [activeTab]);
+
+  // Custom key includes activeTab so tab changes trigger refetch
+  const docKeyFn = useCallback(
+    (params) => ["documents", { ...params, docType: activeTab }],
+    [activeTab]
+  );
+
+  const {
+    items: rows, total, isLoading, error: listError,
+    handleSort, handlePageChange, sortBy, sortOrder, setPage,
+  } = usePaginatedList(docKeyFn, "InvoiceJobs", {
+    defaultPerPage: 10,
+    defaultOrder: "desc",
+    buildParams: buildDocParams,
+    select: (res) => ({
+      items: res.data || [],
+      total: res.total || (res.data || []).length,
+    }),
+  });
+
+  const [error, setError] = useState("");
 
   // Upload modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -94,56 +116,15 @@ export default function DocumentsPage() {
     validExtensions: ["pdf", "csv"],
     validMimeTypes: ["application/pdf", "application/x-pdf", "text/csv", "application/vnd.ms-excel"],
     fileLabel: "PDF / CSV",
+    multiple: true,
   });
 
-  useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, sortBy, sortOrder, activeTab]);
-
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(currentPage),
-        limit: String(perPage),
-        sortBy: String(sortBy),
-        sortOrder: String(sortOrder),
-      });
-
-      if (activeTab !== "all") {
-        params.set("docType", activeTab);
-      }
-
-      const res = await API("GET", `InvoiceJobs?${params}`);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-
-      setRows(res.data || []);
-      setTotal(res.total || (res.data || []).length);
-    } catch (err) {
-      console.error("Error loading documents", err);
-      setError("Failed to load documents");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
-  };
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["documents"] });
 
   const handleUploadSuccess = () => {
     setUploadModalOpen(false);
     docUpload.reset();
-    setTimeout(() => loadData(), 1000);
+    setTimeout(() => invalidate(), 1000);
   };
 
   const handleUploadError = (err) => {
@@ -172,7 +153,7 @@ export default function DocumentsPage() {
   const handleBackToList = () => {
     setViewerOpen(false);
     setViewerData(null);
-    loadData();
+    invalidate();
   };
 
   const handleRetry = async (jobId) => {
@@ -182,7 +163,7 @@ export default function DocumentsPage() {
       if (res.error) {
         setError(res.error);
       } else {
-        loadData();
+        invalidate();
       }
     } catch (err) {
       setError("Failed to retry job");
@@ -190,6 +171,26 @@ export default function DocumentsPage() {
       setRetrying(null);
     }
   };
+
+  const [retryingAll, setRetryingAll] = useState(false);
+
+  const handleRetryAllFailed = async () => {
+    setRetryingAll(true);
+    try {
+      const res = await API("POST", "InvoiceJobs", { action: "retryAllFailed" });
+      if (res.error) {
+        setError(res.error);
+      } else {
+        invalidate();
+      }
+    } catch (err) {
+      setError("Failed to retry jobs");
+    } finally {
+      setRetryingAll(false);
+    }
+  };
+
+  const hasFailedJobs = rows.some((r) => r.status === "failed");
 
   // Get vehicle link info from Json (for non-invoice docs)
   const getLinkedInfo = (row) => {
@@ -210,7 +211,6 @@ export default function DocumentsPage() {
 
     if (isInvoice) {
       const data = buildViewerData(viewerData, viewerData._correctedJson);
-      const { InvoiceDataViewer } = require("@/hooks/wrapper");
       return <InvoiceDataViewer data={data} onBack={handleBackToList} />;
     }
 
@@ -238,13 +238,25 @@ export default function DocumentsPage() {
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">Documents</h1>
               </div>
 
-              <button
-                onClick={() => setUploadModalOpen(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg hover:bg-[var(--primary)]/90 transition-colors shadow-sm"
-              >
-                <Upload className="w-4 h-4" />
-                Upload File
-              </button>
+              <div className="flex items-center gap-2">
+                {hasFailedJobs && (
+                  <button
+                    onClick={handleRetryAllFailed}
+                    disabled={retryingAll}
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg transition-colors text-sm"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${retryingAll ? "animate-spin" : ""}`} />
+                    {retryingAll ? "Retrying..." : "Retry All Failed"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setUploadModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg hover:bg-[var(--primary)]/90 transition-colors shadow-sm"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload File
+                </button>
+              </div>
             </div>
             <p className="text-[var(--secondary-foreground)]">
               Upload PDFs or CSVs — invoices, export certs, inspection certs, vehicle data, and more.
@@ -252,14 +264,17 @@ export default function DocumentsPage() {
             </p>
           </div>
 
-          <Error message={error} />
+          {/* Gmail Auto-Import Settings */}
+          <GmailSettings />
+
+          <Error message={listError || error} />
 
           {/* Doc Type Tabs */}
           <div className="flex gap-1 mb-6 bg-[var(--surface)] rounded-lg p-1 border border-[var(--border)] w-fit">
             {Object.entries(DOC_TYPES).map(([key, config]) => (
               <button
                 key={key}
-                onClick={() => { setActiveTab(key); setCurrentPage(1); }}
+                onClick={() => { setActiveTab(key); setPage(1); }}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   activeTab === key
                     ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
@@ -279,6 +294,7 @@ export default function DocumentsPage() {
 
           {/* Data Table */}
           <DataTable
+            key={activeTab}
             data={rows}
             total={total}
             isLoading={isLoading}
@@ -286,7 +302,7 @@ export default function DocumentsPage() {
             onSort={handleSort}
             onPageChange={handlePageChange}
             title="Documents"
-            initialPerPage={perPage}
+            initialPerPage={10}
             sortBy={sortBy}
             sortOrder={sortOrder}
           >
@@ -319,8 +335,16 @@ export default function DocumentsPage() {
                       <DocTypeBadge docType={row.docType || "invoice"} />
                     </td>
 
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                       <StatusBadge status={row.status} />
+                      {row.status === "failed" && row.Json?.error && (
+                        <p
+                          className="text-xs text-red-400/80 mt-1 max-w-[200px] truncate"
+                          title={typeof row.Json.error === "string" ? row.Json.error : JSON.stringify(row.Json.error)}
+                        >
+                          {typeof row.Json.error === "string" ? row.Json.error : "See details"}
+                        </p>
+                      )}
                     </td>
 
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -383,7 +407,9 @@ export default function DocumentsPage() {
           isOpen={uploadModalOpen}
           label="Upload PDF or CSV"
           accept=".pdf,.csv"
+          multiple
           file={docUpload.file}
+          files={docUpload.files}
           progress={docUpload.progress}
           error={docUpload.error}
           onFileChange={docUpload.validate}

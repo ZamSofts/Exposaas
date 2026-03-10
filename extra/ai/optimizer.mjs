@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { EXTRACTION_SCHEMA, schemaToConstraintText } from "./schema.mjs";
 
@@ -134,8 +134,7 @@ export async function generateCandidates({
     throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const schemaText = schemaToConstraintText(EXTRACTION_SCHEMA);
 
@@ -203,19 +202,25 @@ ${numCandidates}つの異なるアプローチで改善案を作成してくだ�
   // Call Gemini for meta-prompting
   let result;
   try {
-    result = await model.generateContent(metaPrompt);
+    result = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: metaPrompt,
+    });
   } catch (err) {
     // Retry once after delay for rate limiting
     if (err?.message?.includes("429") || err?.message?.includes("quota")) {
       console.warn("[optimizer] Rate limited, retrying in 10s...");
       await sleep(10000);
-      result = await model.generateContent(metaPrompt);
+      result = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: metaPrompt,
+      });
     } else {
       throw err;
     }
   }
 
-  const text = (await result.response.text()).trim();
+  const text = result.text.trim();
 
   // Parse JSON response
   const cleanText = text

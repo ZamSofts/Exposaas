@@ -10,20 +10,11 @@
 
 /**
  * Log a single vehicle audit event.
- *
- * @param {import("@prisma/client").PrismaClient} prisma - Prisma client instance
- * @param {Object} params
- * @param {number} params.vehicleId
- * @param {string} params.action - "create"|"update"|"delete"|"link_document"|"payment_create"|"payment_update"|"payment_delete"
- * @param {string} params.actor - "user"|"ai"|"system"|"csv_import"
- * @param {string|null} [params.actorId] - User ID (string)
- * @param {string|null} [params.field] - Field name (for updates)
- * @param {*} [params.oldValue] - Previous value
- * @param {*} [params.newValue] - New value
- * @param {string|null} [params.source] - "manual"|"invoiceJob:{id}"|"csv:{url}"|"ai_auto_link:{id}"
- * @param {Object|null} [params.metadata] - Extra context
  */
-export async function logVehicleAudit(prisma, { vehicleId, action, actor, actorId, field, oldValue, newValue, source, metadata }) {
+export async function logVehicleAudit(
+  prisma,
+  { vehicleId, action, actor, actorId, field, oldValue, newValue, source, metadata },
+) {
   try {
     await prisma.vehicleAuditLog.create({
       data: {
@@ -46,16 +37,11 @@ export async function logVehicleAudit(prisma, { vehicleId, action, actor, actorI
 /**
  * Log multiple field changes for a vehicle in one batch.
  * Filters out unchanged fields automatically.
- *
- * @param {import("@prisma/client").PrismaClient} prisma
- * @param {Object} params
- * @param {number} params.vehicleId
- * @param {string} params.actor
- * @param {string|null} [params.actorId]
- * @param {string|null} [params.source]
- * @param {Array<{field: string, oldValue: *, newValue: *}>} params.changes
  */
-export async function logVehicleFieldChanges(prisma, { vehicleId, actor, actorId, source, changes }) {
+export async function logVehicleFieldChanges(
+  prisma,
+  { vehicleId, actor, actorId, source, changes },
+) {
   try {
     const data = changes
       .filter(c => String(c.oldValue ?? "") !== String(c.newValue ?? ""))

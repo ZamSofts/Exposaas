@@ -1,8 +1,9 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile, putMultipleFiles } from "@/lib/blob.mjs";
 import multer from "multer";
-import { parseChargeFieldsFromFlat } from "../../../extra/utils/chargeMapping.mjs";
-import { logVehicleAudit, logVehicleFieldChanges } from "../../../extra/utils/auditLog.mjs";
+import { parseChargeFieldsFromFlat } from "../../../extra/utils/chargeMapping";
+import { logVehicleAudit, logVehicleFieldChanges } from "../../../extra/utils/auditLog";
+import { buildFilterWhere, getSearchFilter, getOrderBy } from "@/lib/vehicleFilters";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -54,8 +55,7 @@ const parseFormData = req =>
     });
   });
 
-//file upload function using putMultipleFiles
-const uploadFilesToAzure = async (files, vehicleId, folderPath = "vehicle/") => {
+const uploadFiles = async (files, vehicleId, folderPath = "vehicle/") => {
   if (!files || files.length === 0) {
     return { uploadedDocuments: [], documentsUploaded: 0, errors: [] };
   }
@@ -114,205 +114,8 @@ const validateVehicle = async ({ chassisNumber, brandId, companyId, vehicleId = 
   }
 };
 
-const getSearchFilter = search =>
-  search
-    ? {
-        OR: [
-          { name: { contains: search, mode: "insensitive" } },
-          { chassisNumber: { contains: search, mode: "insensitive" } },
-          { auction: { contains: search, mode: "insensitive" } },
-          { lotNumber: { contains: search, mode: "insensitive" } },
-          { remarks: { contains: search, mode: "insensitive" } },
-          { numberPlate: { contains: search, mode: "insensitive" } },
-          { containerNumber: { contains: search, mode: "insensitive" } },
-          { transportCompany: { contains: search, mode: "insensitive" } },
-          { brand: { name: { contains: search, mode: "insensitive" } } },
-        ],
-      }
-    : {};
-
-const getOrderBy = (sortBy, sortOrder) =>
-  ({
-    brand: { brand: { name: sortOrder } },
-  }[sortBy] || { [sortBy]: sortOrder });
-
-// ── Filter support (Lark Base style) ─────────────────────────────────
-
-const ALLOWED_FILTER_FIELDS = new Set([
-  "chassisNumber", "lotNumber", "auction", "auctionDate", "session",
-  "transportCompany", "deliverTo", "numberPlate", "containerNumber",
-  "etd", "documentStatus", "memo",
-  "bidAmount", "auctionFee", "insuranceFee", "recyclingFee",
-  "transportFee", "otherFees", "taxSum", "totalCost",
-  "length", "width", "height", "m3",
-  "titleTransferDeadline",
-]);
-
-const DECIMAL_FIELDS = new Set([
-  "bidAmount", "auctionFee", "insuranceFee", "recyclingFee",
-  "transportFee", "otherFees", "taxSum", "totalCost",
-  "m3",
-]);
-
-const INTEGER_FIELDS = new Set(["length", "width", "height"]);
-
-const DATE_FIELDS = new Set(["titleTransferDeadline"]);
-
-function getFieldDataType(field) {
-  if (DECIMAL_FIELDS.has(field)) return "number";
-  if (INTEGER_FIELDS.has(field)) return "number";
-  if (DATE_FIELDS.has(field)) return "date";
-  return "string";
-}
-
-/** Get start/end of a date (for day-level equality comparisons) */
-function getDateRange(date) {
-  const start = new Date(date); start.setHours(0, 0, 0, 0);
-  const end = new Date(date);   end.setHours(23, 59, 59, 999);
-  return { start, end };
-}
-
-/**
- * Build a single Prisma condition from operator + value + data type.
- * Note: doesNotContain and date isNot are special-cased in buildFilterWhere
- * because they need NOT wrappers at the clause level, not the field level.
- */
-function buildCondition(dataType, operator, value) {
-  if (operator === "isEmpty") return null;
-  if (operator === "isNotEmpty") return { not: null };
-
-  if (dataType === "string") {
-    switch (operator) {
-      case "is":       return { equals: value, mode: "insensitive" };
-      case "isNot":    return { not: { equals: value, mode: "insensitive" } };
-      case "contains": return { contains: value, mode: "insensitive" };
-      default:         return undefined; // doesNotContain handled in buildFilterWhere
-    }
-  }
-
-  if (dataType === "number") {
-    const num = parseFloat(value);
-    if (isNaN(num)) return undefined;
-    switch (operator) {
-      case "is":             return { equals: num };
-      case "isNot":          return { not: num };
-      case "isGreater":      return { gt: num };
-      case "isGreaterEqual": return { gte: num };
-      case "isLess":         return { lt: num };
-      case "isLessEqual":    return { lte: num };
-      default:               return undefined;
-    }
-  }
-
-  if (dataType === "date") {
-    const d = new Date(value);
-    if (isNaN(d.getTime())) return undefined;
-    switch (operator) {
-      case "is": {
-        const { start, end } = getDateRange(d);
-        return { gte: start, lte: end };
-      }
-      case "isGreater":      return { gt: d };
-      case "isGreaterEqual": return { gte: d };
-      case "isLess":         return { lt: d };
-      case "isLessEqual":    return { lte: d };
-      default:               return undefined; // isNot handled in buildFilterWhere
-    }
-  }
-
-  return undefined;
-}
-
-/** Parse the filters query param and return a Prisma where fragment */
-function buildFilterWhere(filtersParam) {
-  if (!filtersParam) return {};
-
-  let parsed;
-  try { parsed = JSON.parse(filtersParam); } catch { return {}; }
-
-  const { conjunction = "and", conditions } = parsed;
-  if (!Array.isArray(conditions) || conditions.length === 0) return {};
-
-  const clauses = [];
-
-  for (const cond of conditions) {
-    const { field_name, operator, value } = cond;
-    if (!field_name || !operator) continue;
-
-    // isEmpty/isNotEmpty don't need a value
-    const needsValue = !["isEmpty", "isNotEmpty"].includes(operator);
-    if (needsValue && (value === undefined || value === null || value === "")) continue;
-
-    // --- Relation fields ---
-    if (field_name === "brand.name") {
-      // Brand is required (brandId Int, never null)
-      if (operator === "isEmpty") { clauses.push({ id: -1 }); continue; }       // impossible → 0 results
-      if (operator === "isNotEmpty") continue;                                     // always true → no-op
-      if (operator === "doesNotContain") {
-        clauses.push({ NOT: { brand: { name: { contains: value, mode: "insensitive" } } } });
-        continue;
-      }
-      if (operator === "isNot") {
-        clauses.push({ NOT: { brand: { name: { equals: value, mode: "insensitive" } } } });
-        continue;
-      }
-      const c = buildCondition("string", operator, value);
-      if (c) clauses.push({ brand: { name: c } });
-      continue;
-    }
-    if (field_name === "customer.name") {
-      // Customer is optional (customerId Int?) so isEmpty/isNotEmpty check relation existence
-      if (operator === "isEmpty") { clauses.push({ customer: { is: null } }); continue; }
-      if (operator === "isNotEmpty") { clauses.push({ customer: { isNot: null } }); continue; }
-      if (operator === "doesNotContain") {
-        clauses.push({ NOT: { customer: { name: { contains: value, mode: "insensitive" } } } });
-        continue;
-      }
-      if (operator === "isNot") {
-        clauses.push({ NOT: { customer: { name: { equals: value, mode: "insensitive" } } } });
-        continue;
-      }
-      const c = buildCondition("string", operator, value);
-      if (c) clauses.push({ customer: { name: c } });
-      continue;
-    }
-
-    // --- Direct fields (whitelist check; relation fields handled above) ---
-    if (!ALLOWED_FILTER_FIELDS.has(field_name)) continue;
-
-    const dataType = getFieldDataType(field_name);
-
-    // isEmpty → field is null
-    if (operator === "isEmpty") {
-      clauses.push({ [field_name]: null });
-      continue;
-    }
-
-    // Operators that need NOT wrapper at clause level (can't be expressed inside a single field condition)
-    if (operator === "doesNotContain" && dataType === "string") {
-      clauses.push({ NOT: { [field_name]: { contains: value, mode: "insensitive" } } });
-      continue;
-    }
-    if (operator === "isNot" && dataType === "date") {
-      const d = new Date(value);
-      if (isNaN(d.getTime())) continue;
-      const { start, end } = getDateRange(d);
-      clauses.push({ NOT: { [field_name]: { gte: start, lte: end } } });
-      continue;
-    }
-
-    const prismaCondition = buildCondition(dataType, operator, value);
-    if (prismaCondition !== undefined) {
-      clauses.push({ [field_name]: prismaCondition });
-    }
-  }
-
-  if (clauses.length === 0) return {};
-
-  // Combine with conjunction
-  const key = conjunction === "or" ? "OR" : "AND";
-  return { [key]: clauses };
-}
+// ── Filter support imported from shared utility ──
+// buildFilterWhere, getSearchFilter, getOrderBy imported from @/lib/vehicleFilters
 
 /** Build Prisma include object. Omit documents for large page sizes. */
 const getIncludeRelations = (includeDocuments = true) => {
@@ -328,17 +131,17 @@ const getIncludeRelations = (includeDocuments = true) => {
   return base;
 };
 
-/** Delete documents from Azure Blob Storage. Returns { deleted, errors }. */
-const deleteDocumentsFromAzure = async (documents) => {
+/** Delete documents from storage. Returns { deleted, errors }. */
+const deleteDocuments = async (documents) => {
   let deleted = 0;
   const errors = [];
   for (const doc of documents) {
     try {
       await deleteFile(doc.Url);
       deleted++;
-      console.log(`✅ Deleted from Azure: ${doc.Url}`);
+      console.log(`✅ Deleted from storage: ${doc.Url}`);
     } catch (error) {
-      console.error(`❌ Failed to delete from Azure: ${doc.Url}`, error);
+      console.error(`❌ Failed to delete from storage: ${doc.Url}`, error);
       errors.push({ docUrl: doc.Url, error: error.message });
     }
   }
@@ -403,7 +206,7 @@ export default async function handler(req, res) {
     const id = Number(req.query.id);
     const chassisNumber = req.query.chassisNumber;
     const { page = 1, limit: rawLimit = 10, search = "", sortBy = "id", sortOrder = "asc", col } = req.query;
-    const limit = Math.min(Number(rawLimit), 5000);
+    const limit = Math.min(Number(rawLimit), 500);
     const selectFields = col ? Object.fromEntries(col.split(",").map(c => [c, true])) : undefined;
     const userFilter = session.role === "Sadmin" ? {} : { companyId: session?.companyId };
 
@@ -475,7 +278,7 @@ export default async function handler(req, res) {
             brandId: Number(brandId),
             companyId: Number(companyId),
             customerId: customerId && customerId !== "" ? Number(customerId) : null,
-            createdById: session.id,
+            createdById: parseInt(session.id, 10) || null,
             ...chargeFields,
           },
         });
@@ -491,7 +294,7 @@ export default async function handler(req, res) {
 
         // Handle document uploads
         const documentFiles = req.files.documents || [];
-        const uploadResult = await uploadFilesToAzure(documentFiles, vehicle.id, "vehicle/");
+        const uploadResult = await uploadFiles(documentFiles, vehicle.id, "vehicle/");
 
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
@@ -539,11 +342,11 @@ export default async function handler(req, res) {
           brandId: Number(brandId),
           companyId: Number(companyId),
           customerId: customerId && customerId !== "" ? Number(customerId) : null,
-          updatedById: session.id,
+          updatedById: parseInt(session.id, 10) || null,
           ...chargeFields,
         };
 
-        if (name !== "null") {
+        if (name != null && name !== "null") {
           updateData.name = name;
         }
 
@@ -579,8 +382,8 @@ export default async function handler(req, res) {
               });
               documentsDeleted = deleteResult.count;
 
-              const azureResult = await deleteDocumentsFromAzure(docsToDelete);
-              deletionErrors = azureResult.errors;
+              const storageResult = await deleteDocuments(docsToDelete);
+              deletionErrors = storageResult.errors;
             }
           } catch (error) {
             console.error("Error processing document deletions:", error);
@@ -590,7 +393,7 @@ export default async function handler(req, res) {
 
         // Handle new document uploads
         const documentFiles = req.files.documents || [];
-        const uploadResult = await uploadFilesToAzure(documentFiles, vehicleId, "vehicle/");
+        const uploadResult = await uploadFiles(documentFiles, vehicleId, "vehicle/");
 
         // Save successfully uploaded documents to database
         if (uploadResult.uploadedDocuments.length > 0) {
@@ -646,8 +449,8 @@ export default async function handler(req, res) {
         // Delete the vehicle (cascade will automatically delete documents from database)
         await prisma.vehicle.delete({ where: { id } });
 
-        // Clean up documents from Azure Blob Storage
-        const { deleted: documentsDeleted, errors: deletionErrors } = await deleteDocumentsFromAzure(vehicleDocuments);
+        // Clean up documents from storage
+        const { deleted: documentsDeleted, errors: deletionErrors } = await deleteDocuments(vehicleDocuments);
 
         const response = {
           message: "Vehicle deleted successfully",

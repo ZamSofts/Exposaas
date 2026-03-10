@@ -3,13 +3,7 @@ import { ensureQueue } from "../queues/pgBoss.mjs";
 import { splitAndUploadPages } from "../utils/pdfSplitter.mjs";
 import { downloadFile } from "../../src/lib/blob.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-async function streamToBuffer(stream) {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
+import { streamToBuffer } from "../utils/streamUtils.mjs";
 
 let boss;
 
@@ -24,6 +18,8 @@ let boss;
       boss.on("error", err => console.error("[pg-boss] error:", err));
     }
 
+    console.log("🚀 Invoice worker started and listening...");
+
     await boss.work("gemini-extract", async ([job]) => {
       let filePath = job && job.data && (job.data.fileUrl || job.data.filePath || job.data.path);
       let companyId = job && job.data && job.data.companyId;
@@ -33,6 +29,15 @@ let boss;
 
       if (!filePath) {
         throw new Error("Missing file path/url on job data");
+      }
+
+      // Dedup: skip if InvoiceJobs already exist for this document
+      const existingJobs = await prisma.invoiceJobs.count({
+        where: { parentDocumentUrl: filePath, companyId }
+      });
+      if (existingJobs > 0) {
+        console.log(`⏭️ Skipping duplicate: ${existingJobs} InvoiceJob(s) already exist for ${filePath}`);
+        return;
       }
 
       try {
@@ -69,8 +74,22 @@ let boss;
 
         }
       } catch (err) {
-
         if (err && err.meta) console.error("Prisma meta:", err.meta);
+
+        // Create a failed InvoiceJob so the error is visible in the documents page
+        try {
+          await prisma.invoiceJobs.create({
+            data: {
+              companyId,
+              DocumentURL: filePath,
+              docType: "invoice",
+              status: "failed",
+              Json: { error: err.message },
+            },
+          });
+        } catch (dbErr) {
+          console.error("Failed to save failed job record:", dbErr);
+        }
 
         throw err;
       }

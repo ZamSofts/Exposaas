@@ -1,3 +1,5 @@
+// ── Constants (internal) ──
+
 export const CHARGE_TYPE_MAP = {
   bid_amount: "bidAmount",
   auction_fee: "auctionFee",
@@ -61,6 +63,8 @@ const METADATA_CSV_MAP = {
   m3: "m3",
 };
 
+// ── Exported Functions ──
+
 export function calculateTaxAndTotal(currentCharges, updatedField, updatedValue) {
   const charges = {};
   for (const col of ALL_CHARGE_COLUMNS) {
@@ -73,9 +77,6 @@ export function calculateTaxAndTotal(currentCharges, updatedField, updatedValue)
 
 /**
  * Calculate taxSum and totalCost from a flat charge map (DB column names).
- * Shared by createVehiclesFromInvoice, parseChargeFieldsFromFlat, etc.
- * @param {Object} chargeMap — e.g. { bidAmount: 250000, auctionFee: 15000 }
- * @returns {{ taxSum: number, totalCost: number }}
  */
 export function calculateTaxFromChargeMap(chargeMap) {
   const taxSum = TAX_BASE_COLUMNS.reduce((sum, col) => sum + (chargeMap[col] || 0), 0) * TAX_RATE;
@@ -83,10 +84,36 @@ export function calculateTaxFromChargeMap(chargeMap) {
   return { taxSum, totalCost };
 }
 
+/**
+ * Parse a charges array [{type, amount}] (from AI extraction) into flat DB column format with tax.
+ */
+export function parseChargesFromArray(charges) {
+  const result = {};
+
+  if (!Array.isArray(charges)) return result;
+
+  for (const charge of charges) {
+    const dbColumn = charge.type ? CHARGE_TYPE_MAP[charge.type] : undefined;
+    if (dbColumn && charge.amount != null) {
+      const amount = parseFloat(String(charge.amount));
+      if (!isNaN(amount)) {
+        result[dbColumn] = (result[dbColumn] || 0) + amount;
+      }
+    }
+  }
+
+  if (Object.keys(result).length > 0) {
+    const { taxSum, totalCost } = calculateTaxFromChargeMap(result);
+    result.taxSum = taxSum;
+    result.totalCost = totalCost;
+  }
+
+  return result;
+}
+
 export function parseChargeFieldsFromFlat(row) {
   const charges = {};
 
-  // Check camelCase keys (from form body)
   for (const col of ALL_CHARGE_COLUMNS) {
     if (row[col] !== undefined && row[col] !== null && row[col] !== "") {
       const parsed = parseFloat(row[col]);
@@ -94,7 +121,6 @@ export function parseChargeFieldsFromFlat(row) {
     }
   }
 
-  // Check snake_case keys (from CSV)
   for (const [snakeKey, dbCol] of Object.entries(CHARGE_TYPE_MAP)) {
     if (row[snakeKey] !== undefined && row[snakeKey] !== null && row[snakeKey] !== "") {
       const parsed = parseFloat(row[snakeKey]);
@@ -104,7 +130,6 @@ export function parseChargeFieldsFromFlat(row) {
     }
   }
 
-  // Always calculate — null/empty = 0
   const { taxSum, totalCost } = calculateTaxFromChargeMap(charges);
   charges.taxSum = taxSum;
   charges.totalCost = totalCost;

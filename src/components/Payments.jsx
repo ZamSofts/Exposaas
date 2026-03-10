@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useAuth,API,useConfirm, Error, CustomSelect, CustomButton,DataTable, Loader, Toast, FilePreviewer } from "@/hooks/wrapper";
 import { Plus, Edit, Trash2, DollarSign, FileUp, Calendar, Building2 } from "lucide-react";
 
@@ -7,13 +7,17 @@ const DocumentPreview = ({ document, onPreview, onRemove, onFileChange }) => {
   const currentDoc = document.file || document.existing;
   const isNewFile = !!document.file;
 
+  // Create object URL once and revoke on cleanup to prevent memory leak
+  const objectUrl = useMemo(() => (isNewFile ? URL.createObjectURL(document.file) : null), [isNewFile, document.file]);
+  useEffect(() => () => { if (objectUrl) URL.revokeObjectURL(objectUrl); }, [objectUrl]);
+
   const getPreviewElement = () => {
     if (isNewFile) {
       const isImage = document.file.type?.includes("image");
       const isPdf = document.file.type === "application/pdf";
 
       if (isImage) {
-        return <img src={URL.createObjectURL(document.file)} alt={document.file.name} className="w-full h-full object-cover" />;
+        return <img src={objectUrl} alt={document.file.name} className="w-full h-full object-cover" />;
       } else if (isPdf) {
         return (
           <div className="text-red-500">
@@ -71,7 +75,7 @@ const DocumentPreview = ({ document, onPreview, onRemove, onFileChange }) => {
               {/* Preview Button */}
               <button
                 type="button"
-                onClick={() => onPreview(isNewFile ? URL.createObjectURL(document.file) : currentDoc.url, isNewFile ? document.file.name : currentDoc.fileName)}
+                onClick={() => onPreview(isNewFile ? objectUrl : currentDoc.url, isNewFile ? document.file.name : currentDoc.fileName)}
                 className="p-1 text-[var(--primary)] hover:bg-[var(--primary)]/10 rounded"
                 title="Preview document"
               >
@@ -478,7 +482,7 @@ export default function Payments({ vehicleId }) {
                 </div>
                 <div>
                   <label className="input-label">Amount *</label>
-                  <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="input-style" />
+                  <input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="input-style" />
                   <p className="text-xs text-[var(--secondary-foreground)] mt-1">Use positive for payments (+100.00), negative for expenses (-200.00)</p>
                 </div>
                 <div>

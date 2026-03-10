@@ -10,14 +10,12 @@
 
 import { COMPARED_FIELDS } from "../ai/schema.mjs";
 
+// ── Internal Helpers ──
+
 const normChassis = (s) => (s || "").toUpperCase();
 
 /**
  * Normalize a JSON blob into a flat array of vehicle objects.
- * Supports both { items: [...] } and { page_1: [...], page_2: [...] } formats.
- *
- * @param {object|Array} json
- * @returns {Array} flat array of vehicle objects
  */
 function normalizeVehicles(json) {
   if (!json) return [];
@@ -32,7 +30,6 @@ function normalizeVehicles(json) {
 
 /**
  * Filter and sort charges for comparison.
- * Removes empty/zero amounts and normalizes to { type, amount } objects.
  */
 function filterCharges(arr) {
   return (arr || [])
@@ -43,7 +40,6 @@ function filterCharges(arr) {
 
 /**
  * Build a frequency map: chargeType → sorted [amounts].
- * Handles duplicate charge types (e.g., two shipping_fee entries).
  */
 function buildFreqMap(charges) {
   const map = new Map();
@@ -55,13 +51,11 @@ function buildFreqMap(charges) {
   return map;
 }
 
+// ── Exported Functions ──
+
 /**
  * Compare two vehicle arrays and return detailed diff per vehicle.
  * Used by paymentConfirmation.js for HITL review display.
- *
- * @param {object} originalJson - Original Gemini extraction (items or page_N format)
- * @param {object} correctedJson - User-corrected data (page_N format)
- * @returns {{ isCorrect: "exact_match"|"corrected", diffSummary: object }}
  */
 export function computeDetailedDiff(originalJson, correctedJson) {
   const origVehicles = normalizeVehicles(originalJson);
@@ -146,10 +140,6 @@ export function computeDetailedDiff(originalJson, correctedJson) {
 /**
  * Compare extracted vehicles against golden data and return a numeric score.
  * Used by promptEvaluator.mjs for prompt version evaluation.
- *
- * @param {Array} extractedVehicles - Gemini extraction output (array of vehicles)
- * @param {object} goldenJson - Golden PaymentConfirmation JSON (page_N format)
- * @returns {{ isExactMatch: boolean, score: number, fieldsChanged: number, totalFieldsCompared: number }}
  */
 export function computeScoredDiff(extractedVehicles, goldenJson) {
   const goldVehicles = normalizeVehicles(goldenJson);

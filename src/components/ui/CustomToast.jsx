@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export function Toast({ id, type = "success", message, onClose }) {
+export function Toast({ id, type = "success", message, onClose, duration }) {
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
 
@@ -9,14 +9,15 @@ export function Toast({ id, type = "success", message, onClose }) {
       setIsVisible(true);
       setIsExiting(false);
 
-      // Auto-hide after 2 seconds
+      // Auto-hide: errors get longer display time by default
+      const ms = duration ?? (type === "error" ? 4000 : 2000);
       const timer = setTimeout(() => {
         setIsExiting(true);
         // Wait for exit animation to complete before hiding
         setTimeout(() => {
           setIsVisible(false);
         }, 400);
-      }, 2000);
+      }, ms);
 
       return () => clearTimeout(timer);
     } else {
@@ -105,7 +106,7 @@ export function Toast({ id, type = "success", message, onClose }) {
   return (
     <>
       <div
-        className={`fixed top-4 left-[60%] transform -translate-x-1/2 z-[9999] 
+        className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] 
           min-w-[280px] max-w-[400px] transition-all duration-300 ease-out
           ${isExiting ? "animate-toast-exit" : "animate-toast-enter"}
           ${config.bgColor} ${config.textColor} ${config.borderColor}

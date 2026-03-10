@@ -1,6 +1,8 @@
 import { prisma, getSession } from "@/lib/useful";
-import { CHARGE_TYPE_MAP, calculateTaxFromChargeMap } from "../../../extra/utils/chargeMapping.mjs";
-import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
+import { parseChargesFromArray } from "../../../extra/utils/chargeMapping";
+import { resolveBrands, resolveCustomers } from "../../../extra/utils/vehicleDomain";
+import { logVehicleAudit } from "../../../extra/utils/auditLog";
+import { findMergeCandidate, mergeVehicles } from "../../../extra/utils/vehicleMerge";
 
 /**
  * POST /api/createVehiclesFromInvoice
@@ -35,33 +37,6 @@ import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
  *   vehicles: []
  * }
  */
-
-// Parse charges array into flat object with DB column names
-const parseCharges = (charges) => {
-  const result = {};
-
-  if (!Array.isArray(charges)) return result;
-
-  for (const charge of charges) {
-    const dbColumn = CHARGE_TYPE_MAP[charge.type];
-    if (dbColumn && charge.amount != null) {
-      const amount = parseFloat(charge.amount);
-      if (!isNaN(amount)) {
-        // If same column already has a value, add to it (e.g., multiple "other_fee" entries)
-        result[dbColumn] = (result[dbColumn] || 0) + amount;
-      }
-    }
-  }
-
-  // Calculate taxSum and totalCost using shared logic
-  if (Object.keys(result).length > 0) {
-    const { taxSum, totalCost } = calculateTaxFromChargeMap(result);
-    result.taxSum = taxSum;
-    result.totalCost = totalCost;
-  }
-
-  return result;
-};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -99,79 +74,9 @@ export default async function handler(req, res) {
     vehicles: [],
   };
 
-  // --- Pre-load all brands into a Map (eliminates N+1 per vehicle) ---
-  const allBrands = await prisma.brand.findMany({ select: { id: true, name: true } });
-  const brandMap = new Map(allBrands.map(b => [b.name, b.id]));
-
-  // Ensure default brand exists
-  if (!brandMap.has("-")) {
-    const created = await prisma.brand.create({ data: { name: "-" } });
-    brandMap.set("-", created.id);
-  }
-  const defaultBrandId = brandMap.get("-");
-
-  // --- Collect unique brand names that need to be created ---
-  const newBrandNames = new Set();
-  for (const v of vehicles) {
-    const name = v.brand?.trim();
-    if (name && name !== "" && !brandMap.has(name)) {
-      newBrandNames.add(name);
-    }
-  }
-
-  // Batch-create missing brands (with race condition protection)
-  if (newBrandNames.size > 0) {
-    for (const name of newBrandNames) {
-      try {
-        const created = await prisma.brand.create({ data: { name } });
-        brandMap.set(name, created.id);
-      } catch (e) {
-        if (e.code === "P2002") {
-          const existing = await prisma.brand.findUnique({ where: { name } });
-          if (existing) brandMap.set(name, existing.id);
-        } else {
-          throw e;
-        }
-      }
-    }
-  }
-
-  // --- Pre-load customers and auto-create missing ones ---
-  const customerNames = new Set();
-  for (const v of vehicles) {
-    const cn = v.customer?.trim();
-    if (cn) customerNames.add(cn);
-  }
-
-  const customerMap = new Map();
-  if (customerNames.size > 0) {
-    const existingCustomers = await prisma.customer.findMany({
-      where: { companyId: session.companyId, name: { in: [...customerNames] } },
-      select: { id: true, name: true },
-    });
-    for (const c of existingCustomers) customerMap.set(c.name.toLowerCase(), c.id);
-
-    for (const name of customerNames) {
-      if (!customerMap.has(name.toLowerCase())) {
-        try {
-          const created = await prisma.customer.create({
-            data: { name, companyId: session.companyId, uniqueId: `INV-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` },
-          });
-          customerMap.set(name.toLowerCase(), created.id);
-        } catch (e) {
-          if (e.code === "P2002") {
-            const existing = await prisma.customer.findFirst({
-              where: { companyId: session.companyId, name: { equals: name, mode: "insensitive" } },
-              select: { id: true },
-            });
-            if (existing) customerMap.set(name.toLowerCase(), existing.id);
-          } else {
-            throw e;
-          }
-        }
-      }
-    }
-  }
+  // --- Resolve brands and customers (shared domain logic) ---
+  const { brandMap, defaultBrandId } = await resolveBrands(prisma, vehicles.map(v => v.brand));
+  const customerMap = await resolveCustomers(prisma, session.companyId, vehicles.map(v => v.customer), "INV");
 
   // --- Process vehicles using upsert (1 query per vehicle instead of 2-3) ---
   for (const vehicle of vehicles) {
@@ -194,11 +99,67 @@ export default async function handler(req, res) {
       const brandName = vehicle.brand?.trim();
       const brandId = (brandName && brandMap.get(brandName)) || defaultBrandId;
 
-      const chargeData = parseCharges(vehicle.charges);
+      const chargeData = parseChargesFromArray(vehicle.charges);
 
       // Customer lookup
       const customerName = vehicle.customer?.trim() || null;
       const customerId = customerName ? (customerMap.get(customerName.toLowerCase()) || null) : null;
+
+      // ── Merge detection: check if a different vehicle matches by chassisKey+lot+auction ──
+      const mergeCandidate = await findMergeCandidate(prisma, {
+        companyId: session.companyId,
+        chassisNumber,
+        lotNumber: vehicle.lot_number || null,
+        auction: auctionName,
+      });
+
+      if (mergeCandidate && mergeCandidate.chassisNumber !== chassisNumber) {
+        try {
+          const mergeResult = await mergeVehicles(prisma, {
+            source: "invoice",
+            newData: {
+              chassisNumber,
+              lotNumber: vehicle.lot_number || null,
+              auction: auctionName,
+              auctionDate: vehicle.auction_date || null,
+              brandId,
+              customerId: customerId || null,
+              sourceInvoiceJobId: invoiceJobId,
+              ...chargeData,
+            },
+            existing: mergeCandidate,
+            actorId: session.id,
+            mergeSource: `invoiceJob:${invoiceJobId}`,
+          });
+
+          logVehicleAudit(prisma, {
+            vehicleId: mergeResult.survivorId,
+            action: "merge",
+            actor: "user",
+            actorId: session.id,
+            source: `invoiceJob:${invoiceJobId}`,
+            metadata: {
+              absorbedId: mergeResult.absorbedId,
+              absorbedChassis: mergeCandidate.chassisNumber,
+              chargeSource: mergeResult.chargeSource,
+              fieldsChanged: mergeResult.fieldsChanged,
+              relocationCounts: mergeResult.relocationCounts,
+            },
+          });
+
+          results.updated++;
+          results.vehicles.push({
+            id: mergeResult.survivorId,
+            chassisNumber: mergeResult.chassisNumberUsed,
+            action: "merged",
+            mergedFrom: mergeCandidate.chassisNumber,
+          });
+          continue;
+        } catch (mergeErr) {
+          console.error(`Merge failed for ${chassisNumber}, falling back to upsert:`, mergeErr);
+          // Fall through to normal upsert
+        }
+      }
 
       // Single upsert instead of findUnique + update/create
       const result = await prisma.vehicle.upsert({
@@ -214,7 +175,7 @@ export default async function handler(req, res) {
           lotNumber: vehicle.lot_number || undefined,
           brandId,
           sourceInvoiceJobId: invoiceJobId,
-          updatedById: session.id,
+          updatedById: parseInt(session.id, 10) || null,
           ...(customerId ? { customerId } : {}),
           ...chargeData,
         },
@@ -226,7 +187,7 @@ export default async function handler(req, res) {
           brandId,
           companyId: session.companyId,
           sourceInvoiceJobId: invoiceJobId,
-          createdById: session.id,
+          createdById: parseInt(session.id, 10) || null,
           ...(customerId ? { customerId } : {}),
           ...chargeData,
         },

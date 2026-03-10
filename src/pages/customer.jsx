@@ -1,15 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Head from "next/head";
-import { useAuth, API, useConfirm, Error, CustomButton, Loader, Toast,DataTable } from "@/hooks/wrapper";
+import { useAuth, API, useConfirm, Error, CustomButton, Loader, Toast, DataTable, usePaginatedList, queryKeys } from "@/hooks/wrapper";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
-import { Plus, Edit, Trash2, UserCheck, Building, EyeOff, Eye,Car } from "lucide-react";
+import { Plus, Edit, Trash2, UserCheck, Building, EyeOff, Eye, Car } from "lucide-react";
 
 export default function Customers() {
   const { session } = useAuth(["view:customer"]);
   const { confirm, ConfirmComponent } = useConfirm();
+  const queryClient = useQueryClient();
 
-  const [customers, setCustomers] = useState([]);
+  // ── Data fetching (React Query) ──
+  const {
+    items: customers, total, isLoading, error: listError,
+    handleSearch, handleSort, handlePageChange, sortBy, sortOrder,
+  } = usePaginatedList(queryKeys.customers, "customer", {
+    select: (res) => ({
+      items: res.customer || [],
+      total: res.total || 0,
+    }),
+  });
 
+  // ── Form state ──
   const [name, setName] = useState("");
   const [username, setUserName] = useState("");
   const [password, setPassword] = useState("");
@@ -18,63 +30,14 @@ export default function Customers() {
 
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [customLoader, setCustomLoader] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
-  // Pagination and search states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [perPage, setPerPage] = useState(5);
-  const [search, setSearch] = useState("");
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["customers"] });
 
-  // Sorting state managed by parent
-  const [sortBy, setSortBy] = useState("id");
-  const [sortOrder, setSortOrder] = useState("asc");
-
-  useEffect(() => {
-    loadData();
-  }, [currentPage, perPage, search, sortBy, sortOrder]); 
   const showToast = (message, type = "success") => {
     setToast({ id: Date.now(), message, type });
-  };
-
-  const loadData = async () => {
-    setIsLoading(true);
-    const params = new URLSearchParams({
-      page: currentPage.toString(),
-      limit: perPage.toString(),
-      search: search.toString(),
-      sortBy: sortBy.toString(),
-      sortOrder: sortOrder.toString(),
-    });
-
-    const data = await API("GET", `customer?${params}`);
-    if (data.error) {
-      setError(data.error);
-      setIsLoading(false);
-      return;
-    }
-    setError("");
-    setCustomers(data.customer);
-    setTotal(data.total);
-    setIsLoading(false);
-  };
-
-  const handleSort = (column, order) => {
-    setSortBy(column);
-    setSortOrder(order);
-  };
-
-  const handleSearch = search => {
-    setSearch(search);
-    setCurrentPage(1); // Reset to first page on search
-  };
-
-  const handlePageChange = (page, perPageValue) => {
-    setCurrentPage(page);
-    setPerPage(perPageValue);
   };
 
   const editData = async () => {
@@ -98,7 +61,6 @@ export default function Customers() {
       return;
     }
 
-    // If username is provided, password is required too (and vice versa)
     if ((newCustomer.username && !newCustomer.password) || (!newCustomer.username && newCustomer.password)) {
       setError("Both username and password are required to create a login account");
       return;
@@ -125,7 +87,7 @@ export default function Customers() {
     }
 
     resetForm();
-    loadData();
+    invalidate();
   };
 
   const loadEdit = async id => {
@@ -136,7 +98,6 @@ export default function Customers() {
       setCustomLoader(false);
       return;
     }
-    setIsLoading(false);
     setName(data.name);
     setUserName(data.username || "");
     setCountry(data.country || "");
@@ -164,7 +125,7 @@ export default function Customers() {
       return;
     }
     showToast(data.message, "success");
-    loadData();
+    invalidate();
     setCustomLoader(false);
   };
 
@@ -177,7 +138,6 @@ export default function Customers() {
     setError("");
     setEdit(null);
     setCustomLoader(false);
-    setIsLoading(false);
   };
 
   return (
@@ -199,7 +159,6 @@ export default function Customers() {
                 </div>
                 <h1 className="text-3xl font-bold text-[var(--foreground)]">Customer Management</h1>
               </div>
-              {/* Add Customer Button */}
               <CustomButton title="Add Customer" onClick={() => setEdit(0)} className="btn-primary" icon={<Plus className="w-5 h-5" />} />
             </div>
             <p className="text-[var(--secondary-foreground)]">Manage and oversee all customers in your platform</p>
@@ -217,11 +176,7 @@ export default function Customers() {
                       type="text"
                       value={name}
                       onChange={e => setName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") {
-                          editData();
-                        }
-                      }}
+                      onKeyDown={e => { if (e.key === "Enter") editData(); }}
                       placeholder="Enter customer name..."
                       className="input-style"
                       autoFocus
@@ -231,28 +186,17 @@ export default function Customers() {
                       type="text"
                       value={username}
                       onChange={e => setUserName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") {
-                          editData();
-                        }
-                      }}
+                      onKeyDown={e => { if (e.key === "Enter") editData(); }}
                       placeholder="Enter user name..."
                       className="input-style"
-                      autoFocus
                     />
-
-                  
 
                     <label className="input-label">Unique ID *</label>
                     <input
                       type="text"
                       value={uniqueId}
                       onChange={e => setUniqueId(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") {
-                          editData();
-                        }
-                      }}
+                      onKeyDown={e => { if (e.key === "Enter") editData(); }}
                       placeholder="Enter unique identifier..."
                       className="input-style"
                     />
@@ -262,11 +206,7 @@ export default function Customers() {
                       type="text"
                       value={country}
                       onChange={e => setCountry(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === "Enter") {
-                          editData();
-                        }
-                      }}
+                      onKeyDown={e => { if (e.key === "Enter") editData(); }}
                       placeholder="Enter country (optional)..."
                       className="input-style"
                     />
@@ -276,17 +216,10 @@ export default function Customers() {
                         type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") {
-                            editData();
-                          }
-                        }}
+                        onKeyDown={e => { if (e.key === "Enter") editData(); }}
                         placeholder="Enter password..."
                         className="input-style"
-                        autoFocus
                       />
-
-                      {/* Eye Icon */}
                       <CustomButton
                         title={showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                         onClick={() => setShowPassword(!showPassword)}
@@ -297,7 +230,6 @@ export default function Customers() {
                   <Error message={error} />
                   <div className="flex gap-3">
                     <CustomButton title={edit === 0 ? "Add Customer" : "Save Changes"} onClick={editData} className="btn-primary" />
-
                     <CustomButton
                       title="Cancel"
                       onClick={() => resetForm()}
@@ -334,10 +266,9 @@ export default function Customers() {
               </div>
             </div>
           </div>
-          <Error message={error} />
+          <Error message={listError || error} />
           {customLoader && <Loader />}
 
-          {/* DataTable with JSX children */}
           <DataTable
             data={customers}
             total={total}
@@ -350,7 +281,6 @@ export default function Customers() {
             sortBy={sortBy}
             sortOrder={sortOrder}
           >
-            {/* Table Headers with sortable IDs */}
             <thead className="bg-[var(--secondary)]">
               <tr>
                 <th id="id">ID</th>
@@ -363,7 +293,6 @@ export default function Customers() {
               </tr>
             </thead>
 
-            {/* Table Body with data rows */}
             <tbody>
               {customers.map(customer => (
                 <tr key={customer.id} className="hover:bg-[var(--input)] transition-colors duration-200">
@@ -388,7 +317,6 @@ export default function Customers() {
                       <span className="text-sm text-[var(--foreground)]">{customer.country || "-"}</span>
                     </div>
                   </td>
-
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
                       <Car className="w-4 h-4 text-[var(--secondary-foreground)]" />
@@ -403,14 +331,14 @@ export default function Customers() {
                     <div className="flex items-center justify-end gap-2">
                       <button
                         onClick={() => loadEdit(customer.id)}
-                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)]
                                  hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => deleteIt(customer.id)}
-                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
+                        className="p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)]
                                hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -424,7 +352,6 @@ export default function Customers() {
         </div>
       </Sidebar>
 
-      {/* Confirmation Modal */}
       <ConfirmComponent />
       <Toast id={toast.id} type={toast.type} message={toast.message} onClose={() => setToast({ id: 0, message: "", type: "success" })} />
     </>

@@ -7,7 +7,7 @@ const getSession = async (req, res) => {
   const session = await getServerSession(req, res, authOptions);
 
   if (!session || !session.user) {
-    res.status(500).json({ error: "Unauthorized or session missing" });
+    res.status(401).json({ error: "Unauthorized or session missing" });
     throw new Error("No session");
   }
 

@@ -1,7 +1,7 @@
 import { prisma, getSession } from "@/lib/useful";
 import { putFile, deleteFile } from "@/lib/blob.mjs";
 import multer from "multer";
-import { logVehicleAudit } from "../../../extra/utils/auditLog.mjs";
+import { logVehicleAudit } from "../../../extra/utils/auditLog";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -39,8 +39,7 @@ const parseFormData = req =>
     });
   });
 
-// File upload function
-const uploadFileToAzure = async (file, folderPath = "payment/") => {
+const uploadFile = async (file, folderPath = "payment/") => {
   if (!file) {
     return { uploadedFile: null, fileUploaded: false, error: null };
   }
@@ -152,6 +151,11 @@ export default async function handler(req, res) {
           return res.status(404).json({ error: "Payment not found" });
         }
 
+        // Tenant isolation: non-Sadmin can only see own company's payments
+        if (session.role !== "Sadmin" && payment.vehicle?.companyId !== session.companyId) {
+          return res.status(404).json({ error: "Payment not found" });
+        }
+
         // Remove vehicle data from response, keep only payment data
         const { vehicle, ...paymentData } = payment;
         return res.json(paymentData);
@@ -166,6 +170,11 @@ export default async function handler(req, res) {
         });
 
         if (!vehicle) {
+          return res.status(404).json({ error: "Vehicle not found or access denied" });
+        }
+
+        // Tenant isolation: non-Sadmin can only access own company's vehicles
+        if (session.role !== "Sadmin" && vehicle.companyId !== session.companyId) {
           return res.status(404).json({ error: "Vehicle not found or access denied" });
         }
 
@@ -251,7 +260,7 @@ export default async function handler(req, res) {
       let uploadError = null;
 
       if (req.file) {
-        const uploadResult = await uploadFileToAzure(req.file, "payment/");
+        const uploadResult = await uploadFile(req.file, "payment/");
 
         if (uploadResult.fileUploaded) {
           fileUrl = uploadResult.uploadedFile.url;
@@ -338,7 +347,7 @@ export default async function handler(req, res) {
 
       // Handle new file upload (this takes precedence over removal)
       if (req.file) {
-        const uploadResult = await uploadFileToAzure(req.file, "payment/");
+        const uploadResult = await uploadFile(req.file, "payment/");
 
         if (uploadResult.fileUploaded) {
           if (!oldFileUrl) {
@@ -377,9 +386,9 @@ export default async function handler(req, res) {
       if (oldFileUrl && (fileUploaded || removeDocument === "true")) {
         try {
           await deleteFile(oldFileUrl);
-          console.log(`✅ Deleted old payment file from Azure: ${oldFileUrl}`);
+          console.log(`✅ Deleted old payment file from storage: ${oldFileUrl}`);
         } catch (error) {
-          console.error(`❌ Failed to delete old payment file from Azure: ${oldFileUrl}`, error);
+          console.error(`❌ Failed to delete old payment file from storage: ${oldFileUrl}`, error);
         }
       }
 
@@ -423,7 +432,7 @@ export default async function handler(req, res) {
       // Delete the payment from database
       await prisma.vehiclePayments.delete({ where: { id } });
 
-      // Clean up file from Azure Blob Storage if it exists
+      // Clean up file from storage Blob Storage if it exists
       let fileDeleted = false;
       let fileDeletionError = null;
 
@@ -431,9 +440,9 @@ export default async function handler(req, res) {
         try {
           await deleteFile(payment.url);
           fileDeleted = true;
-          console.log(`✅ Deleted payment file from Azure: ${payment.url}`);
+          console.log(`✅ Deleted payment file from storage: ${payment.url}`);
         } catch (error) {
-          console.error(`❌ Failed to delete payment file from Azure: ${payment.url}`, error);
+          console.error(`❌ Failed to delete payment file from storage: ${payment.url}`, error);
           fileDeletionError = {
             fileUrl: payment.url,
             error: error.message,

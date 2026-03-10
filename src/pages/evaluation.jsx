@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Head from "next/head";
-import { useAuth, API, Error, Toast, Loader } from "@/hooks/wrapper";
+import { useAuth, API, Error, Toast, Loader, queryKeys } from "@/hooks/wrapper";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
 import { FlaskConical, Star, StarOff, Play, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 
@@ -19,28 +20,25 @@ function ScoreBadge({ score }) {
 
 export default function EvaluationPage() {
   const { session, status } = useAuth(["view:vehicle"], ["Sadmin"]);
-  const [goldenRecords, setGoldenRecords] = useState([]);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evalResults, setEvalResults] = useState(null);
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
 
-  const loadGoldenRecords = useCallback(async () => {
-    setIsLoading(true);
-    setError("");
-    const res = await API("GET", "evaluationDataset");
-    if (res.error) {
-      setError(res.error);
-    } else {
-      setGoldenRecords(res.records || []);
-    }
-    setIsLoading(false);
-  }, []);
+  // ── Data fetching (React Query) ──
+  const { data: evalData, isLoading, error: queryError } = useQuery({
+    queryKey: queryKeys.evaluation(),
+    queryFn: async () => {
+      const res = await API("GET", "evaluationDataset");
+      if (res.error) throw new Error(res.error);
+      return res;
+    },
+    enabled: status === "authenticated",
+  });
 
-  useEffect(() => {
-    if (status === "authenticated") loadGoldenRecords();
-  }, [status, loadGoldenRecords]);
+  const goldenRecords = evalData?.records || [];
+  const error = queryError?.message || "";
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["evaluation"] });
 
   const toggleGolden = async (id, currentlyGolden) => {
     const res = await API("PATCH", "paymentConfirmation", { id, isGolden: !currentlyGolden });
@@ -48,7 +46,7 @@ export default function EvaluationPage() {
       setToast({ id: Date.now(), message: res.error, type: "error" });
     } else {
       setToast({ id: Date.now(), message: currentlyGolden ? "Removed from golden dataset" : "Added to golden dataset", type: "success" });
-      loadGoldenRecords();
+      invalidate();
     }
   };
 

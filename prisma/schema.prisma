@@ -20,6 +20,8 @@ model Company {
   InvoiceJobs   InvoiceJobs[]
   customers Customer[]
   promptVersions PromptVersion[]
+  exportTemplates ExportTemplate[]
+  gmailAccount GmailAccount?
 }
 
 model Customer {
@@ -132,9 +134,14 @@ model Vehicle {
   height    Int?              // cm
   m3        Decimal?  @db.Decimal(8, 2)  // cubic meters (L×W×H ÷ 1,000,000)
 
-  // Audit trail
-  createdById   String?   // User ID who created this vehicle
-  updatedById   String?   // User ID who last updated this vehicle
+  // Audit trail (Int — matches User.id; no FK relation since Sadmin may not have a User record)
+  createdById   Int?
+  updatedById   Int?
+
+  // Merge tracking
+  mergedAt      DateTime?   // Non-null = this vehicle was merged (drives UI highlight)
+  mergedFromId  Int?        // ID of the absorbed vehicle (reference only, not FK)
+  mergedFields  Json?       // Snapshot: { chargeSource, fieldsChanged, absorbedChassisNumber, source }
 
   // Relations
   brand         Brand         @relation(fields: [brandId], references: [id])
@@ -147,6 +154,7 @@ model Vehicle {
 
   @@unique([companyId, chassisNumber])
   @@index([companyId])
+  @@index([companyId, lotNumber, auction])
   @@index([sourceInvoiceJobId])
   @@index([brandId])
   @@index([customerId])
@@ -197,13 +205,15 @@ model PaymentConfirmation {
   isGolden     Boolean  @default(false)
   embedding    Json?    // Gemini text-embedding vector for few-shot similarity search
   invoiceJobId Int?
-  reviewedById String?  // User ID who reviewed/saved this extraction
+  invoiceJob   InvoiceJobs? @relation("PaymentConfirmationInvoiceJob", fields: [invoiceJobId], references: [id])
+  reviewedById Int?     // User ID who reviewed/saved this extraction
   companyId   Int
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
 
   @@index([companyId])
   @@index([companyId, auctionHouse])
+  @@index([companyId, isGolden])
   @@index([invoiceJobId])
 }
 
@@ -213,7 +223,7 @@ model InvoiceJobs {
   Json        Json?    // Extraction result for this page
   companyId   Int
   isEvaluated Boolean   @default(false)
-  status      String   @default("pending")  // pending, processing, completed, failed, empty, needs_classification
+  status      JobStatus @default(pending)
   totalPages  Int?     // Total page count in PDF (legacy, kept for backwards compat)
   docType     String   @default("invoice")  // invoice, export_cert, inspection_cert, temp_cancel, unknown
 
@@ -225,6 +235,7 @@ model InvoiceJobs {
   company     Company  @relation(fields: [companyId], references: [id])
   createdAt   DateTime @default(now())
   vehicles    Vehicle[]  // Vehicles created from this invoice
+  paymentConfirmations PaymentConfirmation[] @relation("PaymentConfirmationInvoiceJob")
 
   @@index([companyId])
   @@index([companyId, docType])
@@ -272,7 +283,69 @@ model VehicleAuditLog {
   @@index([vehicleId, createdAt])
 }
 
+model ExportTemplate {
+  id                  Int      @id @default(autoincrement())
+  name                String
+  companyId           Int
+  createdById         Int?
+  columns             Json     // string[] — ordered vehicle column IDs
+  computedColumns     Json     @default("[]") // ComputedColumn[] — token-based formulas
+  footerRows          Json     @default("[]") // FooterRow[] — labels for blank amount rows
+  showContainerNumber Boolean  @default(true)
+  showDate            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  company             Company  @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model GmailAccount {
+  id            Int      @id @default(autoincrement())
+  companyId     Int      @unique
+  email         String
+  refreshToken  String
+  lastHistoryId String?
+  ussPassword   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  emails        EmailMessage[]
+}
+
+model EmailMessage {
+  id              Int       @id @default(autoincrement())
+  gmailAccountId  Int
+  gmailMessageId  String
+  subject         String?
+  fromAddress     String?
+  receivedAt      DateTime?
+  attachmentUrl   String?
+  status          String    @default("pending")
+  skipReason      String?
+  documentJobId   Int?
+  createdAt       DateTime  @default(now())
+
+  gmailAccount    GmailAccount @relation(fields: [gmailAccountId], references: [id])
+
+  @@unique([gmailAccountId, gmailMessageId])
+  @@index([gmailAccountId])
+  @@index([status])
+}
+
 enum CompanyStatus {
   active
   inactive
+}
+
+enum JobStatus {
+  pending
+  processing
+  completed
+  failed
+  empty
+  needs_classification
 }

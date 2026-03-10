@@ -3,7 +3,9 @@ import { prisma } from "../PrismaClient/prismaClient.mjs";
 import { downloadFile, deleteFile } from "../../src/lib/blob.mjs";
 import csv from "csv-parser";
 import { parseChargeFieldsFromFlat, parseMetadataFromCSV } from "../utils/chargeMapping.mjs";
+import { resolveBrands, resolveCustomers } from "../utils/vehicleDomain.mjs";
 import { logVehicleAudit } from "../utils/auditLog.mjs";
+import { findMergeCandidate, mergeVehicles } from "../utils/vehicleMerge.mjs";
 
 let boss;
 
@@ -25,204 +27,160 @@ let boss;
         throw err;
       }
 
-      const results = [];
       let count = 0;
+      const stream = await downloadFile(filePath);
+      const parser = csv({
+        mapHeaders: ({ header }) => header.trim().toLowerCase().replace(/\s+/g, "_"),
+      });
 
-      return new Promise(async (resolve, reject) => {
-        const stream = await downloadFile(filePath);
-        const parser = csv({
-          mapHeaders: ({ header }) => header.trim().toLowerCase().replace(/\s+/g, "_"),
+      try {
+        // Step 1: Collect all CSV rows via stream
+        const results = await new Promise((resolve, reject) => {
+          const rows = [];
+          stream
+            .pipe(parser)
+            .on("data", data => rows.push(data))
+            .on("end", () => resolve(rows))
+            .on("error", reject);
         });
 
-        stream
-          .pipe(parser)
-          .on("data", data => results.push(data))
-          .on("end", async () => {
-            try {
-              // --- Pre-load brands & customers to avoid N+1 per row ---
-              const allBrands = await prisma.brand.findMany({ select: { id: true, name: true } });
-              const brandMap = new Map(allBrands.map(b => [b.name, b.id]));
-              if (!brandMap.has("-")) {
-                const created = await prisma.brand.create({ data: { name: "-" } });
-                brandMap.set("-", created.id);
-              }
+        // Step 2: Resolve brands & customers (shared domain logic)
+        const { brandMap } = await resolveBrands(prisma, results.map(r => r["brand"]));
+        const customerMap = await resolveCustomers(prisma, Number(companyId), results.map(r => r["customer"]), "CSV");
 
-              // Collect unique brand names and customer names from CSV
-              const newBrandNames = new Set();
-              const customerNames = new Set();
-              for (const row of results) {
-                const bn = row["brand"]?.trim();
-                if (bn && bn !== "" && !brandMap.has(bn)) newBrandNames.add(bn);
-                const cn = row["customer"]?.trim();
-                if (cn) customerNames.add(cn);
-              }
+        // Step 3: Process rows in batches of 50
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < results.length; i += BATCH_SIZE) {
+          const batch = results.slice(i, i + BATCH_SIZE);
+          const ops = [];
 
-              // Batch create missing brands (with race condition protection)
-              for (const name of newBrandNames) {
-                try {
-                  const created = await prisma.brand.create({ data: { name } });
-                  brandMap.set(name, created.id);
-                } catch (e) {
-                  if (e.code === "P2002") {
-                    // Brand was created by concurrent upload, fetch it
-                    const existing = await prisma.brand.findUnique({ where: { name } });
-                    if (existing) brandMap.set(name, existing.id);
-                  } else {
-                    throw e;
-                  }
-                }
-              }
+          for (const row of batch) {
+            const lotNumber = row["lot_number"] || null;
+            const auction = row["auction"] || null;
+            const rawChassis = row["chassis_number"]?.trim() || null;
+            const chassisNumber = rawChassis ? rawChassis.replace(/\s+/g, "-") : null;
+            const brandName = row["brand"]?.trim() || null;
 
-              // Batch load customers (scoped to company)
-              const customerMap = new Map();
-              let newCustomerCount = 0;
-              if (customerNames.size > 0) {
-                const existingCustomers = await prisma.customer.findMany({
-                  where: {
-                    companyId: Number(companyId),
-                    name: { in: [...customerNames], mode: "insensitive" },
-                  },
-                  select: { id: true, name: true },
-                });
-                for (const c of existingCustomers) customerMap.set(c.name.toLowerCase(), c.id);
+            if (!chassisNumber) continue;
 
-                // Auto-create missing customers (with race condition protection)
-                for (const name of customerNames) {
-                  if (!customerMap.has(name.toLowerCase())) {
-                    try {
-                      const created = await prisma.customer.create({
-                        data: {
-                          name,
-                          companyId: Number(companyId),
-                          uniqueId: `CSV-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                        },
-                      });
-                      customerMap.set(name.toLowerCase(), created.id);
-                      newCustomerCount++;
-                    } catch (e) {
-                      if (e.code === "P2002") {
-                        // Customer was created by concurrent upload, fetch it
-                        const existing = await prisma.customer.findFirst({
-                          where: { companyId: Number(companyId), name: { equals: name, mode: "insensitive" } },
-                          select: { id: true },
-                        });
-                        if (existing) customerMap.set(name.toLowerCase(), existing.id);
-                      } else {
-                        throw e;
-                      }
-                    }
-                  }
-                }
-              }
+            const brandId = (brandName && brandMap.get(brandName)) || brandMap.get("-");
+            const charges = parseChargeFieldsFromFlat(row);
+            const metadata = parseMetadataFromCSV(row);
 
-              // --- Process rows in a transaction (batch of 50) ---
-              const BATCH_SIZE = 50;
-              for (let i = 0; i < results.length; i += BATCH_SIZE) {
-                const batch = results.slice(i, i + BATCH_SIZE);
-                const ops = [];
+            const customerName = row["customer"]?.trim() || null;
+            const customerId = customerName ? (customerMap.get(customerName.toLowerCase()) || null) : null;
 
-                for (const row of batch) {
-                  const lotNumber = row["lot_number"] || null;
-                  const auction = row["auction"] || null;
-                  const rawChassis = row["chassis_number"]?.trim() || null;
-                  const chassisNumber = rawChassis ? rawChassis.replace(/\s+/g, "-") : null;
-                  const brandName = row["brand"]?.trim() || null;
-
-                  if (!chassisNumber) continue;
-
-                  const brandId = (brandName && brandMap.get(brandName)) || brandMap.get("-");
-                  const charges = parseChargeFieldsFromFlat(row);
-                  const metadata = parseMetadataFromCSV(row);
-
-                  const customerName = row["customer"]?.trim() || null;
-                  const customerId = customerName ? (customerMap.get(customerName.toLowerCase()) || null) : null;
-
-                  ops.push(
-                    prisma.vehicle.upsert({
-                      where: {
-                        companyId_chassisNumber: {
-                          companyId: Number(companyId),
-                          chassisNumber,
-                        },
-                      },
-                      update: {
-                        lotNumber,
-                        auction,
-                        brandId,
-                        companyId,
-                        updatedById: userId ? String(userId) : null,
-                        ...(customerId ? { customerId } : {}),
-                        ...charges,
-                        ...metadata,
-                      },
-                      create: {
-                        lotNumber,
-                        auction,
-                        chassisNumber,
-                        brandId,
-                        companyId,
-                        createdById: userId ? String(userId) : null,
-                        ...(customerId ? { customerId } : {}),
-                        ...charges,
-                        ...metadata,
-                      },
-                    })
-                  );
-                }
-
-                if (ops.length > 0) {
-                  const batchResults = await prisma.$transaction(ops);
-                  count += ops.length;
-
-                  // Audit trail — log each upserted vehicle (fire-and-forget)
-                  for (const v of batchResults) {
-                    const wasCreated = v.createdAt?.getTime() === v.updatedAt?.getTime();
-                    logVehicleAudit(prisma, {
-                      vehicleId: v.id,
-                      action: wasCreated ? "create" : "update",
-                      actor: "csv_import",
-                      actorId: userId ? String(userId) : null,
-                      source: `csv:${filePath}`,
-                    });
-                  }
-                }
-              }
-              resolve({ processed: count });
-            } catch (error) {
-              console.log({ error: "Database insert/update failed" });
-              reject(error);
-            } finally {
-              try {
-                await deleteFile(filePath);
-              } catch (deleteError) {
-                console.warn("Failed to delete blob:", deleteError.message);
-              }
-
-              results.length = 0;
-
-              if (stream && typeof stream.destroy === "function") {
-                stream.destroy();
-              }
-              if (parser && typeof parser.destroy === "function") {
-                parser.destroy();
-              }
-            }
-          })
-          .on("error", error => {
-            deleteFile(filePath).catch(deleteError => {
-              console.warn("Failed to delete blob on error:", deleteError.message);
+            // ── Merge detection: check if a different vehicle matches by chassisKey+lot+auction ──
+            const mergeCandidate = await findMergeCandidate(prisma, {
+              companyId: Number(companyId),
+              chassisNumber,
+              lotNumber,
+              auction,
             });
 
-            results.length = 0;
-            if (stream && typeof stream.destroy === "function") {
-              stream.destroy();
+            if (mergeCandidate && mergeCandidate.chassisNumber !== chassisNumber) {
+              try {
+                const mergeResult = await mergeVehicles(prisma, {
+                  source: "csv",
+                  newData: {
+                    chassisNumber,
+                    lotNumber,
+                    auction,
+                    brandId,
+                    customerId: customerId || null,
+                    ...charges,
+                    ...metadata,
+                  },
+                  existing: mergeCandidate,
+                  actorId: userId ? String(userId) : null,
+                  mergeSource: `csv:${filePath}`,
+                });
+
+                logVehicleAudit(prisma, {
+                  vehicleId: mergeResult.survivorId,
+                  action: "merge",
+                  actor: "csv_import",
+                  actorId: userId ? String(userId) : null,
+                  source: `csv:${filePath}`,
+                  metadata: {
+                    absorbedId: mergeResult.absorbedId,
+                    absorbedChassis: mergeCandidate.chassisNumber,
+                    chargeSource: mergeResult.chargeSource,
+                    fieldsChanged: mergeResult.fieldsChanged,
+                    relocationCounts: mergeResult.relocationCounts,
+                  },
+                });
+
+                count++;
+                continue; // Skip adding to upsert batch
+              } catch (mergeErr) {
+                console.error(`[vehicle] Merge failed for ${chassisNumber}, falling back to upsert:`, mergeErr);
+                // Fall through to normal upsert
+              }
             }
-            if (parser && typeof parser.destroy === "function") {
-              parser.destroy();
+
+            ops.push(
+              prisma.vehicle.upsert({
+                where: {
+                  companyId_chassisNumber: {
+                    companyId: Number(companyId),
+                    chassisNumber,
+                  },
+                },
+                update: {
+                  lotNumber,
+                  auction,
+                  brandId,
+                  companyId,
+                  updatedById: userId ? parseInt(userId, 10) || null : null,
+                  customerId: customerId || null,
+                  ...charges,
+                  ...metadata,
+                },
+                create: {
+                  lotNumber,
+                  auction,
+                  chassisNumber,
+                  brandId,
+                  companyId,
+                  createdById: userId ? parseInt(userId, 10) || null : null,
+                  ...(customerId ? { customerId } : {}),
+                  ...charges,
+                  ...metadata,
+                },
+              })
+            );
+          }
+
+          if (ops.length > 0) {
+            const batchResults = await prisma.$transaction(ops);
+            count += ops.length;
+
+            // Audit trail — log each upserted vehicle (fire-and-forget)
+            for (const v of batchResults) {
+              const wasCreated = v.createdAt?.getTime() === v.updatedAt?.getTime();
+              logVehicleAudit(prisma, {
+                vehicleId: v.id,
+                action: wasCreated ? "create" : "update",
+                actor: "csv_import",
+                actorId: userId ? String(userId) : null,
+                source: `csv:${filePath}`,
+              });
             }
-            reject(error);
-          });
-      });
+          }
+        }
+
+        return { processed: count };
+      } finally {
+        // Cleanup: always delete blob and destroy streams
+        try {
+          await deleteFile(filePath);
+        } catch (deleteError) {
+          console.warn("Failed to delete blob:", deleteError.message);
+        }
+        if (stream && typeof stream.destroy === "function") stream.destroy();
+        if (parser && typeof parser.destroy === "function") parser.destroy();
+      }
     });
 
   } catch (err) {

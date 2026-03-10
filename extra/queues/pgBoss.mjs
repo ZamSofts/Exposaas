@@ -27,11 +27,16 @@ async function initBoss() {
 export async function ensureQueue(queueName) {
   const b = await initBoss();
 
+  // Create Dead Letter Queue companion first, then main queue with DLQ routing.
+  // pg-boss createQueue is idempotent (INSERT ON CONFLICT DO NOTHING).
+  // Note: DLQ option only takes effect on first creation — pre-existing queues retain their config.
+  const dlqName = `${queueName}__dlq`;
   try {
-    await b.createQueue(queueName);
-    console.log(`✅ ensured queue: ${queueName}`);
+    await b.createQueue(dlqName);
+    await b.createQueue(queueName, { deadLetter: dlqName });
+    console.log(`✅ ensured queue: ${queueName} (DLQ: ${dlqName})`);
   } catch (err) {
-    console.error(`⚠️ failed to create queue ${queueName}:`, err && err.message ? err.message : err);
+    console.error(`⚠️ failed to create queue ${queueName}:`, err?.message || err);
   }
 
   return b;

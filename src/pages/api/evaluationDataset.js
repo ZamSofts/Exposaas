@@ -20,24 +20,27 @@ export default async function handler(req, res) {
         },
       });
 
+      // Batch-fetch related InvoiceJobs to avoid N+1 queries
+      const jobIds = records.map(r => r.invoiceJobId).filter(Boolean);
+      const invoiceJobs = jobIds.length > 0
+        ? await prisma.invoiceJobs.findMany({
+            where: { id: { in: jobIds } },
+            select: { id: true, DocumentURL: true, status: true },
+          })
+        : [];
+      const jobMap = new Map(invoiceJobs.map(j => [j.id, j]));
+
       // Enrich with vehicle count and InvoiceJob info
-      const enriched = [];
-      for (const r of records) {
+      const enriched = records.map(r => {
         let vehicleCount = 0;
         const json = r.Json || {};
         for (const key of Object.keys(json)) {
           if (Array.isArray(json[key])) vehicleCount += json[key].length;
         }
 
-        let invoiceJob = null;
-        if (r.invoiceJobId) {
-          invoiceJob = await prisma.invoiceJobs.findUnique({
-            where: { id: r.invoiceJobId },
-            select: { id: true, DocumentURL: true, status: true },
-          });
-        }
+        const invoiceJob = r.invoiceJobId ? jobMap.get(r.invoiceJobId) : null;
 
-        enriched.push({
+        return {
           id: r.id,
           documentURL: r.DocumentURL,
           page: r.Page,
@@ -47,8 +50,8 @@ export default async function handler(req, res) {
           invoiceJobId: r.invoiceJobId,
           invoiceJobURL: invoiceJob?.DocumentURL || null,
           createdAt: r.createdAt,
-        });
-      }
+        };
+      });
 
       return res.status(200).json({ records: enriched, total: enriched.length });
     }
