@@ -7,6 +7,12 @@
 
 **Problem:** Japanese car exporters manually copy data from auction invoices (PDFs) into Excel. Time-consuming, error-prone.
 
+**How it works:**
+- **Gmail auto-ingestion** → system polls Gmail every 5 min, downloads PDF invoices automatically (including USS decryption)
+- **AI classifies & extracts** → Gemini identifies document type, then extracts structured vehicle data
+- **Human verifies** → confidence-colored review UI for corrections
+- **AI learns** → corrections become training data, accuracy improves over time
+
 **Why AI-Native (not traditional SaaS):**
 - Invoices are **unstructured** (PDFs, not forms) → Need AI extraction
 - **Event-driven** (async processing) → Users don't wait for Gemini
@@ -14,7 +20,7 @@
 - **Learning system** → Feedback improves extraction over time
 
 **Why this matters for you:**
-- Don't build CRUD forms for invoice data - users upload PDFs
+- The primary flow is **automated ingestion from Gmail**, not manual upload (manual upload exists as fallback)
 - Don't expect synchronous responses - use job queues (pg-boss)
 - Always include verification UI - never auto-save AI outputs without review
 
@@ -90,6 +96,5 @@ npx prisma studio     # View data
 - `docs/ARCHITECTURE.md` — Full feature list (19 features), tech stack details
 - `docs/STATUS.md` — Current metrics, changelog, known issues, roadmap
 - `docs/PATTERNS.md` — Important patterns, FAQ, conventions, deep dive references
-- `docs/CASE_STUDIES.md` — Product strategy case studies (Toma, Abridge)
 - `extra/ai/CLAUDE.md` — AI pipeline gotchas, extraction flow, learning loop
 - `extra/workers/CLAUDE.md` — Worker patterns, queues, DLQ, job lifecycle

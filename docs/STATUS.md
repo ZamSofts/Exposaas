@@ -13,14 +13,55 @@
 
 ---
 
+## Business Model: AI BPO (AI Agent with Human)
+
+Exposaasは顧客にSaaSを提供するのではなく、**AI BPOサービス**として運営する。
+
+- **顧客のGmail** → Movfax経由でPDFが自動転送される → システムが自動取込
+- **AIが主体的に処理** → 分類・抽出を自律実行
+- **オペレーター（自分）が確認** → 全顧客のデータを横断的にレビュー・修正
+- **修正がAI学習に反映** → 精度が上がり、人の負担が減る改善サイクル
+
+**設計思想:** "Human with AI tools"（人がAIを呼ぶ）ではなく、"AI Agent with Human"（AIが人を呼ぶ）。`needsApproval: true` の向き先がオペレーター。（参考: LayerX AI BPO定義）
+
+### なぜAI BPOか（3つの戦略的利点）
+
+**1. AIの進化を待たずに今すぐ提供できる**
+AIの能力はギザギザ（Karpathyの「ゴースト」比喩）。AIが苦手な部分は人がカバーし、今この瞬間から業務を完遂する。裏側ではゴールデンデータを蓄積し、AIの進化に伴い自動化範囲を徐々に拡大。**「先に提供し、後から置き換える」**。
+
+**2. デプロイ速度**
+新モデルで能力がアンロックされた時、自社オペレーションを変えるだけで全顧客が恩恵を受ける。SaaSなら各社に「使い方を変えてください」と説得が必要。AI BPOならオペレーション改善が即座に全顧客に反映される。
+
+**3. 営業のシンプル化**
+裏側では分類Agent・抽出Agent・復号Agent等が動くが、顧客には「落札書1枚あたりXX円」で提供。業務コストとの直接比較が可能。シンプルなものはスケールする。
+
+### 課金モデル
+
+- **単位:** 落札書1枚（= 1 PaymentConfirmation）あたりの処理費
+- **裏側のコスト:** Gemini API + Azure Storage + オペレーター時間
+- **スケール:** ゴールデンデータ増加 → AI精度向上 → オペレーター時間減少 → 利益率向上
+
+---
+
 ## Priority Queue
 
-1. ~~**Embedding Few-Shot Selection**~~ Done -- Gemini Embedding API cosine similarity + auto-embed on golden toggle + Soft HITL prompt in SaveResultModal
-2. ~~**Vehicle Audit Trail**~~ Done -- VehicleAuditLog table, 8 instrumented endpoints/workers, History tab UI, fire-and-forget logging
-3. **Golden data accumulation** -- Target: 3+ per major auction house, continue reviewing invoices (SaveResultModal now prompts after every save)
-4. **auctionHouse null cleanup** -- Review 24 records, assign auction names
-5. **Payment Deadline Tracking** -- Auto-calculate due dates based on auction-specific rules (e.g., "USS → Next Monday")
-6. **Customer Billing (future)** -- CustomerCharge table, separate from VehicleCharge acquisition costs
+### Tier 1: オペレーション効率（今すぐ必要）
+1. **オペレーター管理画面** -- 全社横断のワークキュー（未レビューインボイス一覧）、会社切り替え不要の統合ビュー、連続レビューフロー
+2. **Golden data accumulation** -- Target: 3+ per major auction house, continue reviewing invoices
+3. **auctionHouse null cleanup** -- Review 24 records, assign auction names
+
+### Tier 2: データモート（中期）
+4. **ExtractionDiff テーブル** -- フィールド別・オークション別の抽出精度を構造化して集計可能に
+5. **市場インテリジェンスAPI** -- 車両価格・手数料の時系列集計（将来の追加価値）
+6. **ドキュメントライフサイクル** -- 車両ごとの書類完備状況（落札書・輸出抹消・車検証）
+
+### Tier 3: 拡張（顧客が求めてから）
+7. **Payment Deadline Tracking** -- Auto-calculate due dates based on auction-specific rules
+8. **Customer Billing** -- CustomerCharge table, separate from VehicleCharge acquisition costs
+
+### Done
+- ~~**Embedding Few-Shot Selection**~~ -- Gemini Embedding API cosine similarity + auto-embed on golden toggle + Soft HITL prompt in SaveResultModal
+- ~~**Vehicle Audit Trail**~~ -- VehicleAuditLog table, 8 instrumented endpoints/workers, History tab UI, fire-and-forget logging
 
 ---
 
