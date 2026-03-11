@@ -75,7 +75,7 @@ async function callGeminiWithRetry(ai, request, pageNumber = 0) {
         RETRY_CONFIG.maxDelayMs
       );
       const delayMs = extractedDelay || exponentialDelay;
-
+      console.warn(`⚠️ [gemini] Rate limit hit on attempt ${attempt} for page ${pageNumber}. Retrying in ${delayMs / 1000}s...`);
       await sleep(delayMs);
     }
   }
@@ -164,7 +164,7 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
         fewShotExamples: examples,
         instructions,  // null → buildPrompt uses buildDefaultInstructions(schema)
       });
-    }
+    }        
 
     // Build request with optional Structured Output config
     const request = {
@@ -179,9 +179,10 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
         dynamicPrompt,
       ],
       config: options.responseConfig || {},
-    };
+    };    
 
     const result = await callGeminiWithRetry(ai, request, pageNumber);
+    console.log("Result from geminiiii:", result.text);
 
     // Extract text from response (new SDK: response.text is a property)
     let text = "";

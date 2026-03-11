@@ -9,7 +9,7 @@ import { MAX_VEHICLES_PER_PAGE, QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/co
 /** Structured Output config for invoice extraction */
 const invoiceResponseConfig = {
   responseMimeType: "application/json",
-  responseJsonSchema: zodToJsonSchema(InvoicePageResponseSchema),
+  // responseJsonSchema: zodToJsonSchema(InvoicePageResponseSchema), //THIS WAS MAKING BIGG ISSUE IN THE GEMINI RESPONSE. 
 };
 
 let boss;
@@ -38,7 +38,6 @@ let boss;
           companyId,
           responseConfig: invoiceResponseConfig,
         });
-
         // Soft Zod validation — log warnings but don't reject (Gemini Structured Output enforces schema)
         if (Array.isArray(vehicles)) {
           for (let i = 0; i < vehicles.length; i++) {

@@ -57,7 +57,7 @@ const PERMISSIONS = {
 
 // Prefix-based permissions (for nested routes like /api/gmail/*)
 const PERMISSION_PREFIXES = {
-  "/api/gmail/": { GET: "edit:company", POST: "edit:company", DELETE: "edit:company" },
+  "/api/gmail/": { GET: "edit:user", POST: "edit:user", DELETE: "edit:user" },
 };
 
 // Routes that don't require authentication
