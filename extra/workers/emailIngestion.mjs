@@ -30,8 +30,11 @@ import {
 } from "../utils/gmailClient.mjs";
 import { decryptPdf, isEncryptedPdf } from "../utils/pdfDecrypt.mjs";
 
-// USS sender address for password-protected PDF detection
-const USS_SENDER = "auction-invoice-send@ussnet.co.jp";
+// USS sender addresses for password-protected PDF detection
+const USS_SENDERS = [
+  "auction-invoice-send@ussnet.co.jp",
+  "no-reply@mail01.lcloud.jp",
+];
 
 function extractSender(headers) {
   const from = headers?.find((h) => h.name === "From")?.value || "";
@@ -172,7 +175,7 @@ async function processAccount(account) {
       );
 
       // USS detection: decrypt if password-protected
-      const isUss = fromAddress === USS_SENDER;
+      const isUss = USS_SENDERS.includes(fromAddress);
       if (isUss || isEncryptedPdf(pdfBuffer)) {
         if (!account.ussPassword) {
           await prisma.emailMessage.create({

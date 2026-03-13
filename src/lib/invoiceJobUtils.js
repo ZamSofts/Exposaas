@@ -54,7 +54,7 @@ export function buildViewerData(row, correctedJson) {
   const jsonSource = correctedJson || row.Json;
   return {
     ...(jsonSource && typeof jsonSource === "object" ? jsonSource : {}),
-    blobUrl: row.DocumentURL || null,
+    blobUrl: row.parentDocumentUrl || row.DocumentURL || null,
     companyId: row.companyId,
     id: row.id,
     createdAt: row.createdAt,
