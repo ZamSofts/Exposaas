@@ -122,6 +122,7 @@ async function processAccount(account) {
   let processed = 0;
 
   for (const msgRef of messages) {
+    let emailRecord = null; // track created EmailMessage so catch block can update vs create
     try {
       // Dedup check first (before downloading attachment)
       const existing = await prisma.emailMessage.findUnique({
@@ -224,16 +225,9 @@ async function processAccount(account) {
         "email/"
       );
 
-      // Queue to classify-document (same payload as addDocument.js)
-      await boss.send("classify-document", {
-        fileUrl: blobUrl,
-        companyId: account.companyId,
-        userId: null,
-        userName: "email-ingestion",
-      });
-
-      // Save EmailMessage record
-      await prisma.emailMessage.create({
+      // Create EmailMessage before queueing so we have the ID to pass downstream.
+      // classifyDocument.mjs will update status to "processed" or "skipped".
+      emailRecord = await prisma.emailMessage.create({
         data: {
           gmailAccountId: account.id,
           gmailMessageId: msgRef.id,
@@ -241,8 +235,17 @@ async function processAccount(account) {
           fromAddress,
           receivedAt,
           attachmentUrl: blobUrl,
-          status: "processed",
+          status: "processing",
         },
+      });
+
+      // Queue to classify-document, passing emailMessageId for downstream status tracking
+      await boss.send("classify-document", {
+        fileUrl: blobUrl,
+        companyId: account.companyId,
+        userId: null,
+        userName: "email-ingestion",
+        emailMessageId: emailRecord.id,
       });
 
       processed++;
@@ -252,16 +255,25 @@ async function processAccount(account) {
         msgErr.message
       );
 
-      // Fire-and-forget error recording (same pattern as audit logging)
+      // Fire-and-forget error recording
       try {
-        await prisma.emailMessage.create({
-          data: {
-            gmailAccountId: account.id,
-            gmailMessageId: msgRef.id,
-            status: "failed",
-            skipReason: msgErr.message?.slice(0, 500),
-          },
-        });
+        if (emailRecord) {
+          // EmailMessage already created — update it
+          await prisma.emailMessage.update({
+            where: { id: emailRecord.id },
+            data: { status: "failed", skipReason: msgErr.message?.slice(0, 500) },
+          });
+        } else {
+          // Error before EmailMessage was created — create it now
+          await prisma.emailMessage.create({
+            data: {
+              gmailAccountId: account.id,
+              gmailMessageId: msgRef.id,
+              status: "failed",
+              skipReason: msgErr.message?.slice(0, 500),
+            },
+          });
+        }
       } catch (recordErr) {
         console.warn("Failed to record email error:", recordErr.message);
       }

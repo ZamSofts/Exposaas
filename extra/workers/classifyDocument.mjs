@@ -50,7 +50,20 @@ let boss;
     }
 
     await boss.work("classify-document", { teamConcurrency: 1 }, async ([job]) => {
-      const { fileUrl, companyId, userId, userName } = job.data;
+      const { fileUrl, companyId, userId, userName, emailMessageId } = job.data;
+
+      // Helper: update EmailMessage status (only for email-sourced documents)
+      async function updateEmailMessage(status, skipReason = null) {
+        if (!emailMessageId) return;
+        try {
+          await prisma.emailMessage.update({
+            where: { id: emailMessageId },
+            data: { status, ...(skipReason && { skipReason }) },
+          });
+        } catch (e) {
+          console.warn(`[classify] Failed to update EmailMessage #${emailMessageId}:`, e.message);
+        }
+      }
 
       console.log(`📋 Classifying document: ${fileUrl} for company ${companyId}`);
 
@@ -141,6 +154,7 @@ let boss;
             userId,
             userName,
           });
+          await updateEmailMessage("processed");
           return;
         }
 
@@ -179,13 +193,26 @@ let boss;
           }
 
           console.log(`📄 Created ${pages.length} extract-document job(s) for ${docType}`);
+          await updateEmailMessage("processed");
           return;
         }
 
-        // Unknown or low confidence — save and notify user
-        console.log(`❓ Document classified as ${docType} (confidence: ${confidence}) → saving as unknown`);
+        // Unknown or low confidence
+        console.log(`❓ Document classified as ${docType} (confidence: ${confidence})`);
 
-        const unknownJob = await prisma.invoiceJobs.create({
+        if (emailMessageId) {
+          // Email-sourced: mark as skipped — do NOT create an InvoiceJob (keeps Documents page clean)
+          console.log(`📧 Email-sourced unknown doc → marking EmailMessage #${emailMessageId} as skipped`);
+          await updateEmailMessage(
+            "skipped",
+            `Classified as ${docType} (confidence: ${confidence.toFixed(2)})`
+          );
+          return;
+        }
+
+        // Manual upload: save as needs_classification so user can review
+        console.log(`📋 Manual upload unknown doc → saving as needs_classification`);
+        await prisma.invoiceJobs.create({
           data: {
             companyId,
             DocumentURL: fileUrl,
@@ -209,19 +236,24 @@ let boss;
           return;
         }
 
-        // Save as failed
-        try {
-          await prisma.invoiceJobs.create({
-            data: {
-              companyId,
-              DocumentURL: fileUrl,
-              docType: "unknown",
-              status: "failed",
-              Json: { error: err.message },
-            },
-          });
-        } catch (dbErr) {
-          console.error("❌ Failed to save failed job:", dbErr);
+        // Update EmailMessage if email-sourced
+        await updateEmailMessage("failed", err.message?.slice(0, 500));
+
+        // Save failed InvoiceJob only for manual uploads
+        if (!emailMessageId) {
+          try {
+            await prisma.invoiceJobs.create({
+              data: {
+                companyId,
+                DocumentURL: fileUrl,
+                docType: "unknown",
+                status: "failed",
+                Json: { error: err.message },
+              },
+            });
+          } catch (dbErr) {
+            console.error("❌ Failed to save failed job:", dbErr);
+          }
         }
 
       }
