@@ -29,6 +29,7 @@ import {
   getPdfAttachments,
 } from "../utils/gmailClient.mjs";
 import { decryptPdf, isEncryptedPdf } from "../utils/pdfDecrypt.mjs";
+import { detectAndCorrectRotation } from "../utils/pdfRotation.mjs";
 
 // USS sender addresses for password-protected PDF detection
 const USS_SENDERS = [
@@ -209,6 +210,9 @@ async function processAccount(account) {
           continue;
         }
       }
+
+      // Auto-correct PDF rotation before upload
+      pdfBuffer = await detectAndCorrectRotation(pdfBuffer);
 
       // Upload to Azure Blob Storage
       const { url: blobUrl } = await putFile(
