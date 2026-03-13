@@ -69,6 +69,7 @@ let boss;
           customPrompt: extractionPrompt,
           rawJsonResponse: true,
           responseConfig,
+          model: "gemini-1.5-flash",
         });
 
         // Validate with Zod (soft — log warning, don't block extraction)
