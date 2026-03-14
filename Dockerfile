@@ -1,4 +1,4 @@
-FROM node:22-bullseye
+FROM node:20-bullseye
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN npx prisma generate
 RUN npm run build
 
 
-EXPOSE 3001
+EXPOSE 3000
 
 
 

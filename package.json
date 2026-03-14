@@ -12,8 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "postinstall": "prisma generate"
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@auth/core": "^0.34.2",
