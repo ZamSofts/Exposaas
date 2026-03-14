@@ -121,7 +121,7 @@ let boss;
             customPrompt: CLASSIFICATION_PROMPT,
             rawJsonResponse: true,
             responseConfig: classificationResponseConfig,
-            model: "gemini-2.0-flash",
+            model: "gemini-2.5-flash",
           }
         );
 
