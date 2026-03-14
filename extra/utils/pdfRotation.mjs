@@ -27,7 +27,7 @@ export async function detectAndCorrectRotation(pdfBuffer) {
     // Ask Gemini to detect the needed correction angle
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash-lite',
+      model: 'gemini-2.0-flash',
       contents: [
         { inlineData: { mimeType: 'application/pdf', data: base64 } },
         'What correction angle is needed to make this PDF page upright and readable? Return ONLY JSON: {"rotation": N} where N is 0 (already upright), 90, 180, or 270.',
