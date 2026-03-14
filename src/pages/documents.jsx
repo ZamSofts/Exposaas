@@ -16,6 +16,7 @@ import {
   Upload,
   Link2,
   Eye,
+  Mail,
 } from "lucide-react";
 import {
   getVehicleCount,
@@ -35,6 +36,7 @@ const DOC_TYPES = {
   inspection_cert: { label: "Inspection",  labelJa: "車検証",   color: "#f59e0b" },
   temp_cancel:     { label: "Temp Cancel", labelJa: "一時抹消", color: "#8b5cf6" },
   unknown:         { label: "Unknown",     labelJa: "不明",     color: "#6b7280" },
+  skipped:         { label: "Skipped",     labelJa: "スキップ済み", color: "#f97316" },
 };
 
 // ---------------------------------------------------------------------------
@@ -95,6 +97,23 @@ export default function DocumentsPage() {
       total: res.total || (res.data || []).length,
     }),
   });
+
+  // Skipped emails — separate fetch from /api/gmail/skipped
+  const {
+    items: skippedRows, total: skippedTotal, isLoading: skippedLoading,
+    handlePageChange: skippedPageChange, setPage: setSkippedPage,
+  } = usePaginatedList(
+    useCallback((params) => ["skipped-emails", params], []),
+    "gmail/skipped",
+    {
+      defaultPerPage: 10,
+      defaultOrder: "desc",
+      select: (res) => ({
+        items: res.data || [],
+        total: res.total || 0,
+      }),
+    }
+  );
 
   const [error, setError] = useState("");
 
@@ -192,6 +211,21 @@ export default function DocumentsPage() {
 
   const hasFailedJobs = rows.some((r) => r.status === "failed");
 
+  // Reclassify a skipped email
+  const [reclassifying, setReclassifying] = useState(null);
+  const handleReclassify = async (emailMessageId) => {
+    setReclassifying(emailMessageId);
+    try {
+      const res = await API("POST", "gmail/skipped", { action: "reclassify", emailMessageId });
+      if (res.error) setError(res.error);
+      else queryClient.invalidateQueries({ queryKey: ["skipped-emails"] });
+    } catch (err) {
+      setError("Failed to reclassify");
+    } finally {
+      setReclassifying(null);
+    }
+  };
+
   // Get vehicle link info from Json (for non-invoice docs)
   const getLinkedInfo = (row) => {
     const json = row.Json;
@@ -274,7 +308,7 @@ export default function DocumentsPage() {
             {Object.entries(DOC_TYPES).map(([key, config]) => (
               <button
                 key={key}
-                onClick={() => { setActiveTab(key); setPage(1); }}
+                onClick={() => { setActiveTab(key); setPage(1); setSkippedPage(1); }}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                   activeTab === key
                     ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
@@ -292,114 +326,187 @@ export default function DocumentsPage() {
             ))}
           </div>
 
-          {/* Data Table */}
-          <DataTable
-            key={activeTab}
-            data={rows}
-            total={total}
-            isLoading={isLoading}
-            searchPlaceholder="Search documents..."
-            onSort={handleSort}
-            onPageChange={handlePageChange}
-            title="Documents"
-            initialPerPage={10}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-          >
-            <thead className="bg-[var(--secondary)]">
-              <tr>
-                <th>ID</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Info</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {rows.map((row) => {
-                const isInvoice = row.docType === "invoice" || !row.docType;
-                const vehicleCount = isInvoice ? getVehicleCount(row.Json) : 0;
-                const linkedInfo = !isInvoice ? getLinkedInfo(row) : null;
-
-                return (
+          {/* Data Table — skipped emails tab uses a different endpoint */}
+          {activeTab === "skipped" ? (
+            <DataTable
+              key="skipped"
+              data={skippedRows}
+              total={skippedTotal}
+              isLoading={skippedLoading}
+              onPageChange={skippedPageChange}
+              title="スキップ済みメール"
+              initialPerPage={10}
+            >
+              <thead className="bg-[var(--secondary)]">
+                <tr>
+                  <th>Date</th>
+                  <th>From</th>
+                  <th>Subject</th>
+                  <th>Reason</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skippedRows.map((row) => (
                   <tr key={row.id} className="hover:bg-[var(--input)] transition-colors duration-200">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-[var(--foreground)]">
-                        #{row.id.toString().padStart(3, "0")}
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <DocTypeBadge docType={row.docType || "invoice"} />
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <StatusBadge status={row.status} />
-                      {row.status === "failed" && row.Json?.error && (
-                        <p
-                          className="text-xs text-red-400/80 mt-1 max-w-[200px] truncate"
-                          title={typeof row.Json.error === "string" ? row.Json.error : JSON.stringify(row.Json.error)}
-                        >
-                          {typeof row.Json.error === "string" ? row.Json.error : "See details"}
-                        </p>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {isInvoice ? (
-                        <div className="flex items-center gap-2">
-                          <Car className="w-4 h-4 text-[var(--secondary-foreground)]" />
-                          <span className="text-sm text-[var(--foreground)]">{vehicleCount} vehicles</span>
-                        </div>
-                      ) : linkedInfo ? (
-                        linkedInfo
-                      ) : (
-                        <span className="text-sm text-[var(--secondary-foreground)]">
-                          {row.Json?.extracted?.chassis_number || "—"}
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-[var(--secondary-foreground)]">
-                        {window.goodDateTime?.(row.createdAt) || new Date(row.createdAt).toLocaleDateString()}
+                        {row.receivedAt ? new Date(row.receivedAt).toLocaleDateString() : "—"}
                       </div>
                     </td>
-
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 text-sm text-[var(--foreground)]">
+                        <Mail className="w-3.5 h-3.5 text-[var(--secondary-foreground)]" />
+                        {row.fromAddress || "—"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-[var(--foreground)] max-w-[240px] truncate" title={row.subject}>
+                        {row.subject || "—"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-xs text-[var(--secondary-foreground)] max-w-[180px] truncate" title={row.skipReason}>
+                        {row.skipReason || "—"}
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        {row.status === "failed" ? (
+                        {row.attachmentUrl && (
                           <button
-                            onClick={() => handleRetry(row.id)}
-                            disabled={retrying === row.id}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded text-sm transition-colors"
-                          >
-                            <RefreshCw className={`w-3.5 h-3.5 ${retrying === row.id ? "animate-spin" : ""}`} />
-                            {retrying === row.id ? "Retrying..." : "Retry"}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => openViewer(row)}
-                            disabled={isReviewDisabled(row)}
-                            className={
-                              isActionDone(row)
-                                ? "applied"
-                                : "inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 text-[var(--primary)] rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            }
+                            onClick={() => {
+                              setViewerData({ parentDocumentUrl: row.attachmentUrl, docType: "unknown" });
+                              setViewerOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 text-[var(--primary)] rounded text-sm transition-colors"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            {getReviewButtonLabel(row, vehicleCount)}
+                            View
                           </button>
                         )}
+                        <button
+                          onClick={() => handleReclassify(row.id)}
+                          disabled={reclassifying === row.id}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded text-sm transition-colors"
+                        >
+                          <RefreshCw className={`w-3.5 h-3.5 ${reclassifying === row.id ? "animate-spin" : ""}`} />
+                          {reclassifying === row.id ? "Sending..." : "Re-classify"}
+                        </button>
                       </div>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </DataTable>
+                ))}
+              </tbody>
+            </DataTable>
+          ) : (
+            <DataTable
+              key={activeTab}
+              data={rows}
+              total={total}
+              isLoading={isLoading}
+              searchPlaceholder="Search documents..."
+              onSort={handleSort}
+              onPageChange={handlePageChange}
+              title="Documents"
+              initialPerPage={10}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+            >
+              <thead className="bg-[var(--secondary)]">
+                <tr>
+                  <th>ID</th>
+                  <th>Type</th>
+                  <th>Status</th>
+                  <th>Info</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {rows.map((row) => {
+                  const isInvoice = row.docType === "invoice" || !row.docType;
+                  const vehicleCount = isInvoice ? getVehicleCount(row.Json) : 0;
+                  const linkedInfo = !isInvoice ? getLinkedInfo(row) : null;
+
+                  return (
+                    <tr key={row.id} className="hover:bg-[var(--input)] transition-colors duration-200">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-[var(--foreground)]">
+                          #{row.id.toString().padStart(3, "0")}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <DocTypeBadge docType={row.docType || "invoice"} />
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <StatusBadge status={row.status} />
+                        {row.status === "failed" && row.Json?.error && (
+                          <p
+                            className="text-xs text-red-400/80 mt-1 max-w-[200px] truncate"
+                            title={typeof row.Json.error === "string" ? row.Json.error : JSON.stringify(row.Json.error)}
+                          >
+                            {typeof row.Json.error === "string" ? row.Json.error : "See details"}
+                          </p>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {isInvoice ? (
+                          <div className="flex items-center gap-2">
+                            <Car className="w-4 h-4 text-[var(--secondary-foreground)]" />
+                            <span className="text-sm text-[var(--foreground)]">{vehicleCount} vehicles</span>
+                          </div>
+                        ) : linkedInfo ? (
+                          linkedInfo
+                        ) : (
+                          <span className="text-sm text-[var(--secondary-foreground)]">
+                            {row.Json?.extracted?.chassis_number || "—"}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-[var(--secondary-foreground)]">
+                          {window.goodDateTime?.(row.createdAt) || new Date(row.createdAt).toLocaleDateString()}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          {row.status === "failed" ? (
+                            <button
+                              onClick={() => handleRetry(row.id)}
+                              disabled={retrying === row.id}
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded text-sm transition-colors"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${retrying === row.id ? "animate-spin" : ""}`} />
+                              {retrying === row.id ? "Retrying..." : "Retry"}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => openViewer(row)}
+                              disabled={isReviewDisabled(row)}
+                              className={
+                                isActionDone(row)
+                                  ? "applied"
+                                  : "inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 text-[var(--primary)] rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              }
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              {getReviewButtonLabel(row, vehicleCount)}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </DataTable>
+          )}
         </div>
 
         {/* Upload Modal */}

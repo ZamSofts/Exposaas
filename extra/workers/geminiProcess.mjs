@@ -75,7 +75,7 @@ async function callGeminiWithRetry(ai, request, pageNumber = 0) {
         RETRY_CONFIG.maxDelayMs
       );
       const delayMs = extractedDelay || exponentialDelay;
-
+      console.warn(`⚠️ [gemini] Rate limit hit on attempt ${attempt} for page ${pageNumber}. Retrying in ${delayMs / 1000}s...`);
       await sleep(delayMs);
     }
   }
@@ -164,11 +164,11 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
         fewShotExamples: examples,
         instructions,  // null → buildPrompt uses buildDefaultInstructions(schema)
       });
-    }
+    }        
 
     // Build request with optional Structured Output config
     const request = {
-      model: "gemini-2.5-flash",
+      model: options.model || "gemini-2.5-flash",
       contents: [
         {
           inlineData: {
@@ -179,9 +179,10 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
         dynamicPrompt,
       ],
       config: options.responseConfig || {},
-    };
+    };    
 
     const result = await callGeminiWithRetry(ai, request, pageNumber);
+    console.log("Result from geminiiii:", result.text);
 
     // Extract text from response (new SDK: response.text is a property)
     let text = "";
@@ -227,11 +228,28 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
       return parsed;
     }
 
+    let vehicles;
     if (Array.isArray(parsed)) {
-      return parsed;
+      vehicles = parsed;
+    } else {
+      vehicles = parsed["page_1"] || parsed["page_2"] || parsed["items"] || [];
     }
 
-    const vehicles = parsed["page_1"] || parsed["page_2"] || parsed["items"] || [];
+    // Normalize: if Gemini returned string elements instead of objects, try to parse them.
+    // This handles cases where Structured Output wraps vehicle data as JSON strings.
+    vehicles = vehicles.flatMap(item => {
+      if (typeof item === "string") {
+        try {
+          const inner = JSON.parse(item.startsWith("[") ? item : `[${item}]`);
+          return Array.isArray(inner) ? inner : [inner];
+        } catch {
+          console.warn("[gemini] Skipping unparseable string element in vehicles array");
+          return [];
+        }
+      }
+      return [item];
+    });
+
     return vehicles;
 
   } catch (error) {

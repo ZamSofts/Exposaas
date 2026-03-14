@@ -12,10 +12,16 @@ export const useAuth = (roles = [], excludeRoles = []) => {
       return;
     }
 
-      if (excludeRoles.length > 0 && status !== "loading" && excludeRoles.includes(session.user.role)) {
+    if (excludeRoles.length > 0 && status !== "loading" && session?.user && excludeRoles.includes(session.user.role)) {
+      // Redirect to appropriate page based on role
+      if (session.user.role === "Sadmin") {
+        router.push("/company");
+      } else {
         router.push("/vehicle");
-        return;
       }
+      return;
+    }
+
     if (roles.length > 0 && status !== "loading" && session?.user) {
       const hasRole = roles.includes(session.user.role);
       const hasPermission = session.user.permissions?.some(p => roles.includes(p));
