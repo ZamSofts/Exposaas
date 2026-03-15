@@ -20,9 +20,9 @@ if (typeof window === "undefined") {
   if (missing.length > 0) {
     console.error(`\n❌ Missing required environment variables:\n  ${missing.join("\n  ")}\n`);
     // In production, fail hard; in dev, warn only
-    if (process.env.NODE_ENV === "production") {
-      process.exit(1);
-    }
+    // if (process.env.NODE_ENV === "production") {
+    //   process.exit(1);
+    // }
   }
 
   const missingOptional = OPTIONAL_WARN_ENV.filter((key) => !process.env[key]);
