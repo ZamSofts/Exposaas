@@ -31,6 +31,12 @@ import {
 import { decryptPdf, isEncryptedPdf } from "../utils/pdfDecrypt.mjs";
 import { detectAndCorrectRotation } from "../utils/pdfRotation.mjs";
 
+// Whitelisted senders — only emails from these addresses are processed
+const ALLOWED_SENDERS = [
+  "auction-invoice-send@ussnet.co.jp",
+  "no-reply@mail01.lcloud.jp",
+];
+
 // USS sender addresses for password-protected PDF detection
 const USS_SENDERS = [
   "auction-invoice-send@ussnet.co.jp",
@@ -147,6 +153,22 @@ async function processAccount(account) {
       const subject = extractHeader(headers, "Subject");
       const dateStr = extractHeader(headers, "Date");
       const receivedAt = dateStr ? new Date(dateStr) : null;
+
+      // Skip emails not from whitelisted auction senders
+      if (!ALLOWED_SENDERS.includes(fromAddress)) {
+        await prisma.emailMessage.create({
+          data: {
+            gmailAccountId: account.id,
+            gmailMessageId: msgRef.id,
+            subject,
+            fromAddress,
+            receivedAt,
+            status: "skipped",
+            skipReason: "Sender not in allowed list",
+          },
+        });
+        continue;
+      }
 
       // Find PDF attachments in MIME tree
       const payload = fullMsg.data.payload;
