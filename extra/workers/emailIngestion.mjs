@@ -34,7 +34,6 @@ import { detectAndCorrectRotation } from "../utils/pdfRotation.mjs";
 // USS sender addresses for password-protected PDF detection
 const USS_SENDERS = [
   "auction-invoice-send@ussnet.co.jp",
-  "no-reply@mail01.lcloud.jp",
 ];
 
 function extractSender(headers) {
