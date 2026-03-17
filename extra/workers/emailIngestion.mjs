@@ -30,11 +30,17 @@ import {
 } from "../utils/gmailClient.mjs";
 import { decryptPdf, isEncryptedPdf } from "../utils/pdfDecrypt.mjs";
 import { detectAndCorrectRotation } from "../utils/pdfRotation.mjs";
+var moreAllowedSenders = process.env.SENDERS_EMAIL ? process.env.SENDERS_EMAIL.split(",").map((s) => s.trim().toLowerCase()) : [];
+// Whitelisted senders — only emails from these addresses are processed
+const ALLOWED_SENDERS = [
+  "auction-invoice-send@ussnet.co.jp",
+  "no-reply@mail01.lcloud.jp",
+  ...moreAllowedSenders
+];
 
 // USS sender addresses for password-protected PDF detection
 const USS_SENDERS = [
   "auction-invoice-send@ussnet.co.jp",
-  "no-reply@mail01.lcloud.jp",
 ];
 
 function extractSender(headers) {
@@ -59,7 +65,7 @@ let boss;
     }
 
     // Register recurring schedule: every 5 minutes
-    await boss.schedule("email-poll", "*/5 * * * *", {});
+    await boss.schedule("email-poll", "*/1 * * * *", {});
     console.log("📧 Email poll scheduled every 5 minutes");
 
     await boss.work("email-poll", { teamConcurrency: 1 }, async ([job]) => {
@@ -148,6 +154,22 @@ async function processAccount(account) {
       const subject = extractHeader(headers, "Subject");
       const dateStr = extractHeader(headers, "Date");
       const receivedAt = dateStr ? new Date(dateStr) : null;
+
+      // Skip emails not from whitelisted auction senders
+      if (!ALLOWED_SENDERS.includes(fromAddress)) {
+        await prisma.emailMessage.create({
+          data: {
+            gmailAccountId: account.id,
+            gmailMessageId: msgRef.id,
+            subject,
+            fromAddress,
+            receivedAt,
+            status: "skipped",
+            skipReason: "Sender not in allowed list",
+          },
+        });
+        continue;
+      }
 
       // Find PDF attachments in MIME tree
       const payload = fullMsg.data.payload;
