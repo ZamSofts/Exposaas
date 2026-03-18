@@ -1,8 +1,9 @@
-import { useState, createContext, useContext } from "react";
+import { useState, useMemo, useCallback, createContext, useContext } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import { useRouter } from "next/router";
 import {
+  Home,
   Truck,
   Users,
   Menu,
@@ -33,8 +34,13 @@ export default function Sidebar({ children }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  const contextValue = useMemo(
+    () => ({ isCollapsed, setIsCollapsed }),
+    [isCollapsed]
+  );
+
   return (
-    <SidebarContext.Provider value={{ isCollapsed, setIsCollapsed }}>
+    <SidebarContext.Provider value={contextValue}>
       <div className="min-h-screen bg-[var(--background)]">
         <SidebarContent isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
         {/* Mobile overlay */}
@@ -80,14 +86,23 @@ const filterItemsByRole = (items, userRole, userPermissions = []) => {
   });
 };
 
-// Define all sidebar items with their role requirements
-const getAllSidebarSections = () => [
+// Module-level constant — JSX icons created once, not on every render
+const ALL_SIDEBAR_SECTIONS = [
   {
-    title: "MAIN NAVIGATION",
+    title: "メインメニュー",
     items: [
       {
+        id: "home",
+        label: "ホーム",
+        icon: <Home size={20} />,
+        href: "/home",
+        roles: ["view:vehicle"],
+        excludeRoles: ["Sadmin"],
+        color: "#60a5fa",
+      },
+      {
         id: "companies",
-        label: "Manage Companies",
+        label: "会社管理",
         icon: <Building2 size={20} />,
         href: "/company",
         roles: ["Sadmin"], // Only show to Sadmin
@@ -100,14 +115,14 @@ const getAllSidebarSections = () => [
       // },
       {
         id: "user",
-        label: "User Management",
+        label: "ユーザー管理",
         icon: <Users size={20} />,
         href: "/user",
         roles: ["view:user"],
       },
       {
         id: "customer",
-        label: "Customer Management",
+        label: "顧客管理",
         icon: <Users size={20} />,
         href: "/customer",
         roles: ["view:customer"],
@@ -116,46 +131,50 @@ const getAllSidebarSections = () => [
 
       {
         id: "role",
-        label: "Role Management",
+        label: "ロール管理",
         icon: <Shield size={20} />,
         href: "/role",
         roles: ["view:role", "Sadmin"],
       },
       {
         id: "vehicle",
-        label: "Vehicle Management",
+        label: "車両管理",
         icon: <Car size={20} />,
         href: "/vehicle",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
+        color: "#fbbf24",
       },
-{
+      {
         id: "documents",
-        label: "Documents",
+        label: "書類管理",
         icon: <FolderOpen size={20} />,
         href: "/documents",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
+        color: "#34d399",
       },
       {
         id: "export-templates",
-        label: "Export Templates",
+        label: "出力テンプレート",
         icon: <FileSpreadsheet size={20} />,
         href: "/exportTemplates",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
+        color: "#a78bfa",
       },
       {
         id: "ai-accuracy",
-        label: "AI Accuracy",
+        label: "AI精度",
         icon: <BarChart3 size={20} />,
         href: "/accuracy",
         roles: ["view:vehicle"],
         excludeRoles: ["Sadmin"],
+        color: "#fb7185",
       },
       {
         id: "evaluation",
-        label: "Evaluation",
+        label: "評価",
         icon: <FlaskConical size={20} />,
         href: "/evaluation",
         roles: ["view:vehicle"],
@@ -163,7 +182,7 @@ const getAllSidebarSections = () => [
       },
       {
         id: "prompts",
-        label: "Prompts",
+        label: "プロンプト",
         icon: <Sparkles size={20} />,
         href: "/prompts",
         roles: ["view:vehicle"],
@@ -222,17 +241,22 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
     }));
   };
 
-  // Get filtered sidebar sections based on user role and permissions
-  const sidebarSections = getAllSidebarSections()
-    .map(section => ({
-      ...section,
-      items: filterItemsByRole(section.items, session?.role, session?.permissions),
-    }))
-    .filter(section => section.items.length > 0); // Remove empty sections
+  // Memoize: only recompute when role/permissions change
+  const sidebarSections = useMemo(
+    () =>
+      ALL_SIDEBAR_SECTIONS
+        .map(section => ({
+          ...section,
+          items: filterItemsByRole(section.items, session?.role, session?.permissions),
+        }))
+        .filter(section => section.items.length > 0),
+    [session?.role, session?.permissions]
+  );
 
-  const isActiveRoute = href => {
-    return router.pathname === href;
-  };
+  const isActiveRoute = useCallback(
+    href => router.pathname === href,
+    [router.pathname]
+  );
 
   return (
     <aside

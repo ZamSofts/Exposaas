@@ -3,7 +3,7 @@ import Head from "next/head";
 import { useAuth, useConfirm, API, Error, DataTable, isAllowed, Toast, Loader, EditVehicle, FilePreviewer, usePaginatedList, useStaticOptions, queryKeys } from "@/hooks/wrapper";
 import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
-import { Plus, Search, Filter } from "lucide-react";
+import { Plus, Search, Filter, Columns2 } from "lucide-react";
 import VehicleRow from "@/components/VehicleRow";
 import VehicleFilters from "@/components/VehicleFilters";
 import ExportDropdown from "@/components/export/ExportDropdown";
@@ -118,6 +118,21 @@ export default function VehiclesPage() {
   const [toast, setToast] = useState({ id: 0, message: "", type: "success" });
   const [mergeInfoVehicle, setMergeInfoVehicle] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  // ── Column visibility ──
+  const [visibleColIds, setVisibleColIds] = useState(
+    () => new Set(VEHICLE_COLUMNS.filter((c) => c.visible !== false).map((c) => c.id))
+  );
+  const [showColPicker, setShowColPicker] = useState(false);
+
+  const toggleCol = (colId) => {
+    setVisibleColIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(colId)) next.delete(colId);
+      else next.add(colId);
+      return next;
+    });
+  };
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["vehicles"] });
 
@@ -308,6 +323,33 @@ export default function VehiclesPage() {
                 <Filter className="w-3.5 h-3.5" />
                 Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
               </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowColPicker(!showColPicker)}
+                  className="flex items-center gap-1 px-2 py-1 text-xs font-medium border rounded transition-colors bg-[var(--secondary)] text-[var(--foreground)] border-[var(--border)] hover:bg-[var(--border)]"
+                >
+                  <Columns2 className="w-3.5 h-3.5" />
+                  列を表示
+                </button>
+                {showColPicker && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg p-2 w-44 max-h-72 overflow-y-auto">
+                    {VEHICLE_COLUMNS.filter((c) => c.type !== "actions").map((col) => (
+                      <label
+                        key={col.id}
+                        className="flex items-center gap-2 px-2 py-1 hover:bg-[var(--secondary)] rounded cursor-pointer text-xs text-[var(--foreground)]"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={visibleColIds.has(col.id)}
+                          onChange={() => toggleCol(col.id)}
+                          className="accent-[var(--primary)]"
+                        />
+                        {col.label || col.id}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
               <ExportDropdown
                 templates={exportTemplates}
                 onExport={handleExport}
@@ -353,7 +395,9 @@ export default function VehiclesPage() {
             >
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  {VEHICLE_COLUMNS.map((col) => {
+                  {VEHICLE_COLUMNS.filter((col) =>
+                    col.type === "actions" || visibleColIds.has(col.id)
+                  ).map((col) => {
                     if (col.type === "actions" && !isAllowed(col.requirePermission, session)) return null;
                     return (
                       <th key={col.id} id={col.id} style={{ width: col.width }}>
@@ -378,6 +422,7 @@ export default function VehiclesPage() {
                     setDocumentPreview={setDocumentPreview}
                     onShowMergeInfo={setMergeInfoVehicle}
                     session={session}
+                    visibleColIds={visibleColIds}
                   />
                 ))}
               </tbody>

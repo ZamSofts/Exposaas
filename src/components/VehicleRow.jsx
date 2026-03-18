@@ -16,15 +16,20 @@ const VehicleRow = React.memo(function VehicleRow({
   setDocumentPreview,
   onShowMergeInfo,
   session,
+  visibleColIds,
 }) {
+  const columns = visibleColIds
+    ? VEHICLE_COLUMNS.filter((c) => c.type === "actions" || visibleColIds.has(c.id))
+    : VEHICLE_COLUMNS;
+
   return (
-    <tr className="hover:bg-[var(--input)]/50 transition-colors" style={{ height: 32 }}>
-      {VEHICLE_COLUMNS.map((col) => {
+    <tr className="hover:bg-[var(--input)]/50 transition-colors" style={{ height: 40 }}>
+      {columns.map((col) => {
         // ── Actions column (conditional) ──────────────────────
         if (col.type === "actions") {
           if (!isAllowed(col.requirePermission, session)) return null;
           return (
-            <td key={col.id} className="px-2 py-1 whitespace-nowrap text-right text-sm border border-[var(--border)] overflow-hidden">
+            <td key={col.id} className="px-2 py-2 whitespace-nowrap text-right text-sm border border-[var(--border)] overflow-hidden">
               <div className="flex items-center justify-end gap-0.5">
                 <button
                   onClick={() => onEdit(v.id)}
@@ -46,7 +51,7 @@ const VehicleRow = React.memo(function VehicleRow({
         // ── Static columns (custom rendering) ─────────────────
         if (col.type === "static") {
           return (
-            <td key={col.id} className="px-2 py-1 whitespace-nowrap border border-[var(--border)] overflow-hidden text-ellipsis">
+            <td key={col.id} className="px-2 py-2 whitespace-nowrap font-medium border border-[var(--border)] overflow-hidden text-ellipsis">
               {renderStaticCell(col, v, { setDocumentPreview, onShowMergeInfo })}
             </td>
           );
@@ -56,7 +61,7 @@ const VehicleRow = React.memo(function VehicleRow({
         if (col.type === "readonly-currency" || col.type === "readonly-currency-primary") {
           const isPrimary = col.type === "readonly-currency-primary";
           return (
-            <td key={col.id} className="px-2 py-1 whitespace-nowrap text-right border border-[var(--border)] overflow-hidden text-ellipsis">
+            <td key={col.id} className="px-2 py-2 whitespace-nowrap text-right font-medium border border-[var(--border)] overflow-hidden text-ellipsis">
               <span className={`text-sm tabular-nums ${isPrimary ? "font-semibold text-[var(--primary)]" : "text-[var(--foreground)]"}`}>
                 {formatCurrency(v[col.field] ?? 0)}
               </span>

@@ -65,7 +65,7 @@ let boss;
     }
 
     // Register recurring schedule: every 5 minutes
-    await boss.schedule("email-poll", "*/1 * * * *", {});
+    await boss.schedule("email-poll", "*/5 * * * *", {});
     console.log("📧 Email poll scheduled every 5 minutes");
 
     await boss.work("email-poll", { teamConcurrency: 1 }, async ([job]) => {

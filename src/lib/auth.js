@@ -98,8 +98,6 @@ export const authOptions = {
         token.company = user.company;
         token.permissions = user.permissions;
       }
-      // console.log("jwt token:", token);
-
       return token;
     },
     async session({ session, token }) {

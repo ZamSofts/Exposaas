@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, cloneElement } from "react";
+import React, { useState, useEffect, useRef, useMemo, cloneElement, useCallback } from "react";
 import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -17,12 +17,12 @@ function getColumnCount(children) {
 }
 
 // Virtual tbody for spreadsheet mode — only renders visible rows
-function VirtualTbody({ rows, scrollContainerRef, estimateSize = 32 }) {
+function VirtualTbody({ rows, scrollEl, estimateSize = 40 }) {
   const virtualizer = useVirtualizer({
     count: rows.length,
-    getScrollElement: () => scrollContainerRef.current,
+    getScrollElement: () => scrollEl,
     estimateSize: () => estimateSize,
-    overscan: 10,
+    overscan: 15,
   });
 
   const virtualRows = virtualizer.getVirtualItems();
@@ -76,7 +76,8 @@ export default function DataTable({
   variant = "default",
 }) {
   const isSpreadsheet = variant === "spreadsheet";
-  const scrollContainerRef = useRef(null);
+  const [scrollEl, setScrollEl] = useState(null);
+  const scrollRefCallback = useCallback((node) => setScrollEl(node), []);
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [perPage, setPerPage] = useState(initialPerPage);
@@ -193,8 +194,8 @@ export default function DataTable({
                     if (React.isValidElement(header) && header.type === "th") {
                       const columnId = header.props.id;
                       const defaultHeaderClasses = isSpreadsheet
-                        ? "px-2 py-1.5 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider whitespace-nowrap overflow-hidden border border-[var(--border)]"
-                        : "px-3 py-2 text-left text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider whitespace-nowrap";
+                        ? "px-2 py-1.5 text-left text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider whitespace-nowrap overflow-hidden border border-[var(--border)] bg-[var(--table-header-bg,#f1f5f9)]"
+                        : "px-3 py-2 text-left text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider whitespace-nowrap bg-[var(--table-header-bg,#f1f5f9)]";
                       const existingClasses = header.props.className || "";
 
                       if (columnId && onSort) {
@@ -257,7 +258,7 @@ export default function DataTable({
             return (
               <VirtualTbody
                 rows={rows}
-                scrollContainerRef={scrollContainerRef}
+                scrollEl={scrollEl}
               />
             );
           }
@@ -276,7 +277,7 @@ export default function DataTable({
   const processedChildren = useMemo(
     () => processChildren(children),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [children, isLoading, data.length, sortBy, sortOrder, isSpreadsheet, perPage]
+    [children, isLoading, data.length, sortBy, sortOrder, isSpreadsheet, perPage, scrollEl]
   );
 
   return (
@@ -328,8 +329,8 @@ export default function DataTable({
           </div>
         )}
 
-        <div ref={isSpreadsheet ? scrollContainerRef : undefined} className={isSpreadsheet ? "overflow-auto max-h-[calc(100vh-140px)] spreadsheet-scroll" : "overflow-auto max-h-[calc(100vh-280px)]"}>
-          <table className={isSpreadsheet ? "w-full border-collapse" : "w-full"} style={isSpreadsheet ? { tableLayout: "fixed" } : undefined}>
+        <div ref={isSpreadsheet ? scrollRefCallback : undefined} className={isSpreadsheet ? "overflow-auto max-h-[calc(100vh-140px)] spreadsheet-scroll" : "overflow-auto max-h-[calc(100vh-280px)]"}>
+          <table className={isSpreadsheet ? "border-collapse striped-table" : "w-full striped-table"} style={isSpreadsheet ? { tableLayout: "fixed" } : undefined}>
             {processedChildren}
           </table>
         </div>
