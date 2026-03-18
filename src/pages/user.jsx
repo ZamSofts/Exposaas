@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Head from "next/head";
-import { useRouter } from "next/router";
 import { useConfirm, useAuth, API, CustomSelect, MultiSelect, CustomButton, Loader, Toast, Error, DataTable, usePaginatedList, useStaticOptions, queryKeys } from "@/hooks/wrapper";
 import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/Sidebar";
@@ -8,7 +7,6 @@ import { Eye, EyeOff, Plus, Edit, Trash2, User, Users } from "lucide-react";
 
 export default function Userss() {
   const { session, status } = useAuth(["Sadmin", "Admin", "view:user"]);
-  const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
   const queryClient = useQueryClient();
 
@@ -52,7 +50,6 @@ export default function Userss() {
   const [password, setPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
-  const [visiblePasswords, setVisiblePasswords] = useState([]);
 
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
@@ -138,10 +135,6 @@ export default function Userss() {
     showToast(data.message, 'success');
     invalidate();
     setCustomLoader(false);
-  };
-
-  const togglePasswordVisibility = id => {
-    setVisiblePasswords(prev => (prev.includes(id) ? prev.filter(uid => uid !== id) : [...prev, id]));
   };
 
   const resetForm = () => {

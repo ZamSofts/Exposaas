@@ -182,7 +182,6 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
     };    
 
     const result = await callGeminiWithRetry(ai, request, pageNumber);
-    console.log("Result from geminiiii:", result.text);
 
     // Extract text from response (new SDK: response.text is a property)
     let text = "";

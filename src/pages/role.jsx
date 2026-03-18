@@ -36,7 +36,7 @@ export default function Role() {
 
   const [edit, setEdit] = useState(null);
   const [error, setError] = useState("");
-  const [customLoader, setcustomLoader] = useState(false);
+  const [customLoader, setCustomLoader] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isFullAccess, setIsFullAccess] = useState(false);
 
@@ -54,7 +54,7 @@ export default function Role() {
       return;
     }
 
-    setcustomLoader(true);
+    setCustomLoader(true);
 
     // Use all permissions if Full Access is enabled
     const finalPermissions = isFullAccess ? static_permissions.map(permission => permission.id) : permissions;
@@ -79,7 +79,7 @@ export default function Role() {
     }
     if (data.error) {
       setError(data.error);
-      setcustomLoader(false);
+      setCustomLoader(false);
       return;
     }
     invalidate();
@@ -87,11 +87,11 @@ export default function Role() {
   };
 
   const loadEdit = async id => {
-    setcustomLoader(true);
+    setCustomLoader(true);
     const role = await API("GET", `role?id=${id}`);
     if (!role) {
       setError("User not found");
-      setcustomLoader(false);
+      setCustomLoader(false);
       return;
     }
 
@@ -103,7 +103,7 @@ export default function Role() {
     setIsFullAccess(hasAllPermissions);
 
     setEdit(id);
-    setcustomLoader(false);
+    setCustomLoader(false);
   };
 
   const deleteIt = async id => {
@@ -114,15 +114,15 @@ export default function Role() {
       type: "danger",
     });
     if (!confirmed) return;
-    setcustomLoader(true);
+    setCustomLoader(true);
     const data = await API("DELETE", `role?id=${id}`);
     if (data.error) {
       setError(data.error);
-      setcustomLoader(false);
+      setCustomLoader(false);
       return;
     }
     invalidate();
-    setcustomLoader(false);
+    setCustomLoader(false);
   };
 
   const getPermissionNames = permissionId => {
@@ -147,7 +147,7 @@ export default function Role() {
     setPermission([]);
     setEdit(null);
     setError("");
-    setcustomLoader(false);
+    setCustomLoader(false);
     setIsDropdownOpen(false);
     setIsFullAccess(false);
   };

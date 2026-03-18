@@ -1,7 +1,8 @@
+import React from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
-export default function SidebarNav({
+function SidebarNav({
   sidebarSections,
   isCollapsed,
   dropdownStates,
@@ -135,7 +136,13 @@ export default function SidebarNav({
                 );
               }
 
-              // Regular menu item
+              // Regular menu item — only compute activeBg when this item is actually active
+              const activeColor = item.color || null;
+              const activeBg = isActive
+                ? activeColor
+                  ? `rgba(${parseInt(activeColor.slice(1,3),16)},${parseInt(activeColor.slice(3,5),16)},${parseInt(activeColor.slice(5,7),16)},0.12)`
+                  : "rgba(59,130,246,0.12)"
+                : undefined;
               return (
                 <Link
                   key={item.id}
@@ -146,13 +153,18 @@ export default function SidebarNav({
                   }}
                   className={`
                     group flex items-center px-3 py-2.5 rounded-lg transition-all duration-200
-                    ${isActive ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"}
+                    ${isActive ? "shadow-sm" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"}
                   `}
+                  style={isActive ? {
+                    backgroundColor: activeBg,
+                    color: "var(--foreground)",
+                    borderLeft: `3px solid ${activeColor || "var(--primary)"}`,
+                  } : {}}
                 >
                   <div
                     className={`
                     flex-shrink-0 w-5 h-5 transition-transform duration-200
-                    ${isActive ? "text-white" : "group-hover:scale-110"}
+                    ${isActive ? "" : "group-hover:scale-110"}
                   `}
                   >
                     {item.icon}
@@ -160,15 +172,13 @@ export default function SidebarNav({
 
                   <span
                     className={`
-                    ml-3 text-sm font-medium transition-all duration-300
+                    ml-3 text-sm transition-all duration-300
+                    ${isActive ? "font-semibold" : "font-medium"}
                     ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
                   `}
                   >
                     {item.label}
                   </span>
-
-                  {/* Active indicator */}
-                  {isActive && <div className="absolute left-0 w-1 h-6 bg-white rounded-r-full"></div>}
                 </Link>
               );
             })}
@@ -178,3 +188,5 @@ export default function SidebarNav({
     </div>
   );
 }
+
+export default React.memo(SidebarNav);

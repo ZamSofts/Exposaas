@@ -69,12 +69,12 @@ export function buildViewerData(row, correctedJson) {
 // Keeps rendering in the page, but centralises the status → display mapping.
 // ---------------------------------------------------------------------------
 const STATUS_CONFIG = {
-  completed:            { icon: "CheckCircle2", label: "Completed",            colorClass: "bg-green-500/20 text-green-400" },
-  processing:           { icon: "Clock",        label: "Processing",           colorClass: "bg-blue-500/20 text-blue-400" },
-  failed:               { icon: "AlertCircle",  label: "Failed",              colorClass: "bg-red-500/20 text-red-400" },
-  empty:                { icon: "Inbox",        label: "Empty",               colorClass: "bg-gray-500/20 text-gray-400" },
-  needs_classification: { icon: "HelpCircle",   label: "Needs Classification", colorClass: "bg-amber-500/20 text-amber-400" },
-  pending:              { icon: "Clock",        label: "Pending",             colorClass: "bg-gray-500/20 text-gray-400" },
+  completed:            { icon: "CheckCircle2", label: "Completed",  colorClass: "bg-green-500/15 text-green-600 border border-green-500/30" },
+  processing:           { icon: "Clock",        label: "Processing", colorClass: "bg-blue-500/15 text-blue-600 border border-blue-500/30" },
+  failed:               { icon: "AlertCircle",  label: "Failed",     colorClass: "bg-red-500/15 text-red-600 border border-red-500/30" },
+  empty:                { icon: "Inbox",        label: "Empty",      colorClass: "bg-gray-500/15 text-gray-500 border border-gray-500/20" },
+  needs_classification: { icon: "HelpCircle",   label: "要確認",      colorClass: "bg-amber-500/15 text-amber-600 border border-amber-500/30" },
+  pending:              { icon: "Clock",        label: "Pending",    colorClass: "bg-gray-500/15 text-gray-500 border border-gray-500/20" },
 };
 
 export function getStatusConfig(status) {

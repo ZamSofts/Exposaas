@@ -31,20 +31,6 @@ if (typeof window !== "undefined") {
     });
     return `${day}-${month}-${year} ${time}`;
   };
-  window.goodDate = d => {
-    const date = new Date(d);
-    if (date.toString() === "Invalid Date") return null;
-    const day = date.getDate().toString().padStart(2, "0");
-    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const month = months[date.getMonth()];
-    const year = date.getFullYear();
-    const time = date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-    return `${month} ${day}, ${year}`;
-  };
 }
 
 function AppContent({ Component, pageProps }) {

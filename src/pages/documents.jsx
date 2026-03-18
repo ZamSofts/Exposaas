@@ -9,6 +9,7 @@ import DocumentViewer from "@/components/DocumentViewer";
 import Sidebar from "@/components/Sidebar";
 import GmailSettings from "@/components/GmailSettings";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { useConfirm } from "@/components/ui/ConfirmModal";
 import {
   FileText,
   Car,
@@ -27,6 +28,16 @@ import {
   isActionDone,
 } from "@/lib/invoiceJobUtils";
 import { InvoiceDataViewer } from "@/hooks/wrapper";
+
+// エラーコード → 日本語メッセージ変換
+function getErrorMessage(error) {
+  if (!error) return null;
+  const code = error?.code || error?.status;
+  if (code === 429) return "AI処理の上限に達しました。しばらく待ってRetryしてください";
+  if (code === 400) return "ファイル形式が対応していません";
+  if (code === 500) return "サーバーエラーが発生しました";
+  return "処理に失敗しました。Retryしてください";
+}
 
 // Doc type configuration (mirrors classificationSchema.mjs for UI)
 const DOC_TYPES = {
@@ -192,8 +203,19 @@ export default function DocumentsPage() {
   };
 
   const [retryingAll, setRetryingAll] = useState(false);
+  const { confirm, ConfirmComponent } = useConfirm();
+
+  const failedCount = rows.filter((r) => r.status === "failed").length;
+  const hasFailedJobs = failedCount > 0;
 
   const handleRetryAllFailed = async () => {
+    const ok = await confirm({
+      title: "全件リトライの確認",
+      message: `失敗した ${failedCount} 件を一括リトライします。完了まで時間がかかる場合があります。`,
+      type: "warning",
+    });
+    if (!ok) return;
+
     setRetryingAll(true);
     try {
       const res = await API("POST", "InvoiceJobs", { action: "retryAllFailed" });
@@ -208,8 +230,6 @@ export default function DocumentsPage() {
       setRetryingAll(false);
     }
   };
-
-  const hasFailedJobs = rows.some((r) => r.status === "failed");
 
   // Reclassify a skipped email
   const [reclassifying, setReclassifying] = useState(null);
@@ -303,6 +323,17 @@ export default function DocumentsPage() {
 
           <Error message={listError || error} />
 
+          {/* 未処理件数バナー */}
+          {activeTab !== "skipped" && (() => {
+            const pendingCount = rows.filter(r => r.status === "pending" || r.status === "processing").length;
+            if (pendingCount === 0) return null;
+            return (
+              <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-600 rounded-lg p-3 text-sm font-medium">
+                未処理の書類が {pendingCount} 件あります
+              </div>
+            );
+          })()}
+
           {/* Doc Type Tabs */}
           <div className="flex gap-1 mb-6 bg-[var(--surface)] rounded-lg p-1 border border-[var(--border)] w-fit">
             {Object.entries(DOC_TYPES).map(([key, config]) => (
@@ -339,11 +370,11 @@ export default function DocumentsPage() {
             >
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  <th>Date</th>
-                  <th>From</th>
-                  <th>Subject</th>
-                  <th>Reason</th>
-                  <th>Actions</th>
+                  <th>日付</th>
+                  <th>送信元</th>
+                  <th>件名</th>
+                  <th>理由</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -415,11 +446,11 @@ export default function DocumentsPage() {
               <thead className="bg-[var(--secondary)]">
                 <tr>
                   <th>ID</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Info</th>
-                  <th>Created</th>
-                  <th>Actions</th>
+                  <th>種別</th>
+                  <th>ステータス</th>
+                  <th>情報</th>
+                  <th>作成日</th>
+                  <th>操作</th>
                 </tr>
               </thead>
 
@@ -445,10 +476,10 @@ export default function DocumentsPage() {
                         <StatusBadge status={row.status} />
                         {row.status === "failed" && row.Json?.error && (
                           <p
-                            className="text-xs text-red-400/80 mt-1 max-w-[200px] truncate"
-                            title={typeof row.Json.error === "string" ? row.Json.error : JSON.stringify(row.Json.error)}
+                            className="text-xs text-red-500/80 mt-1 max-w-[200px]"
+                            title={JSON.stringify(row.Json.error)}
                           >
-                            {typeof row.Json.error === "string" ? row.Json.error : "See details"}
+                            {getErrorMessage(row.Json.error)}
                           </p>
                         )}
                       </td>
@@ -485,20 +516,24 @@ export default function DocumentsPage() {
                               <RefreshCw className={`w-3.5 h-3.5 ${retrying === row.id ? "animate-spin" : ""}`} />
                               {retrying === row.id ? "Retrying..." : "Retry"}
                             </button>
-                          ) : (
+                          ) : isActionDone(row) ? (
+                            <span className="applied">確認済み</span>
+                          ) : row.status === "completed" ? (
                             <button
                               onClick={() => openViewer(row)}
-                              disabled={isReviewDisabled(row)}
-                              className={
-                                isActionDone(row)
-                                  ? "applied"
-                                  : "inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 text-[var(--primary)] rounded text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              }
+                              className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 text-[var(--primary)] rounded text-sm transition-colors"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              {getReviewButtonLabel(row, vehicleCount)}
+                              Review
                             </button>
-                          )}
+                          ) : (row.status === "pending" || row.status === "processing") ? (
+                            <button
+                              onClick={() => openViewer(row)}
+                              className="apply-button"
+                            >
+                              処理する →
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -508,6 +543,9 @@ export default function DocumentsPage() {
             </DataTable>
           )}
         </div>
+
+        {/* Confirm Dialog */}
+        <ConfirmComponent />
 
         {/* Upload Modal */}
         <FileUploadModal
