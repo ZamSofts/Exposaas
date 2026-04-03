@@ -58,9 +58,10 @@ export default function VehiclesPage() {
     items: vehicles, total, isLoading, error: listError,
     handleSort, handleSearch, handlePageChange, sortBy, sortOrder, setPage,
   } = usePaginatedList(vehicleKeyFn, "vehicle", {
-    defaultPerPage: 25,
+    defaultPerPage: 99999,
     defaultOrder: "desc",
     debounceMs: 400,
+    staleTime: 5 * 60 * 1000,
     buildParams,
     select: (res) => ({
       items: res.vehicles || [],
@@ -110,7 +111,6 @@ export default function VehiclesPage() {
   );
 
   // ── Local UI state ──
-  const [error, setError] = useState("");
   const [customLoader, setCustomLoader] = useState(false);
   const [edit, setEdit] = useState(null);
   const [documentPreview, setDocumentPreview] = useState(null);
@@ -121,9 +121,22 @@ export default function VehiclesPage() {
 
   // ── Column visibility ──
   const [visibleColIds, setVisibleColIds] = useState(
-    () => new Set(VEHICLE_COLUMNS.filter((c) => c.visible !== false).map((c) => c.id))
+    () => new Set(VEHICLE_COLUMNS.map((c) => c.id))
   );
   const [showColPicker, setShowColPicker] = useState(false);
+
+  // ── Visible columns memo — used by both <colgroup> and <thead> to stay in sync ──
+  const visibleCols = useMemo(
+    () => VEHICLE_COLUMNS.filter((col) =>
+      col.type === "actions" ? isAllowed(col.requirePermission, session) : visibleColIds.has(col.id)
+    ),
+    [visibleColIds, session]
+  );
+
+  const totalTableWidth = useMemo(
+    () => visibleCols.reduce((sum, col) => sum + col.width, 0),
+    [visibleCols]
+  );
 
   const toggleCol = (colId) => {
     setVisibleColIds((prev) => {
@@ -149,10 +162,9 @@ export default function VehiclesPage() {
     setToast({ id: Date.now(), message, type });
   }, []);
 
-  // ── Inline editing: optimistic update via queryClient cache ──
+  // ── Inline editing: update cache with server-confirmed data ──
   const handleInlineSave = useCallback(
     (vehicleId, updatedVehicle) => {
-      // Optimistically update the React Query cache
       queryClient.setQueriesData({ queryKey: ["vehicles"] }, (old) => {
         if (!old || !old.vehicles) return old;
         return {
@@ -250,7 +262,6 @@ export default function VehiclesPage() {
     setCustomLoader(true);
     const data = await API("DELETE", `vehicle?id=${id}`);
     if (data.error) {
-      setError(data.error);
       showToast(data.error, "error");
       setCustomLoader(false);
       return;
@@ -291,7 +302,7 @@ export default function VehiclesPage() {
       </Head>
       <Sidebar>
         <div className="p-2 bg-[var(--background)] min-h-screen">
-          <Error message={listError || error} />
+          <Error message={listError} />
           {customLoader && <Loader />}
 
           {/* Spreadsheet Toolbar */}
@@ -392,19 +403,21 @@ export default function VehiclesPage() {
               sortBy={sortBy}
               sortOrder={sortOrder}
               variant="spreadsheet"
+              initialPerPage={99999}
+              tableWidth={totalTableWidth}
             >
+              {/* colgroup で列幅を固定 — table-layout:fixed と組み合わせることで
+                  スクロール中も幅が変わらない（Google Sheets / LarkBase と同じ仕組み） */}
+              <colgroup>
+                {visibleCols.map((col) => (
+                  <col key={col.id} style={{ width: col.width }} />
+                ))}
+              </colgroup>
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  {VEHICLE_COLUMNS.filter((col) =>
-                    col.type === "actions" || visibleColIds.has(col.id)
-                  ).map((col) => {
-                    if (col.type === "actions" && !isAllowed(col.requirePermission, session)) return null;
-                    return (
-                      <th key={col.id} id={col.id} style={{ width: col.width }}>
-                        {col.label}
-                      </th>
-                    );
-                  })}
+                  {visibleCols.map((col) => (
+                    <th key={col.id} id={col.id}>{col.label}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>

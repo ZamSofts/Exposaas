@@ -49,6 +49,7 @@ function parseValue(value, config) {
       if (isEmpty) return null;
       const parsed = parseFloat(value);
       if (isNaN(parsed)) throw new Error("Invalid numeric value");
+      if (parsed < 0) throw new Error("Value cannot be negative");
       return parsed;
     }
     case "integer": {
@@ -119,14 +120,40 @@ export default async function handler(req, res) {
     // Special validations
     if (field === "chassisNumber") {
       if (!parsedValue) return res.status(400).json({ error: "Chassis number is required" });
-      const existing = await prisma.vehicle.findFirst({
-        where: {
-          companyId: vehicle.companyId,
-          chassisNumber: parsedValue,
-          id: { not: Number(id) },
-        },
+
+      // Atomic duplicate check + update in a single transaction to prevent race conditions
+      const oldValue = vehicle[field];
+      const txUpdateData = { chassisNumber: parsedValue, updatedById: parseInt(session.id, 10) || null };
+      let txUpdated;
+      try {
+        txUpdated = await prisma.$transaction(async (tx) => {
+          const existing = await tx.vehicle.findFirst({
+            where: { companyId: vehicle.companyId, chassisNumber: parsedValue, id: { not: Number(id) } },
+          });
+          if (existing) {
+            const err = new Error("Chassis number already exists");
+            err.isConflict = true;
+            throw err;
+          }
+          return tx.vehicle.update({
+            where: { id: Number(id) },
+            data: txUpdateData,
+            include: {
+              brand: { select: { name: true } },
+              customer: { select: { id: true, name: true } },
+            },
+          });
+        });
+      } catch (txError) {
+        if (txError.isConflict) return res.status(409).json({ error: txError.message });
+        throw txError;
+      }
+
+      logVehicleAudit(prisma, {
+        vehicleId: Number(id), action: "update", actor: "user", actorId: session.id,
+        field, oldValue, newValue: parsedValue, source: "manual",
       });
-      if (existing) return res.status(409).json({ error: "Chassis number already exists" });
+      return res.json({ message: "Vehicle Updated successfully", vehicle: txUpdated });
     }
 
     // Handle relation fields: auto-create if new name provided

@@ -1,9 +1,10 @@
 import "@/lib/validateEnv"; // Validate env vars at startup (server-side only)
 import "@/styles/globals.css";
-import React from "react";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeContext, useThemeState } from "@/hooks/useTheme";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 const queryClient = new QueryClient({
@@ -48,21 +49,19 @@ if (typeof window !== "undefined") {
 }
 
 function AppContent({ Component, pageProps }) {
-  const themeState = useThemeState();
-
   return (
-    <ThemeContext.Provider value={themeState}>
+    <div className={inter.className}>
       <Component {...pageProps} />
-    </ThemeContext.Provider>
+    </div>
   );
 }
 
-export default function App({ Component, pageProps: { session, ...pageProps }, router }) {
+export default function App({ Component, pageProps: { session, ...pageProps } }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider session={session}>
         <ErrorBoundary>
-          <AppContent Component={Component} pageProps={pageProps} router={router} />
+          <AppContent Component={Component} pageProps={pageProps} />
         </ErrorBoundary>
       </SessionProvider>
     </QueryClientProvider>

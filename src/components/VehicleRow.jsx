@@ -3,6 +3,13 @@ import { Edit, Trash2, FileText, ShieldCheck, ClipboardCheck, FileX, GitMerge } 
 import EditableCell from "@/components/ui/EditableCell";
 import { VEHICLE_COLUMNS, formatCurrency } from "@/config/vehicleColumns";
 import { isAllowed } from "@/hooks/wrapper";
+import { formatDate } from "@/lib/dateUtils";
+
+// ─── TD class constants (mirrors EditableCell pattern) ──────
+const TD_BASE     = "px-2 py-[5px] whitespace-nowrap border border-[var(--border)] overflow-hidden text-ellipsis";
+const TD_ACTIONS  = `${TD_BASE} text-right`;
+const TD_STATIC   = `${TD_BASE} font-medium`;
+const TD_CURRENCY = `${TD_BASE} text-right font-medium`;
 
 const VehicleRow = React.memo(function VehicleRow({
   vehicle: v,
@@ -23,13 +30,13 @@ const VehicleRow = React.memo(function VehicleRow({
     : VEHICLE_COLUMNS;
 
   return (
-    <tr className="hover:bg-[var(--input)]/50 transition-colors" style={{ height: 40 }}>
+    <tr className="hover:bg-[var(--input)]/50 transition-colors" style={{ height: 32 }}>
       {columns.map((col) => {
         // ── Actions column (conditional) ──────────────────────
         if (col.type === "actions") {
           if (!isAllowed(col.requirePermission, session)) return null;
           return (
-            <td key={col.id} className="px-2 py-2 whitespace-nowrap text-right text-sm border border-[var(--border)] overflow-hidden">
+            <td key={col.id} className={TD_ACTIONS}>
               <div className="flex items-center justify-end gap-0.5">
                 <button
                   onClick={() => onEdit(v.id)}
@@ -51,7 +58,7 @@ const VehicleRow = React.memo(function VehicleRow({
         // ── Static columns (custom rendering) ─────────────────
         if (col.type === "static") {
           return (
-            <td key={col.id} className="px-2 py-2 whitespace-nowrap font-medium border border-[var(--border)] overflow-hidden text-ellipsis">
+            <td key={col.id} className={TD_STATIC}>
               {renderStaticCell(col, v, { setDocumentPreview, onShowMergeInfo })}
             </td>
           );
@@ -61,8 +68,8 @@ const VehicleRow = React.memo(function VehicleRow({
         if (col.type === "readonly-currency" || col.type === "readonly-currency-primary") {
           const isPrimary = col.type === "readonly-currency-primary";
           return (
-            <td key={col.id} className="px-2 py-2 whitespace-nowrap text-right font-medium border border-[var(--border)] overflow-hidden text-ellipsis">
-              <span className={`text-sm tabular-nums ${isPrimary ? "font-semibold text-[var(--primary)]" : "text-[var(--foreground)]"}`}>
+            <td key={col.id} className={TD_CURRENCY}>
+              <span className={`text-[13px] tabular-nums ${isPrimary ? "font-semibold text-[var(--primary)]" : "text-[var(--foreground)]"}`}>
                 {formatCurrency(v[col.field] ?? 0)}
               </span>
             </td>
@@ -104,7 +111,7 @@ function renderStaticCell(col, v, ctx) {
   switch (col.id) {
     case "id":
       return (
-        <span className="text-sm font-mono tabular-nums text-[var(--secondary-foreground)] text-right block flex items-center justify-end gap-1">
+        <span className="text-[13px] font-mono tabular-nums text-[var(--secondary-foreground)] text-right block flex items-center justify-end gap-1">
           {v.mergedAt && (
             <button
               onClick={(e) => {
@@ -112,7 +119,7 @@ function renderStaticCell(col, v, ctx) {
                 ctx.onShowMergeInfo?.(v);
               }}
               className="inline-flex items-center px-1 py-0.5 bg-amber-500/10 text-amber-500 rounded hover:bg-amber-500/20 transition-colors"
-              title={`統合済み — ${new Date(v.mergedAt).toLocaleDateString()}`}
+              title={`統合済み — ${formatDate(v.mergedAt)}`}
             >
               <GitMerge className="w-3 h-3" />
             </button>
@@ -136,12 +143,12 @@ function renderStaticCell(col, v, ctx) {
           <FileText className="w-3.5 h-3.5" />
         </button>
       ) : (
-        <span className="text-sm text-[var(--secondary-foreground)]">-</span>
+        <span className="text-[13px] text-[var(--secondary-foreground)]">-</span>
       );
     case "docs": {
       const certDocs = (v.documents || []).filter(d => d.docType && d.docType !== "invoice");
       if (certDocs.length === 0) {
-        return <span className="text-sm text-[var(--secondary-foreground)]">-</span>;
+        return <span className="text-[13px] text-[var(--secondary-foreground)]">-</span>;
       }
       const docTypeConfig = {
         export_cert:     { icon: ShieldCheck,    color: "#10b981", title: "輸出抹消" },
@@ -176,12 +183,12 @@ function renderStaticCell(col, v, ctx) {
     }
     case "createdAt":
       return (
-        <span className="text-sm text-[var(--secondary-foreground)]">
-          {new Date(v.createdAt).toLocaleDateString()}
+        <span className="text-[13px] text-[var(--secondary-foreground)]">
+          {formatDate(v.createdAt)}
         </span>
       );
     default:
-      return <span className="text-sm text-[var(--secondary-foreground)]">-</span>;
+      return <span className="text-[13px] text-[var(--secondary-foreground)]">-</span>;
   }
 }
 

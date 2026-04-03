@@ -1,190 +1,81 @@
 import React from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 function SidebarNav({
   sidebarSections,
   isCollapsed,
-  dropdownStates,
-  toggleDropdown,
-  setDropdownStates,
   isActiveRoute,
   setIsMobileMenuOpen,
-  session,
+  sectionStates,
+  toggleSection,
 }) {
   return (
-    <div
-      className="flex-1 overflow-y-auto overflow-x-hidden py-4"
-      style={{
-        scrollbarWidth: "thin",
-        scrollbarColor: "var(--border) transparent",
-      }}
-    >
-      <style jsx>{`
-        div::-webkit-scrollbar {
-          width: 6px;
-        }
-        div::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        div::-webkit-scrollbar-thumb {
-          background-color: var(--border);
-          border-radius: 3px;
-        }
-        div::-webkit-scrollbar-thumb:hover {
-          background-color: var(--muted-foreground);
-        }
-      `}</style>
-      {sidebarSections.map((section) => (
-        <div key={section.title} className="mb-6">
-          <div className={`px-4 mb-2 transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:h-0" : "opacity-100 h-auto"}`}>
-            <h3 className="text-xs font-medium text-[var(--secondary-foreground)] uppercase tracking-wider">{section.title}</h3>
-          </div>
+    <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-thin">
+      {sidebarSections.map((section) => {
+        const isSectionCollapsed = section.isCollapsible && sectionStates[section.title];
 
-          <nav className="space-y-1 px-2">
-            {section.items.map(item => {
-              const isActive = isActiveRoute(item.href);
-              const isDropdownOpen = dropdownStates[item.id];
+        return (
+          <div key={section.title ?? "__top__"} className="mb-1">
+            {/* Section header */}
+            {section.title && (
+              <button
+                onClick={section.isCollapsible ? () => toggleSection(section.title) : undefined}
+                className={`
+                  w-full flex items-center justify-between px-4 py-1.5 mb-0.5
+                  transition-all duration-200
+                  ${isCollapsed ? "md:opacity-0 md:pointer-events-none" : "opacity-100"}
+                  ${section.isCollapsible ? "cursor-pointer hover:text-[var(--foreground)]" : "cursor-default"}
+                `}
+              >
+                <span className="text-[11px] font-semibold text-[var(--muted-foreground)] uppercase tracking-wider">
+                  {section.title}
+                </span>
+                {section.isCollapsible && (
+                  <ChevronDown
+                    size={13}
+                    className={`text-[var(--muted-foreground)] transition-transform duration-200 ${isSectionCollapsed ? "-rotate-90" : ""}`}
+                  />
+                )}
+              </button>
+            )}
 
-              // If it's a dropdown item
-              if (item.isDropdown && item.subItems) {
-                return (
-                  <div key={item.id} className="space-y-1">
-                    {/* Dropdown trigger */}
-                    <button
-                      onClick={() => toggleDropdown(item.id)}
+            {/* Section items */}
+            <div
+              className={`overflow-hidden transition-all duration-200 ${
+                isSectionCollapsed ? "max-h-0 opacity-0" : "max-h-[500px] opacity-100"
+              }`}
+            >
+              <nav className="px-2 space-y-0.5">
+                {section.items.map(item => {
+                  const isActive = isActiveRoute(item.href);
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      onClick={() => setIsMobileMenuOpen?.(false)}
                       className={`
-                        group w-full flex items-center px-3 py-2.5 rounded-lg transition-all duration-200
-                        text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]
+                        group flex items-center gap-3 px-3 py-2 text-sm transition-all duration-150
+                        ${isActive
+                          ? "sidebar-active-item font-semibold text-[var(--foreground)]"
+                          : "rounded-lg text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-white/70"
+                        }
                       `}
                     >
-                      <div className="flex-shrink-0 w-5 h-5 transition-transform duration-200 group-hover:scale-110">{item.icon}</div>
-
-                      <span
-                        className={`
-                          ml-3 text-sm font-medium transition-all duration-300
-                          ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
-                        `}
-                      >
+                      <span className={`shrink-0 ${isActive ? "text-[var(--primary)]" : "text-[var(--muted-foreground)] group-hover:text-[var(--foreground)]"}`}>
+                        {item.icon}
+                      </span>
+                      <span className={`transition-all duration-300 truncate ${isCollapsed ? "md:opacity-0 md:w-0 overflow-hidden" : "opacity-100"}`}>
                         {item.label}
                       </span>
-
-                      {/* Dropdown arrow */}
-                      <div
-                        className={`
-                          ml-auto transition-all duration-300
-                          ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
-                        `}
-                      >
-                        {isDropdownOpen ? <ChevronDown size={16} className="transition-transform duration-200" /> : <ChevronRight size={16} className="transition-transform duration-200" />}
-                      </div>
-                    </button>
-
-                    {/* Dropdown content */}
-                    <div
-                      className={`
-                        overflow-hidden transition-all duration-300 ease-in-out
-                        ${isDropdownOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}
-                        ${isCollapsed ? "md:hidden" : ""}
-                      `}
-                    >
-                      <div className="ml-8 space-y-1 py-1">
-                        {item.subItems
-                          .filter(subItem => {
-                            // Check if role is excluded
-                            if (subItem.excludeRoles && subItem.excludeRoles.length > 0 && session?.role && subItem.excludeRoles.includes(session.role)) {
-                              return false;
-                            }
-
-                            // Filter sub-items by role
-                            if (!subItem.roles || subItem.roles.length === 0) return true;
-                            if (!session?.role) return false;
-                            return subItem.roles.includes(session.role);
-                          })
-                          .map(subItem => {
-                            const isSubActive = isActiveRoute(subItem.href);
-                            return (
-                              <Link
-                                key={subItem.id}
-                                href={subItem.href}
-                                onClick={() => {
-                                  setIsMobileMenuOpen?.(false);
-                                  // Close the dropdown when clicking on a sub-item
-                                  setDropdownStates(prev => ({
-                                    ...prev,
-                                    [item.id]: false,
-                                  }));
-                                }}
-                                className={`
-                                  flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-200 relative
-                                  ${
-                                    isSubActive
-                                      ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-lg"
-                                      : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
-                                  }
-                                `}
-                              >
-                                {subItem.icon && <div className="flex-shrink-0">{subItem.icon}</div>}
-                                <span>{subItem.label}</span>
-                                {isSubActive && <div className="absolute -left-2 top-2 w-1 h-6 bg-white rounded-r-full"></div>}
-                              </Link>
-                            );
-                          })}
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-
-              // Regular menu item — only compute activeBg when this item is actually active
-              const activeColor = item.color || null;
-              const activeBg = isActive
-                ? activeColor
-                  ? `rgba(${parseInt(activeColor.slice(1,3),16)},${parseInt(activeColor.slice(3,5),16)},${parseInt(activeColor.slice(5,7),16)},0.12)`
-                  : "rgba(59,130,246,0.12)"
-                : undefined;
-              return (
-                <Link
-                  key={item.id}
-                  href={item.href}
-                  onClick={() => {
-                    // Close mobile menu when link is clicked
-                    setIsMobileMenuOpen?.(false);
-                  }}
-                  className={`
-                    group flex items-center px-3 py-2.5 rounded-lg transition-all duration-200
-                    ${isActive ? "shadow-sm" : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"}
-                  `}
-                  style={isActive ? {
-                    backgroundColor: activeBg,
-                    color: "var(--foreground)",
-                    borderLeft: `3px solid ${activeColor || "var(--primary)"}`,
-                  } : {}}
-                >
-                  <div
-                    className={`
-                    flex-shrink-0 w-5 h-5 transition-transform duration-200
-                    ${isActive ? "" : "group-hover:scale-110"}
-                  `}
-                  >
-                    {item.icon}
-                  </div>
-
-                  <span
-                    className={`
-                    ml-3 text-sm transition-all duration-300
-                    ${isActive ? "font-semibold" : "font-medium"}
-                    ${isCollapsed ? "md:opacity-0 md:w-0" : "opacity-100"}
-                  `}
-                  >
-                    {item.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-      ))}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

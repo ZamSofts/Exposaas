@@ -24,10 +24,10 @@ function formatDateJa(date) {
 
 function StatCard({ label, unit, value, color, icon: Icon, isLoading }) {
   const styles = {
-    red:    { bg: "bg-red-500/10",    text: "text-red-600",    border: "border-red-500/20" },
-    orange: { bg: "bg-orange-500/10", text: "text-orange-500", border: "border-orange-500/20" },
-    blue:   { bg: "bg-blue-500/10",   text: "text-blue-600",   border: "border-blue-500/20" },
-    gray:   { bg: "bg-gray-500/10",   text: "text-gray-500",   border: "border-gray-500/20" },
+    red:    { bg: "bg-red-500/20",    text: "text-red-700",    border: "border-red-500/35" },
+    orange: { bg: "bg-orange-500/20", text: "text-orange-600", border: "border-orange-500/35" },
+    blue:   { bg: "bg-blue-500/20",   text: "text-blue-700",   border: "border-blue-500/35" },
+    gray:   { bg: "bg-gray-500/15",   text: "text-gray-600",   border: "border-gray-500/30" },
   };
   const s = styles[color] || styles.gray;
 

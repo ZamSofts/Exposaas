@@ -1,5 +1,3 @@
-import { API } from "@/hooks/wrapper";
-
 /**
  * Shared utilities for InvoiceJobs — used by the /documents page.
  */
@@ -19,17 +17,6 @@ export function getVehicleCount(json) {
     }
   }
   return count;
-}
-
-// ---------------------------------------------------------------------------
-// Page info label (e.g. "Page 1 of 3")
-// ---------------------------------------------------------------------------
-export function getPageInfo(row) {
-  if (row.pageNumber && row.originalTotalPages) {
-    return `Page ${row.pageNumber} of ${row.originalTotalPages}`;
-  }
-  if (row.totalPages) return `${row.totalPages} pages (legacy)`;
-  return "Single";
 }
 
 // ---------------------------------------------------------------------------
@@ -69,12 +56,12 @@ export function buildViewerData(row, correctedJson) {
 // Keeps rendering in the page, but centralises the status → display mapping.
 // ---------------------------------------------------------------------------
 const STATUS_CONFIG = {
-  completed:            { icon: "CheckCircle2", label: "Completed",  colorClass: "bg-green-500/15 text-green-600 border border-green-500/30" },
-  processing:           { icon: "Clock",        label: "Processing", colorClass: "bg-blue-500/15 text-blue-600 border border-blue-500/30" },
-  failed:               { icon: "AlertCircle",  label: "Failed",     colorClass: "bg-red-500/15 text-red-600 border border-red-500/30" },
-  empty:                { icon: "Inbox",        label: "Empty",      colorClass: "bg-gray-500/15 text-gray-500 border border-gray-500/20" },
-  needs_classification: { icon: "HelpCircle",   label: "要確認",      colorClass: "bg-amber-500/15 text-amber-600 border border-amber-500/30" },
-  pending:              { icon: "Clock",        label: "Pending",    colorClass: "bg-gray-500/15 text-gray-500 border border-gray-500/20" },
+  completed:            { icon: "CheckCircle2", label: "Completed",  colorClass: "bg-green-100 text-green-800 border border-green-300" },
+  processing:           { icon: "Clock",        label: "Processing", colorClass: "bg-blue-100 text-blue-800 border border-blue-300" },
+  failed:               { icon: "AlertCircle",  label: "Failed",     colorClass: "bg-red-100 text-red-800 border border-red-300" },
+  empty:                { icon: "Inbox",        label: "Empty",      colorClass: "bg-gray-100 text-gray-700 border border-gray-300" },
+  needs_classification: { icon: "HelpCircle",   label: "要確認",      colorClass: "bg-amber-100 text-amber-800 border border-amber-300" },
+  pending:              { icon: "Clock",        label: "Pending",    colorClass: "bg-gray-100 text-gray-700 border border-gray-300" },
 };
 
 export function getStatusConfig(status) {

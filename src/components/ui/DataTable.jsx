@@ -17,12 +17,12 @@ function getColumnCount(children) {
 }
 
 // Virtual tbody for spreadsheet mode — only renders visible rows
-function VirtualTbody({ rows, scrollEl, estimateSize = 40 }) {
+function VirtualTbody({ rows, scrollEl, estimateSize = 32 }) {
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollEl,
     estimateSize: () => estimateSize,
-    overscan: 15,
+    overscan: 50,
   });
 
   const virtualRows = virtualizer.getVirtualItems();
@@ -74,6 +74,7 @@ export default function DataTable({
   sortBy = "",
   sortOrder = "asc",
   variant = "default",
+  tableWidth,
 }) {
   const isSpreadsheet = variant === "spreadsheet";
   const [scrollEl, setScrollEl] = useState(null);
@@ -93,7 +94,7 @@ export default function DataTable({
   }, [search]);
 
   const handleSearch = () => {
-    onSearch(search);
+    onSearch?.(search);
   };
 
   const handleSort = (column) => {
@@ -194,7 +195,7 @@ export default function DataTable({
                     if (React.isValidElement(header) && header.type === "th") {
                       const columnId = header.props.id;
                       const defaultHeaderClasses = isSpreadsheet
-                        ? "px-2 py-1.5 text-left text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider whitespace-nowrap overflow-hidden border border-[var(--border)] bg-[var(--table-header-bg,#f1f5f9)]"
+                        ? "px-2 py-[5px] text-left text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider whitespace-nowrap overflow-hidden border border-[var(--border)] bg-[var(--table-header-bg,#f1f5f9)]"
                         : "px-3 py-2 text-left text-xs font-semibold text-[var(--foreground)] uppercase tracking-wider whitespace-nowrap bg-[var(--table-header-bg,#f1f5f9)]";
                       const existingClasses = header.props.className || "";
 
@@ -330,7 +331,7 @@ export default function DataTable({
         )}
 
         <div ref={isSpreadsheet ? scrollRefCallback : undefined} className={isSpreadsheet ? "overflow-auto max-h-[calc(100vh-140px)] spreadsheet-scroll" : "overflow-auto max-h-[calc(100vh-280px)]"}>
-          <table className={isSpreadsheet ? "border-collapse striped-table" : "w-full striped-table"} style={isSpreadsheet ? { tableLayout: "fixed" } : undefined}>
+          <table className={isSpreadsheet ? "border-collapse striped-table" : "w-full striped-table"} style={isSpreadsheet ? { tableLayout: "fixed", width: tableWidth ? tableWidth + "px" : undefined, minWidth: tableWidth ? tableWidth + "px" : undefined } : undefined}>
             {processedChildren}
           </table>
         </div>
@@ -355,6 +356,7 @@ export default function DataTable({
                     <option value={500}>500</option>
                     <option value={1000}>1000</option>
                     <option value={2000}>2000</option>
+                    <option value={99999}>全件</option>
                   </select>
                 </div>
                 <div className="text-sm text-[var(--secondary-foreground)]">

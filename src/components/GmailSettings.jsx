@@ -88,7 +88,8 @@ export default function GmailSettings() {
               {status.email}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[var(--secondary)] text-[var(--secondary-foreground)]">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700 border border-gray-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
               Not connected
             </span>
           )}
