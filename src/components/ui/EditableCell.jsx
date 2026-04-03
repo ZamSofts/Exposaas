@@ -3,6 +3,7 @@ import { API } from "@/hooks/wrapper";
 import InlineCellDropdown from "./InlineCellDropdown";
 import InlineCellCombobox from "./InlineCellCombobox";
 import { getColorForValue } from "@/lib/colorLabel";
+import { formatDate } from "@/lib/dateUtils";
 
 // ─── Shared helpers ──────────────────────────────────────────
 
@@ -34,13 +35,27 @@ function ReadOnlyContent({ text, dotColor }) {
       </span>
     );
   }
-  return <span className="text-sm text-[var(--foreground)]">{text}</span>;
+  return <span className="text-[13px] text-[var(--foreground)]">{text}</span>;
 }
 
 // ─── TD class constants ──────────────────────────────────────
-const TD_READONLY = "px-2 py-1 whitespace-nowrap border border-[var(--border)] overflow-hidden text-ellipsis";
-const TD_CLICKABLE = "px-2 py-1 whitespace-nowrap cursor-pointer hover:bg-[var(--input)] transition-colors border border-[var(--border)] overflow-hidden text-ellipsis";
-const TD_EDITING = "px-0.5 py-0.5 whitespace-nowrap border border-[var(--border)]";
+const TD_READONLY = "px-2 py-[3px] whitespace-nowrap border border-[var(--border)] overflow-hidden text-ellipsis";
+const TD_CLICKABLE = "px-2 py-[3px] whitespace-nowrap cursor-pointer hover:bg-[var(--input)] transition-colors border border-[var(--border)] overflow-hidden text-ellipsis";
+const TD_EDITING = "px-0.5 py-[1px] whitespace-nowrap border border-[var(--border)]";
+const TD_ERROR = "border-l-2 border-l-red-400";
+
+/** Tiny inline spinner shown while an API save is in-flight. */
+function SaveSpinner() {
+  return (
+    <svg
+      className="inline-block animate-spin w-3 h-3 ml-1 text-[var(--secondary-foreground)] flex-shrink-0"
+      viewBox="0 0 24 24" fill="none"
+    >
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+    </svg>
+  );
+}
 
 /**
  * Polymorphic inline-editable table cell.
@@ -72,11 +87,13 @@ export default function EditableCell({
   const [editValue, setEditValue] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasError, setHasError] = useState(false);
   const inputRef = useRef(null);
 
-  // Sync local state when parent value changes
+  // Sync local state when parent value changes (also clears error on successful save)
   useEffect(() => {
     setEditValue(normalizeValue(value, type));
+    setHasError(false);
   }, [value, type]);
 
   // Auto-focus input when entering edit mode
@@ -105,18 +122,22 @@ export default function EditableCell({
     }
 
     setIsSaving(true);
+    setHasError(false);
     try {
       const payload = type === "number"
         ? (saveValue === "" ? null : parseFloat(saveValue))
         : saveValue;
 
-      const result = await API("POST", "vehicleInlineUpdate", {
-        id: vehicleId,
-        field,
-        value: payload,
-      });
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Request timed out")), 8000)
+      );
+      const result = await Promise.race([
+        API("POST", "vehicleInlineUpdate", { id: vehicleId, field, value: payload }),
+        timeout,
+      ]);
 
       if (result.error) {
+        setHasError(true);
         onError?.(result.error);
         revert();
         return;
@@ -124,6 +145,7 @@ export default function EditableCell({
       setIsEditing(false);
       onSaved?.(result.vehicle);
     } catch (err) {
+      setHasError(true);
       onError?.("Failed to save");
       revert();
     } finally {
@@ -150,9 +172,7 @@ export default function EditableCell({
   const readOnlyText = () => {
     if (displayValue !== undefined && displayValue !== null) return displayValue;
     if (type === "number") return Number(value || 0).toLocaleString();
-    if (type === "date" && value) {
-      try { return new Date(value).toLocaleDateString(); } catch { return value; }
-    }
+    if (type === "date" && value) return formatDate(value);
     return value || "-";
   };
 
@@ -172,22 +192,26 @@ export default function EditableCell({
   // ─── Number: Always-visible input (Excel-style) ────────────
   if (type === "number") {
     return (
-      <td className={TD_EDITING}>
-        <input
-          ref={inputRef}
-          type="number"
-          value={editValue}
-          onChange={e => setEditValue(e.target.value)}
-          onBlur={() => handleSave()}
-          onKeyDown={handleKeyDown}
-          disabled={isSaving}
-          className={`w-full px-1.5 py-1 text-sm tabular-nums bg-transparent border border-transparent rounded
-            text-[var(--foreground)] text-right
-            hover:border-[var(--border)] focus:border-[var(--primary)] focus:bg-[var(--input)]
-            focus:outline-none transition-colors
-            ${isSaving ? "opacity-50" : ""}`}
-          placeholder="-"
-        />
+      <td className={`${TD_EDITING} ${hasError ? TD_ERROR : ""}`}>
+        <div className="flex items-center">
+          <input
+            ref={inputRef}
+            type="number"
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={() => handleSave()}
+            onFocus={() => setHasError(false)}
+            onKeyDown={handleKeyDown}
+            disabled={isSaving}
+            className={`w-full px-1.5 py-[2px] text-[13px] tabular-nums bg-transparent border border-transparent rounded
+              text-[var(--foreground)] text-right
+              hover:border-[var(--border)] focus:border-[var(--primary)] focus:bg-[var(--input)]
+              focus:outline-none transition-colors
+              ${isSaving ? "opacity-40" : ""}`}
+            placeholder="-"
+          />
+          {isSaving && <SaveSpinner />}
+        </div>
       </td>
     );
   }
@@ -195,7 +219,10 @@ export default function EditableCell({
   // ─── Click-to-edit types (read display) ─────────────────────
   if (!isEditing) {
     return (
-      <td className={TD_CLICKABLE} onClick={() => setIsEditing(true)}>
+      <td
+        className={`${TD_CLICKABLE} ${hasError ? TD_ERROR : ""}`}
+        onClick={() => { setHasError(false); setIsEditing(true); }}
+      >
         <ReadOnlyContent text={readOnlyText()} dotColor={dotColor} />
       </td>
     );
@@ -204,20 +231,23 @@ export default function EditableCell({
   // ─── Text Input ─────────────────────────────────────────────
   if (type === "text") {
     return (
-      <td className={TD_EDITING}>
-        <input
-          ref={inputRef}
-          type="text"
-          value={editValue}
-          onChange={e => setEditValue(e.target.value)}
-          onBlur={() => handleSave()}
-          onKeyDown={handleKeyDown}
-          disabled={isSaving}
-          className={`w-full min-w-[80px] px-1.5 py-1 text-sm bg-[var(--input)] border border-[var(--primary)] rounded
-            text-[var(--foreground)] focus:outline-none transition-colors
-            ${isSaving ? "opacity-50" : ""}`}
-          placeholder="-"
-        />
+      <td className={`${TD_EDITING} ${hasError ? TD_ERROR : ""}`}>
+        <div className="flex items-center">
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={() => handleSave()}
+            onKeyDown={handleKeyDown}
+            disabled={isSaving}
+            className={`w-full min-w-[80px] px-1.5 py-[2px] text-[13px] bg-[var(--input)] border border-[var(--primary)] rounded
+              text-[var(--foreground)] focus:outline-none transition-colors
+              ${isSaving ? "opacity-40" : ""}`}
+            placeholder="-"
+          />
+          {isSaving && <SaveSpinner />}
+        </div>
       </td>
     );
   }
@@ -226,19 +256,22 @@ export default function EditableCell({
   if (type === "date") {
     const dateVal = editValue ? (typeof editValue === "string" ? editValue.split("T")[0] : "") : "";
     return (
-      <td className={TD_EDITING}>
-        <input
-          ref={inputRef}
-          type="date"
-          value={dateVal}
-          onChange={e => setEditValue(e.target.value)}
-          onBlur={() => handleSave()}
-          onKeyDown={handleKeyDown}
-          disabled={isSaving}
-          className={`w-full min-w-[120px] px-1.5 py-1 text-sm bg-[var(--input)] border border-[var(--primary)] rounded
-            text-[var(--foreground)] focus:outline-none transition-colors
-            ${isSaving ? "opacity-50" : ""}`}
-        />
+      <td className={`${TD_EDITING} ${hasError ? TD_ERROR : ""}`}>
+        <div className="flex items-center">
+          <input
+            ref={inputRef}
+            type="date"
+            value={dateVal}
+            onChange={e => setEditValue(e.target.value)}
+            onBlur={() => handleSave()}
+            onKeyDown={handleKeyDown}
+            disabled={isSaving}
+            className={`w-full min-w-[120px] px-1.5 py-[2px] text-[13px] bg-[var(--input)] border border-[var(--primary)] rounded
+              text-[var(--foreground)] focus:outline-none transition-colors
+              ${isSaving ? "opacity-40" : ""}`}
+          />
+          {isSaving && <SaveSpinner />}
+        </div>
       </td>
     );
   }
@@ -246,7 +279,7 @@ export default function EditableCell({
   // ─── Dropdown (relation fields) ─────────────────────────────
   if (type === "dropdown") {
     return (
-      <td className={TD_EDITING} style={{ minWidth: "140px" }}>
+      <td className={`${TD_EDITING} ${hasError ? TD_ERROR : ""}`} style={{ minWidth: "140px" }}>
         <InlineCellDropdown
           options={options || []}
           selectedValue={editValue}
@@ -262,7 +295,7 @@ export default function EditableCell({
   // ─── Combobox (free text + suggestions) ─────────────────────
   if (type === "combobox") {
     return (
-      <td className={TD_EDITING} style={{ minWidth: "140px" }}>
+      <td className={`${TD_EDITING} ${hasError ? TD_ERROR : ""}`} style={{ minWidth: "140px" }}>
         <InlineCellCombobox
           options={options || []}
           currentValue={editValue}

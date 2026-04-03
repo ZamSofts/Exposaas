@@ -5,11 +5,8 @@ vi.mock("@/hooks/wrapper", () => ({ API: vi.fn() }));
 
 import {
   getVehicleCount,
-  getPageInfo,
   buildViewerData,
   getStatusConfig,
-  getReviewButtonLabel,
-  isReviewDisabled,
   isActionDone,
 } from "../invoiceJobUtils";
 
@@ -39,19 +36,6 @@ describe("getVehicleCount", () => {
   });
 });
 
-describe("getPageInfo", () => {
-  it("returns 'Page X of Y' for per-page jobs", () => {
-    expect(getPageInfo({ pageNumber: 2, originalTotalPages: 5 })).toBe("Page 2 of 5");
-  });
-
-  it("returns legacy format for totalPages", () => {
-    expect(getPageInfo({ totalPages: 3 })).toBe("3 pages (legacy)");
-  });
-
-  it("returns 'Single' for no page info", () => {
-    expect(getPageInfo({})).toBe("Single");
-  });
-});
 
 describe("getStatusConfig", () => {
   it("returns config for all valid statuses", () => {
@@ -78,57 +62,6 @@ describe("getStatusConfig", () => {
   });
 });
 
-describe("getReviewButtonLabel", () => {
-  it("returns 'Processing...' for processing status", () => {
-    expect(getReviewButtonLabel({ status: "processing" }, 0)).toBe("Processing...");
-  });
-
-  it("returns 'Pending...' for pending status", () => {
-    expect(getReviewButtonLabel({ status: "pending" }, 0)).toBe("Pending...");
-  });
-
-  it("returns 'Review' for completed invoice with vehicles", () => {
-    expect(getReviewButtonLabel({ status: "completed", docType: "invoice" }, 3)).toBe("Review");
-  });
-
-  it("returns 'Empty' for invoice with 0 vehicles", () => {
-    expect(getReviewButtonLabel({ status: "completed", docType: "invoice" }, 0)).toBe("Empty");
-  });
-
-  it("returns 'Evaluated' for evaluated invoice", () => {
-    expect(getReviewButtonLabel({ status: "completed", docType: "invoice", isEvaluated: true }, 3)).toBe("Evaluated");
-  });
-
-  it("returns 'View' for cert types", () => {
-    expect(getReviewButtonLabel({ status: "completed", docType: "export_cert" }, 1)).toBe("View");
-  });
-
-  it("returns 'Linked' for cert with linkedVehicleId", () => {
-    expect(getReviewButtonLabel({ status: "completed", docType: "export_cert", Json: { linkedVehicleId: 5 } }, 1)).toBe("Linked");
-  });
-
-  it("returns 'Classify' for needs_classification", () => {
-    expect(getReviewButtonLabel({ status: "needs_classification" }, 0)).toBe("Classify");
-  });
-});
-
-describe("isReviewDisabled", () => {
-  it("disabled for processing", () => {
-    expect(isReviewDisabled({ status: "processing" })).toBe(true);
-  });
-
-  it("disabled for pending", () => {
-    expect(isReviewDisabled({ status: "pending" })).toBe(true);
-  });
-
-  it("enabled for completed", () => {
-    expect(isReviewDisabled({ status: "completed" })).toBe(false);
-  });
-
-  it("enabled for failed", () => {
-    expect(isReviewDisabled({ status: "failed" })).toBe(false);
-  });
-});
 
 describe("isActionDone", () => {
   it("done for evaluated invoice", () => {

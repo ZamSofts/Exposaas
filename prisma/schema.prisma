@@ -9,19 +9,19 @@ datasource db {
 }
 
 model Company {
-  id        Int           @id @default(autoincrement())
-  name      String
-  createdAt DateTime      @default(now())
-  status    CompanyStatus @default(active)
-  users     User[]
-  vehicles  Vehicle[]
-  roles     Role[]
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  createdAt            DateTime              @default(now())
+  status               CompanyStatus         @default(active)
+  customers            Customer[]
+  exportTemplates      ExportTemplate[]
+  gmailAccount         GmailAccount?
+  InvoiceJobs          InvoiceJobs[]
   paymentConfirmations PaymentConfirmation[]
-  InvoiceJobs   InvoiceJobs[]
-  customers Customer[]
-  promptVersions PromptVersion[]
-  exportTemplates ExportTemplate[]
-  gmailAccount GmailAccount?
+  promptVersions       PromptVersion[]
+  roles                Role[]
+  users                User[]
+  vehicles             Vehicle[]
 }
 
 model Customer {
@@ -29,27 +29,27 @@ model Customer {
   name      String
   country   String?
   uniqueId  String
-  vehicles  Vehicle[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   userId    Int?      @unique
-  user      User?     @relation(fields: [userId], references: [id])
   companyId Int?
-  company   Company?   @relation(fields: [companyId], references: [id])
+  company   Company?  @relation(fields: [companyId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
+  vehicles  Vehicle[]
 
   @@unique([companyId, uniqueId])
   @@index([companyId])
 }
 
 model User {
-  id           Int           @id @default(autoincrement())
-  username     String        @unique
-  password     String
-  companyId    Int
-  createdAt    DateTime      @default(now())
-  company      Company       @relation(fields: [companyId], references: [id])
-  roles        UserRole[]
-  customer     Customer?
+  id        Int        @id @default(autoincrement())
+  username  String     @unique
+  password  String
+  companyId Int
+  createdAt DateTime   @default(now())
+  customer  Customer?
+  company   Company    @relation(fields: [companyId], references: [id])
+  roles     UserRole[]
 
   @@index([companyId])
 }
@@ -57,10 +57,10 @@ model User {
 model Role {
   id          Int              @id @default(autoincrement())
   name        String
-  permissions RolePermission[]
-  users       UserRole[]
   companyId   Int?
   company     Company?         @relation(fields: [companyId], references: [id])
+  permissions RolePermission[]
+  users       UserRole[]
 
   @@unique([name, companyId])
   @@map("Role")
@@ -93,64 +93,52 @@ model UserRole {
 }
 
 model Vehicle {
-  id            Int           @id @default(autoincrement())
-  name          String?
-  chassisNumber String
-  remarks       String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  companyId     Int
-  brandId       Int
-  customerId    Int?
-  auction       String?
-  lotNumber     String?
-
-  // Charge columns (acquisition costs from invoices/CSV)
-  bidAmount          Decimal?  @db.Decimal(12, 2)
-  auctionFee         Decimal?  @db.Decimal(12, 2)
-  insuranceFee       Decimal?  @db.Decimal(12, 2)
-  recyclingFee       Decimal?  @db.Decimal(12, 2)
-  transportFee       Decimal?  @db.Decimal(12, 2)
-  otherFees          Decimal?  @db.Decimal(12, 2)
-  taxSum             Decimal?  @db.Decimal(12, 2)  // Auto-calculated: (bid + auction + insurance + transport + other) × 0.1
-  totalCost          Decimal?  @db.Decimal(12, 2)  // Auto-calculated: all fees + taxSum
-  sourceInvoiceJobId Int?
-
-  // Logistics/metadata columns
-  auctionDate            String?
-  session                String?
-  transportCompany       String?
-  deliverTo              String?
-  numberPlate            String?
-  titleTransferDeadline  DateTime?
-  containerNumber        String?
-  etd                    String?
-  documentStatus         String?
-  memo                   String?
-
-  // Size dimensions (from certificates: export_cert, inspection_cert, temp_cancel)
-  length    Int?              // cm
-  width     Int?              // cm
-  height    Int?              // cm
-  m3        Decimal?  @db.Decimal(8, 2)  // cubic meters (L×W×H ÷ 1,000,000)
-
-  // Audit trail (Int — matches User.id; no FK relation since Sadmin may not have a User record)
-  createdById   Int?
-  updatedById   Int?
-
-  // Merge tracking
-  mergedAt      DateTime?   // Non-null = this vehicle was merged (drives UI highlight)
-  mergedFromId  Int?        // ID of the absorbed vehicle (reference only, not FK)
-  mergedFields  Json?       // Snapshot: { chargeSource, fieldsChanged, absorbedChassisNumber, source }
-
-  // Relations
-  brand         Brand         @relation(fields: [brandId], references: [id])
-  company       Company       @relation(fields: [companyId], references: [id])
-  customer      Customer?     @relation(fields: [customerId], references: [id])
-  sourceInvoiceJob InvoiceJobs? @relation(fields: [sourceInvoiceJobId], references: [id])
-  documents     VehicleDocument[]
-  payments      VehiclePayments[]
-  auditLogs     VehicleAuditLog[]
+  id                    Int               @id @default(autoincrement())
+  name                  String?
+  chassisNumber         String
+  remarks               String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  companyId             Int
+  brandId               Int
+  auction               String?
+  lotNumber             String?
+  customerId            Int?
+  auctionFee            Decimal?          @db.Decimal(12, 2)
+  bidAmount             Decimal?          @db.Decimal(12, 2)
+  otherFees             Decimal?          @db.Decimal(12, 2)
+  recyclingFee          Decimal?          @db.Decimal(12, 2)
+  sourceInvoiceJobId    Int?
+  totalCost             Decimal?          @db.Decimal(12, 2)
+  transportFee          Decimal?          @db.Decimal(12, 2)
+  auctionDate           String?
+  containerNumber       String?
+  deliverTo             String?
+  etd                   String?
+  numberPlate           String?
+  session               String?
+  taxSum                Decimal?          @db.Decimal(12, 2)
+  titleTransferDeadline DateTime?
+  transportCompany      String?
+  insuranceFee          Decimal?          @db.Decimal(12, 2)
+  documentStatus        String?
+  memo                  String?
+  height                Int?
+  length                Int?
+  m3                    Decimal?          @db.Decimal(8, 2)
+  width                 Int?
+  createdById           Int?
+  updatedById           Int?
+  mergedAt              DateTime?
+  mergedFields          Json?
+  mergedFromId          Int?
+  brand                 Brand             @relation(fields: [brandId], references: [id])
+  company               Company           @relation(fields: [companyId], references: [id])
+  customer              Customer?         @relation(fields: [customerId], references: [id])
+  sourceInvoiceJob      InvoiceJobs?      @relation(fields: [sourceInvoiceJobId], references: [id])
+  auditLogs             VehicleAuditLog[]
+  documents             VehicleDocument[]
+  payments              VehiclePayments[]
 
   @@unique([companyId, chassisNumber])
   @@index([companyId])
@@ -163,10 +151,10 @@ model Vehicle {
 model VehicleDocument {
   id        Int      @id @default(autoincrement())
   vehicleId Int
-  Url       String
-  docType   String?  // invoice, export_cert, inspection_cert, temp_cancel
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  Url       String
+  docType   String?
   vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
@@ -176,8 +164,8 @@ model VehiclePayments {
   id        Int       @id @default(autoincrement())
   vehicleId Int
   name      String
-  amount    Decimal   @db.Decimal(10, 2)
   date      DateTime?
+  amount    Decimal   @db.Decimal(10, 2)
   remarks   String?
   url       String?
   createdAt DateTime  @default(now())
@@ -193,23 +181,22 @@ model Brand {
   vehicles Vehicle[]
 }
 
-
 model PaymentConfirmation {
-  id          Int      @id @default(autoincrement())
-  DocumentURL String?
-  Page        Int
-  Json        Json
-  isCorrect   String
-  diffSummary  Json?
-  auctionHouse String?
-  isGolden     Boolean  @default(false)
-  embedding    Json?    // Gemini text-embedding vector for few-shot similarity search
+  id           Int          @id @default(autoincrement())
+  DocumentURL  String?
+  Page         Int
+  Json         Json
+  isCorrect    String
+  companyId    Int
+  createdAt    DateTime     @default(now())
   invoiceJobId Int?
+  auctionHouse String?
+  diffSummary  Json?
+  isGolden     Boolean      @default(false)
+  embedding    Json?
+  reviewedById Int?
+  company      Company      @relation(fields: [companyId], references: [id])
   invoiceJob   InvoiceJobs? @relation("PaymentConfirmationInvoiceJob", fields: [invoiceJobId], references: [id])
-  reviewedById Int?     // User ID who reviewed/saved this extraction
-  companyId   Int
-  company     Company  @relation(fields: [companyId], references: [id])
-  createdAt   DateTime @default(now())
 
   @@index([companyId])
   @@index([companyId, auctionHouse])
@@ -218,47 +205,42 @@ model PaymentConfirmation {
 }
 
 model InvoiceJobs {
-  id          Int      @id @default(autoincrement())
-  DocumentURL String?
-  Json        Json?    // Extraction result for this page
-  companyId   Int
-  isEvaluated Boolean   @default(false)
-  status      JobStatus @default(pending)
-  totalPages  Int?     // Total page count in PDF (legacy, kept for backwards compat)
-  docType     String   @default("invoice")  // invoice, export_cert, inspection_cert, temp_cancel, unknown
-
-  // Per-page job fields (new architecture)
-  pageNumber          Int?      // Which page this is (1, 2, 3...) - null for legacy jobs
-  parentDocumentUrl   String?   // Original multi-page PDF URL (to group pages from same upload)
-  originalTotalPages  Int?      // Total pages in original PDF
-
-  company     Company  @relation(fields: [companyId], references: [id])
-  createdAt   DateTime @default(now())
-  vehicles    Vehicle[]  // Vehicles created from this invoice
+  id                   Int                   @id @default(autoincrement())
+  DocumentURL          String?
+  Json                 Json?
+  companyId            Int
+  createdAt            DateTime              @default(now())
+  isEvaluated          Boolean               @default(false)
+  status               JobStatus             @default(pending)
+  totalPages           Int?
+  originalTotalPages   Int?
+  pageNumber           Int?
+  parentDocumentUrl    String?
+  docType              String                @default("invoice")
+  company              Company               @relation(fields: [companyId], references: [id])
   paymentConfirmations PaymentConfirmation[] @relation("PaymentConfirmationInvoiceJob")
+  vehicles             Vehicle[]
 
   @@index([companyId])
   @@index([companyId, docType])
-  @@index([parentDocumentUrl])  // For grouping pages from same PDF
+  @@index([parentDocumentUrl])
 }
 
-
 model PromptVersion {
-  id           Int       @id @default(autoincrement())
+  id           Int             @id @default(autoincrement())
   version      String
-  content      String    @db.Text
+  content      String
   parentId     Int?
   strategy     String?
-  status       String    @default("draft") // draft, evaluating, evaluated, active, archived
+  status       String          @default("draft")
   score        Float?
   scoreDetails Json?
   companyId    Int
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime        @default(now())
   evaluatedAt  DateTime?
-
-  company  Company        @relation(fields: [companyId], references: [id])
-  parent   PromptVersion? @relation("PromptDeriv", fields: [parentId], references: [id])
-  children PromptVersion[] @relation("PromptDeriv")
+  company      Company         @relation(fields: [companyId], references: [id])
+  parent       PromptVersion?  @relation("PromptDeriv", fields: [parentId], references: [id])
+  children     PromptVersion[] @relation("PromptDeriv")
 
   @@index([companyId])
   @@index([companyId, status])
@@ -266,18 +248,17 @@ model PromptVersion {
 
 model VehicleAuditLog {
   id        Int      @id @default(autoincrement())
-  vehicleId Int?     // Nullable: set to null when vehicle is deleted (audit log survives)
-  action    String   // create, update, delete, link_document, payment_create, payment_update, payment_delete
-  actor     String   // user, ai, system, csv_import
-  actorId   String?  // User ID (string — NextAuth stores IDs as strings)
-  field     String?  // Field name (for update actions)
-  oldValue  String?  // Previous value (stringified)
-  newValue  String?  // New value (stringified)
-  source    String?  // manual, invoiceJob:{id}, csv:{url}, ai_auto_link:{id}
-  metadata  Json?    // Additional context
+  vehicleId Int?
+  action    String
+  actor     String
+  actorId   String?
+  field     String?
+  oldValue  String?
+  newValue  String?
+  source    String?
+  metadata  Json?
   createdAt DateTime @default(now())
-
-  vehicle   Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
 
   @@index([vehicleId])
   @@index([vehicleId, createdAt])
@@ -288,9 +269,9 @@ model ExportTemplate {
   name                String
   companyId           Int
   createdById         Int?
-  columns             Json     // string[] — ordered vehicle column IDs
-  computedColumns     Json     @default("[]") // ComputedColumn[] — token-based formulas
-  footerRows          Json     @default("[]") // FooterRow[] — labels for blank amount rows
+  columns             Json
+  computedColumns     Json     @default("[]")
+  footerRows          Json     @default("[]")
   showContainerNumber Boolean  @default(true)
   showDate            Boolean  @default(true)
   createdAt           DateTime @default(now())
@@ -302,34 +283,32 @@ model ExportTemplate {
 }
 
 model GmailAccount {
-  id            Int      @id @default(autoincrement())
-  companyId     Int      @unique
+  id            Int            @id @default(autoincrement())
+  companyId     Int            @unique
   email         String
   refreshToken  String
   lastHistoryId String?
   ussPassword   String?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  company       Company        @relation(fields: [companyId], references: [id])
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   emails        EmailMessage[]
+  company       Company        @relation(fields: [companyId], references: [id])
 }
 
 model EmailMessage {
-  id              Int       @id @default(autoincrement())
-  gmailAccountId  Int
-  gmailMessageId  String
-  subject         String?
-  fromAddress     String?
-  receivedAt      DateTime?
-  attachmentUrl   String?
-  status          String    @default("pending")
-  skipReason      String?
-  documentJobId   Int?
-  createdAt       DateTime  @default(now())
-
-  gmailAccount    GmailAccount @relation(fields: [gmailAccountId], references: [id])
+  id             Int          @id @default(autoincrement())
+  gmailAccountId Int
+  gmailMessageId String
+  subject        String?
+  fromAddress    String?
+  receivedAt     DateTime?
+  attachmentUrl  String?
+  status         String       @default("pending")
+  skipReason     String?
+  documentJobId  Int?
+  createdAt      DateTime     @default(now())
+  gmailAccount   GmailAccount @relation(fields: [gmailAccountId], references: [id])
 
   @@unique([gmailAccountId, gmailMessageId])
   @@index([gmailAccountId])

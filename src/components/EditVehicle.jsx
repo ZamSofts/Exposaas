@@ -80,6 +80,36 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
 
   const isEditMode = vehicleId !== null && vehicleId !== 0;
 
+  const resetForm = () => {
+    setName("");
+    setBrandId(null);
+    setChassisNumber("");
+    setLotNumber("");
+    setAuction("");
+    setCustomerId(null);
+    setRemarks("");
+    setBidAmount("");
+    setAuctionFee("");
+    setInsuranceFee("");
+    setRecyclingFee("");
+    setTransportFee("");
+    setOtherFees("");
+    setAuctionDate("");
+    setSessionField("");
+    setTransportCompany("");
+    setDeliverTo("");
+    setNumberPlate("");
+    setTitleTransferDeadline("");
+    setContainerNumber("");
+    setEtd("");
+    setDocumentStatus("");
+    setMemo("");
+    setVehicleDocuments([]);
+    setDocumentsToDelete([]);
+    setError("");
+    setActiveTab("basic");
+  };
+
   useEffect(() => {
     if (status === "authenticated" && session) {
       setCompanyId(Number(session.companyId));
@@ -89,10 +119,12 @@ export const EditVehicle = ({ vehicleId = null, onBack, onSuccess }) => {
   useEffect(() => {
     loadInitialData();
   }, []);
-  
+
   useEffect(() => {
     if (isEditMode) {
       loadData();
+    } else {
+      resetForm();
     }
   }, [vehicleId]);
 

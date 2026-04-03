@@ -1,87 +1,40 @@
 @import "tailwindcss";
 
-/* Dark Theme (Default) */
 :root {
-  --background: hsl(0, 0%, 13%); /* Main background */
-  --foreground: hsl(0, 0%, 100%); /* Primary text */
+  --background: hsl(210, 20%, 98%);
+  --foreground: hsl(222, 47%, 11%);
 
-  --surface: hsl(0, 0%, 17%); /* Cards, panels */
-  --border: hsl(0, 0%, 20%); /* Border lines */
-  --input: hsl(0, 0%, 18%); /* Input fields */
+  --surface: hsl(0, 0%, 100%);
+  --sidebar-bg: hsl(210, 20%, 95%);   /* サイドバー背景 — グレー */
+  --border: hsl(214, 32%, 91%);
+  --input: hsl(0, 0%, 96%);
 
-  --primary: hsl(207, 90%, 54%); /* Telegram blue */
-  --primary-hover: hsl(207, 90%, 60%);
-  --primary-foreground: hsl(0, 0%, 100%);
-
-  --secondary: hsl(0, 0%, 23%); /* Muted backgrounds */
-  --secondary-foreground: hsl(0, 0%, 67%); /* Muted text */
-
-  --accent: hsl(207, 90%, 70%); /* Highlight elements */
-  --success: hsl(122, 39%, 49%);
-  --warning: hsl(36, 100%, 50%);
-  --error: hsl(0, 84.2%, 60.2%);
-
-  --radius: 8px;
-
-  /* Badge (neutral bg + colored dot) */
-  --badge-bg: #21262d;
-  --badge-border: #30363d;
-  --badge-text: #e6edf3;
-  --badge-bg-hover: #30363d;
-
-  /* Dot palette */
-  --dot-red: #f87171;
-  --dot-green: #34d399;
-  --dot-blue: #60a5fa;
-  --dot-purple: #a78bfa;
-  --dot-orange: #fb923c;
-  --dot-pink: #f472b6;
-  --dot-teal: #2dd4bf;
-  --dot-yellow: #facc15;
-  --dot-indigo: #818cf8;
-  --dot-emerald: #6ee7b7;
-  --dot-sky: #38bdf8;
-  --dot-fuchsia: #e879f9;
-  --dot-stone: #a8a29e;
-  --dot-amber: #fbbf24;
-  --dot-lime: #a3e635;
-  --dot-cyan: #22d3ee;
-}
-
-/* Light Theme */
-:root[data-theme="light"] {
-  --background: hsl(210, 20%, 98%);  /* #f8fafc — わずかにグレー、純白より目に優しい */
-  --foreground: hsl(222, 47%, 11%);  /* #0f172a — ほぼ黒、コントラスト最大化 */
-
-  --surface: hsl(0, 0%, 100%);       /* 純白 — 背景との差でカードが浮く */
-  --border: hsl(214, 32%, 91%);      /* #e2e8f0 — 少し濃く、区切りを明確に */
-  --input: hsl(0, 0%, 96%);          /* Light input fields */
-
-  --primary: hsl(207, 90%, 54%); /* Keep same blue */
+  --primary: hsl(207, 90%, 54%);
   --primary-hover: hsl(207, 90%, 48%);
   --primary-foreground: hsl(0, 0%, 100%);
 
-  --secondary: hsl(0, 0%, 93%);      /* Light muted backgrounds */
-  --secondary-foreground: hsl(215, 16%, 47%); /* #64748b — 補助テキスト、見出しとの差を明確に */
+  --secondary: hsl(0, 0%, 93%);
+  --secondary-foreground: hsl(215, 16%, 47%);
 
-  --accent: hsl(207, 90%, 60%); /* Lighter accent for light theme */
+  --accent: hsl(207, 90%, 60%);
   --success: hsl(122, 39%, 49%);
   --warning: hsl(36, 100%, 50%);
   --error: hsl(0, 84.2%, 60.2%);
 
-  /* Table */
-  --table-header-bg: hsl(210, 20%, 96%);  /* #f1f5f9 — ヘッダー背景 */
-  --table-stripe-bg: hsl(210, 20%, 99%);  /* #fafbfc — 偶数行の縞 */
+  --table-header-bg: hsl(210, 20%, 96%);
+  --table-stripe-bg: hsl(210, 20%, 96%);
 
   --radius: 8px;
 
-  /* Badge (neutral bg + colored dot) — light mode */
+  --muted-foreground: hsl(215, 16%, 55%);
+
+  /* Badge */
   --badge-bg: #f3f4f6;
   --badge-border: #d1d5db;
   --badge-text: #374151;
   --badge-bg-hover: #e5e7eb;
 
-  /* Dot palette — light mode (slightly more saturated) */
+  /* Dot palette */
   --dot-red: #ef4444;
   --dot-green: #22c55e;
   --dot-blue: #3b82f6;
@@ -103,12 +56,10 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  font-family: inherit;
 }
 
 /* Custom Scrollbar Styles */
-/* Standard scrollbar for Webkit browsers (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -122,7 +73,6 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 10px;
-  transition: background-color 0.3s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -137,7 +87,6 @@ body {
   background: var(--input);
 }
 
-/* Thin scrollbar variant */
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -152,7 +101,6 @@ body {
   background: var(--primary);
 }
 
-/* Primary colored scrollbar */
 .scrollbar-primary::-webkit-scrollbar-thumb {
   background: var(--primary);
   opacity: 0.7;
@@ -163,7 +111,6 @@ body {
   opacity: 1;
 }
 
-/* Spreadsheet table scrollbar — always visible, higher contrast */
 .spreadsheet-scroll::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -189,17 +136,15 @@ body {
   scrollbar-color: var(--secondary-foreground) var(--secondary);
 }
 
-/* Hidden scrollbar but still scrollable */
 .scrollbar-hidden {
-  -ms-overflow-style: none;  /* Internet Explorer 10+ */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .scrollbar-hidden::-webkit-scrollbar {
-  display: none;  /* Safari and Chrome */
+  display: none;
 }
 
-/* Firefox scrollbar styling */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) var(--input);
@@ -220,13 +165,8 @@ body {
 }
 
 @keyframes show-modal {
-  0% {
-    transform: scale(0);
-  }
-
-  100% {
-    transform: scale(1);
-  }
+  0%   { transform: scale(0); }
+  100% { transform: scale(1); }
 }
 
 .bounce {
@@ -236,56 +176,61 @@ body {
 }
 
 .trash {
-  @apply p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)] 
+  @apply p-2 text-[var(--secondary-foreground)] hover:text-[var(--error)]
          hover:bg-[var(--error)]/10 rounded-lg transition-all duration-200;
 }
 .pencil {
-  @apply p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)] 
-                     hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200;
+  @apply p-2 text-[var(--secondary-foreground)] hover:text-[var(--primary)]
+         hover:bg-[var(--primary)]/10 rounded-lg transition-all duration-200;
 }
 .btn-primary {
   @apply flex items-center gap-2 px-6 py-3 bg-[var(--primary)] hover:bg-[var(--primary-hover)]
-                         text-white rounded-lg font-medium transition-all duration-200 hover:scale-105
-                         shadow-lg hover:shadow-xl;
+         text-white rounded-lg font-medium transition-all duration-200 hover:scale-105
+         shadow-lg hover:shadow-xl;
 }
 .apply-button {
   @apply px-3 py-1 bg-[var(--primary)]/10 text-[var(--primary)] rounded-full text-xs font-medium border border-[var(--primary)]/20
   hover:bg-[var(--primary)]/50 transition;
 }
 .applied {
-  @apply px-3 py-1  bg-[var(--success)]/10 text-[var(--success)] rounded-full text-xs font-medium border border-[var(--success)]/20;
+  @apply px-3 py-1 bg-[var(--success)]/10 text-[var(--success)] rounded-full text-xs font-medium border border-[var(--success)]/20;
 }
-.apply-button,.applied {
-  @apply w-29 text-center; 
+.apply-button, .applied {
+  @apply w-29 text-center;
 }
 .input-style {
   @apply w-full px-4 py-3 pr-12 bg-[var(--input)] border border-[var(--border)] rounded-lg
-               text-[var(--foreground)] placeholder-[var(--secondary-foreground)]
-               focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent
-               transition-all duration-200;
+         text-[var(--foreground)] placeholder-[var(--secondary-foreground)]
+         focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent
+         transition-all duration-200;
 }
 .input-label {
-  @apply block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2
+  @apply block mt-5 text-sm font-medium text-[var(--secondary-foreground)] mb-2;
 }
 .vehicle-doc-style {
-  @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4 bg-[var(--input)] rounded-lg border border-[var(--border)]
+  @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4 bg-[var(--input)] rounded-lg border border-[var(--border)];
 }
-
 .vehicle-doc-display {
-  @apply aspect-square bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 flex flex-col justify-between hover:border-[var(--primary)] transition-all duration-200
+  @apply aspect-square bg-[var(--surface)] border border-[var(--border)] rounded-lg p-2 flex flex-col justify-between hover:border-[var(--primary)] transition-all duration-200;
 }
 .vehicle-doc-upload-button {
-  @apply aspect-square border-2 border-dashed border-[var(--border)] rounded-lg flex flex-col items-center justify-center hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 transition-all duration-200 cursor-pointer
+  @apply aspect-square border-2 border-dashed border-[var(--border)] rounded-lg flex flex-col items-center justify-center hover:border-[var(--primary)] hover:bg-[var(--primary)]/5 transition-all duration-200 cursor-pointer;
 }
-
 .vehicle-doc-remove-button {
-  @apply absolute -top-1 -right-1 w-5 h-5 bg-[var(--error)] text-white rounded-full flex items-center justify-center text-xs hover:bg-[var(--error)]/80 transition-colors duration-200 opacity-0 group-hover:opacity-100
+  @apply absolute -top-1 -right-1 w-5 h-5 bg-[var(--error)] text-white rounded-full flex items-center justify-center text-xs hover:bg-[var(--error)]/80 transition-colors duration-200 opacity-0 group-hover:opacity-100;
 }
 
-/* ── テーブル縞模様（スプレッドシート） ── */
+/* ── テーブル縞模様 ── */
 .striped-table tbody tr:nth-child(even) {
   background-color: var(--table-stripe-bg);
 }
 .striped-table tbody tr:hover {
-  background-color: hsl(207, 90%, 96%) !important; /* hover は青みがかったハイライト */
+  background-color: hsl(207, 90%, 96%) !important;
+}
+
+/* ── サイドバーアクティブアイテム ── */
+.sidebar-active-item {
+  background: var(--surface);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }

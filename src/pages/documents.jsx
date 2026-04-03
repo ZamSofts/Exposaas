@@ -23,8 +23,6 @@ import {
   getVehicleCount,
   fetchCorrectedJson,
   buildViewerData,
-  getReviewButtonLabel,
-  isReviewDisabled,
   isActionDone,
 } from "@/lib/invoiceJobUtils";
 import { InvoiceDataViewer } from "@/hooks/wrapper";
@@ -41,13 +39,13 @@ function getErrorMessage(error) {
 
 // Doc type configuration (mirrors classificationSchema.mjs for UI)
 const DOC_TYPES = {
-  all:             { label: "All",         labelJa: "すべて",   color: null },
-  invoice:         { label: "Invoice",     labelJa: "請求書",   color: "#3b82f6" },
-  export_cert:     { label: "Export Cert", labelJa: "輸出抹消", color: "#10b981" },
-  inspection_cert: { label: "Inspection",  labelJa: "車検証",   color: "#f59e0b" },
-  temp_cancel:     { label: "Temp Cancel", labelJa: "一時抹消", color: "#8b5cf6" },
-  unknown:         { label: "Unknown",     labelJa: "不明",     color: "#6b7280" },
-  skipped:         { label: "Skipped",     labelJa: "スキップ済み", color: "#f97316" },
+  all:             { label: "All",         labelJa: "すべて",      dotColor: null,      bg: null,        text: null,        border: null },
+  invoice:         { label: "Invoice",     labelJa: "請求書",      dotColor: "#2563eb", bg: "#dbeafe",   text: "#1e40af",   border: "#93c5fd" },
+  export_cert:     { label: "Export Cert", labelJa: "輸出抹消",    dotColor: "#059669", bg: "#d1fae5",   text: "#065f46",   border: "#6ee7b7" },
+  inspection_cert: { label: "Inspection",  labelJa: "車検証",      dotColor: "#d97706", bg: "#fef3c7",   text: "#92400e",   border: "#fcd34d" },
+  temp_cancel:     { label: "Temp Cancel", labelJa: "一時抹消",    dotColor: "#7c3aed", bg: "#ede9fe",   text: "#4c1d95",   border: "#c4b5fd" },
+  unknown:         { label: "Unknown",     labelJa: "不明",        dotColor: "#6b7280", bg: "#f3f4f6",   text: "#374151",   border: "#d1d5db" },
+  skipped:         { label: "Skipped",     labelJa: "スキップ済み", dotColor: "#ea580c", bg: "#ffedd5",   text: "#9a3412",   border: "#fdba74" },
 };
 
 // ---------------------------------------------------------------------------
@@ -59,15 +57,12 @@ function DocTypeBadge({ docType }) {
     <span
       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
       style={{
-        backgroundColor: `${config.color}20`,
-        color: config.color,
-        border: `1px solid ${config.color}40`,
+        backgroundColor: config.bg,
+        color: config.text,
+        border: `1px solid ${config.border}`,
       }}
     >
-      <span
-        className="w-1.5 h-1.5 rounded-full"
-        style={{ backgroundColor: config.color }}
-      />
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.dotColor }} />
       {config.labelJa}
     </span>
   );
@@ -297,7 +292,7 @@ export default function DocumentsPage() {
                   <button
                     onClick={handleRetryAllFailed}
                     disabled={retryingAll}
-                    className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded-lg transition-colors text-sm"
+                    className="flex items-center gap-2 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-300 rounded-lg transition-colors text-sm"
                   >
                     <RefreshCw className={`w-4 h-4 ${retryingAll ? "animate-spin" : ""}`} />
                     {retryingAll ? "Retrying..." : "Retry All Failed"}
@@ -472,16 +467,10 @@ export default function DocumentsPage() {
                         <DocTypeBadge docType={row.docType || "invoice"} />
                       </td>
 
-                      <td className="px-6 py-4">
-                        <StatusBadge status={row.status} />
-                        {row.status === "failed" && row.Json?.error && (
-                          <p
-                            className="text-xs text-red-500/80 mt-1 max-w-[200px]"
-                            title={JSON.stringify(row.Json.error)}
-                          >
-                            {getErrorMessage(row.Json.error)}
-                          </p>
-                        )}
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span title={row.status === "failed" && row.Json?.error ? getErrorMessage(row.Json.error) : undefined}>
+                          <StatusBadge status={row.status} />
+                        </span>
                       </td>
 
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -525,13 +514,6 @@ export default function DocumentsPage() {
                             >
                               <Eye className="w-3.5 h-3.5" />
                               Review
-                            </button>
-                          ) : (row.status === "pending" || row.status === "processing") ? (
-                            <button
-                              onClick={() => openViewer(row)}
-                              className="apply-button"
-                            >
-                              処理する →
                             </button>
                           ) : null}
                         </div>

@@ -93,6 +93,7 @@ export function usePaginatedList(keyFn, endpoint, options = {}) {
     defaultOrder = "asc",
     debounceMs = 0,
     enabled = true,
+    staleTime,
     buildParams,
     select,
   } = options;
@@ -137,6 +138,7 @@ export function usePaginatedList(keyFn, endpoint, options = {}) {
       return res;
     },
     enabled,
+    staleTime,
   });
 
   // Extract items + total from API response
@@ -221,9 +223,17 @@ export function useApiMutation(method, endpoint, options = {}) {
     mutationFn: async (body) => {
       const res = await API(method, endpoint, body);
       if (res.error) throw new Error(res.error);
+      // Partial success: some operations failed (e.g. file upload batch)
+      // Preserve errors for onSuccess warning without blocking cache invalidation
+      if (res.errors?.length) {
+        res._partialErrors = res.errors;
+      }
       return res;
     },
     onSuccess: (data) => {
+      if (data._partialErrors?.length) {
+        console.warn("[useApiMutation] Partial errors in response:", data._partialErrors);
+      }
       if (invalidateKeys) {
         for (const key of invalidateKeys) {
           queryClient.invalidateQueries({ queryKey: [key] });

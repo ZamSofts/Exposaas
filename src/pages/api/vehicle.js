@@ -120,13 +120,13 @@ const validateVehicle = async ({ chassisNumber, brandId, companyId, vehicleId = 
 /** Build Prisma include object. Omit documents for large page sizes. */
 const getIncludeRelations = (includeDocuments = true) => {
   const base = {
-    company: { select: { name: true } },
     brand: { select: { name: true } },
     customer: { select: { id: true, name: true } },
     sourceInvoiceJob: { select: { id: true, DocumentURL: true } },
   };
   if (includeDocuments) {
     base.documents = { select: { id: true, Url: true, docType: true, createdAt: true } };
+    base.company = { select: { name: true } };
   }
   return base;
 };
@@ -206,7 +206,7 @@ export default async function handler(req, res) {
     const id = Number(req.query.id);
     const chassisNumber = req.query.chassisNumber;
     const { page = 1, limit: rawLimit = 10, search = "", sortBy = "id", sortOrder = "asc", col } = req.query;
-    const limit = Math.min(Number(rawLimit), 500);
+    const limit = Math.min(Number(rawLimit), 10000);
     const selectFields = col ? Object.fromEntries(col.split(",").map(c => [c, true])) : undefined;
     const userFilter = session.role === "Sadmin" ? {} : { companyId: session?.companyId };
 
@@ -246,8 +246,8 @@ export default async function handler(req, res) {
           return res.json(vehicle);
         }
 
-        // Paginated list (use lighter relations for large page sizes)
-        const include = getIncludeRelations(limit <= 500);
+        // Paginated list — documents excluded for performance (only needed in detail view)
+        const include = getIncludeRelations(false);
         const [vehicles, total] = await Promise.all([
           prisma.vehicle.findMany({
             skip: (page - 1) * limit,
@@ -446,11 +446,11 @@ export default async function handler(req, res) {
           });
         }
 
+        // Clean up documents from storage FIRST (before DB delete, so references are still available)
+        const { deleted: documentsDeleted, errors: deletionErrors } = await deleteDocuments(vehicleDocuments);
+
         // Delete the vehicle (cascade will automatically delete documents from database)
         await prisma.vehicle.delete({ where: { id } });
-
-        // Clean up documents from storage
-        const { deleted: documentsDeleted, errors: deletionErrors } = await deleteDocuments(vehicleDocuments);
 
         const response = {
           message: "Vehicle deleted successfully",

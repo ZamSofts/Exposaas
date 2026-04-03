@@ -168,7 +168,7 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
 
     // Build request with optional Structured Output config
     const request = {
-      model: options.model || "gemini-2.5-flash",
+      model: options.model || "gemini-2.0-flash",
       contents: [
         {
           inlineData: {
