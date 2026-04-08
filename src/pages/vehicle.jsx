@@ -58,7 +58,7 @@ export default function VehiclesPage() {
     items: vehicles, total, isLoading, error: listError,
     handleSort, handleSearch, handlePageChange, sortBy, sortOrder, setPage,
   } = usePaginatedList(vehicleKeyFn, "vehicle", {
-    defaultPerPage: 99999,
+    defaultPerPage: 50,
     defaultOrder: "desc",
     debounceMs: 400,
     staleTime: 5 * 60 * 1000,
@@ -403,7 +403,7 @@ export default function VehiclesPage() {
               sortBy={sortBy}
               sortOrder={sortOrder}
               variant="spreadsheet"
-              initialPerPage={99999}
+              initialPerPage={50}
               tableWidth={totalTableWidth}
             >
               {/* colgroup で列幅を固定 — table-layout:fixed と組み合わせることで

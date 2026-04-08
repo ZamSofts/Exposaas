@@ -28,7 +28,7 @@
 
 - **NO TypeScript** — This project uses JavaScript only. Never create `.ts` files (except test files under `__tests__/`). Never convert `.js` files to `.ts`.
 - **Do NOT modify the Dockerfile** — The production Dockerfile is maintained by the engineer. Do not change it.
-- **Never push directly to `main`** — Always work on the `shahmir` branch. The engineer reviews and merges PRs to `main`. Push to `main` triggers production deployment.
+- **Never push directly to `main`** — Always work on the `shahmir` branch. Push to `shahmir` triggers production deployment on Azure. `main` is for archiving only.
 
 ## Tech Stack & Map
 
