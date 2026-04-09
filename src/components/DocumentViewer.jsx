@@ -90,7 +90,11 @@ export default function DocumentViewer({ data, onBack }) {
   const extracted = data?.Json?.extracted || {};
   const linkedVehicleId = data?.Json?.linkedVehicleId || null;
 
+  // Prefer single-page blob (DocumentURL); fall back to original multi-page PDF
   const pdfUrl = data?.DocumentURL || data?.parentDocumentUrl;
+  const pdfPage = data?.pageNumber || 1;
+  // If using the multi-page parent PDF, jump to the correct page
+  const isParentPdf = !data?.DocumentURL && !!data?.parentDocumentUrl;
 
   // Search for vehicles by chassis number
   const handleSearchVehicle = async () => {
@@ -196,7 +200,7 @@ export default function DocumentViewer({ data, onBack }) {
           <div className="w-1/2 border-r border-[var(--border)] bg-[var(--surface)]">
             {pdfUrl ? (
               <iframe
-                src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                src={isParentPdf ? `${pdfUrl}#page=${pdfPage}&toolbar=1&navpanes=0&scrollbar=1` : `${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
                 className="w-full h-full border-0"
                 title="Document Preview"
               />
