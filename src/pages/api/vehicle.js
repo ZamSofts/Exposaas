@@ -181,6 +181,21 @@ const parseVehicleFields = body => {
     if (!isNaN(parsed)) fields.m3 = parsed;
   }
 
+  // Cert-extracted integer fields
+  for (const key of ["vehicleWeight", "grossVehicleWeight", "engineDisplacement"]) {
+    if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+      const parsed = parseInt(body[key]);
+      if (!isNaN(parsed)) fields[key] = parsed;
+    }
+  }
+
+  // Cert-extracted string fields
+  for (const key of ["engineModel", "firstRegistrationDate"]) {
+    if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+      fields[key] = body[key];
+    }
+  }
+
   // titleTransferDeadline (DateTime)
   if (body.titleTransferDeadline !== undefined && body.titleTransferDeadline !== null && body.titleTransferDeadline !== "") {
     const d = new Date(body.titleTransferDeadline);
@@ -360,7 +375,8 @@ export default async function handler(req, res) {
           const trackedFields = ["chassisNumber", "auction", "lotNumber", "remarks", "brandId", "customerId", "name",
             "bidAmount", "auctionFee", "insuranceFee", "recyclingFee", "transportFee", "otherFees",
             "auctionDate", "session", "transportCompany", "deliverTo", "numberPlate", "containerNumber", "etd", "documentStatus", "memo",
-            "length", "width", "height", "m3", "titleTransferDeadline"];
+            "length", "width", "height", "m3", "titleTransferDeadline",
+            "engineModel", "vehicleWeight", "grossVehicleWeight", "engineDisplacement", "firstRegistrationDate"];
           const changes = trackedFields
             .filter(f => updateData[f] !== undefined)
             .map(f => ({ field: f, oldValue: oldVehicle[f], newValue: updateData[f] }));

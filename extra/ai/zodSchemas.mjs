@@ -77,8 +77,12 @@ const nullableStr = z.string().nullable();
 const baseCertFields = {
   chassis_number: nullableStr,
   brand: nullableStr,
-  model_code: nullableStr,
+  engine_model: nullableStr,
   registration_number: nullableStr,
+  first_registration_date: nullableStr,
+  engine_displacement: nullableStr,
+  vehicle_weight: nullableStr,
+  gross_vehicle_weight: nullableStr,
   length: nullableStr,
   width: nullableStr,
   height: nullableStr,
@@ -88,26 +92,16 @@ const baseCertFields = {
 /** Export Cancellation Certificate (輸出抹消仮登録証明書) */
 export const ExportCertSchema = z.object({
   ...baseCertFields,
-  first_registration_date: nullableStr,
-  vehicle_weight: nullableStr,
-  export_scheduled_date: nullableStr,
 });
 
 /** Vehicle Inspection Certificate (自動車検査証) */
 export const InspectionCertSchema = z.object({
   ...baseCertFields,
-  model: nullableStr,
-  first_registration_date: nullableStr,
-  expiry_date: nullableStr,
-  engine_displacement: nullableStr,
 });
 
 /** Temporary Cancellation Certificate (一時抹消登録証明書) */
 export const TempCancelSchema = z.object({
   ...baseCertFields,
-  owner_name: nullableStr,
-  cancellation_date: nullableStr,
-  registration_id: nullableStr,
 });
 
 /** Map docType → Zod schema for Structured Output */

@@ -164,24 +164,30 @@ let boss;
                 data: { documentStatus: newStatus },
               });
 
-              // Sync size fields to Vehicle (only update null fields)
-              const sizeUpdates = {};
-              if (extracted.length  && !vehicle.length)  sizeUpdates.length = parseInt(extracted.length)  || undefined;
-              if (extracted.width   && !vehicle.width)    sizeUpdates.width  = parseInt(extracted.width)   || undefined;
-              if (extracted.height  && !vehicle.height)   sizeUpdates.height = parseInt(extracted.height)  || undefined;
-              if (extracted.m3      && vehicle.m3 == null) sizeUpdates.m3    = parseFloat(extracted.m3)    || undefined;
+              // Sync cert fields to Vehicle — always overwrite with latest extracted values
+              const certUpdates = {};
+              if (extracted.length)               certUpdates.length               = parseInt(extracted.length)               || undefined;
+              if (extracted.width)                certUpdates.width                = parseInt(extracted.width)                || undefined;
+              if (extracted.height)               certUpdates.height               = parseInt(extracted.height)               || undefined;
+              if (extracted.m3)                   certUpdates.m3                   = parseFloat(extracted.m3)                 || undefined;
+              if (extracted.engine_model)         certUpdates.engineModel          = String(extracted.engine_model);
+              if (extracted.vehicle_weight)       certUpdates.vehicleWeight        = parseInt(extracted.vehicle_weight)       || undefined;
+              if (extracted.gross_vehicle_weight) certUpdates.grossVehicleWeight   = parseInt(extracted.gross_vehicle_weight) || undefined;
+              if (extracted.engine_displacement)  certUpdates.engineDisplacement   = parseInt(extracted.engine_displacement)  || undefined;
+              if (extracted.first_registration_date) certUpdates.firstRegistrationDate = String(extracted.first_registration_date);
+              if (extracted.registration_number)  certUpdates.numberPlate          = String(extracted.registration_number);
 
               // Remove undefined entries
-              for (const k of Object.keys(sizeUpdates)) {
-                if (sizeUpdates[k] === undefined) delete sizeUpdates[k];
+              for (const k of Object.keys(certUpdates)) {
+                if (certUpdates[k] === undefined) delete certUpdates[k];
               }
 
-              if (Object.keys(sizeUpdates).length > 0) {
+              if (Object.keys(certUpdates).length > 0) {
                 await prisma.vehicle.update({
                   where: { id: vehicle.id },
-                  data: sizeUpdates,
+                  data: certUpdates,
                 });
-                console.log(`📐 Synced size fields to vehicle #${vehicle.id}:`, sizeUpdates);
+                console.log(`📐 Synced cert fields to vehicle #${vehicle.id}:`, certUpdates);
               }
 
               // Update the InvoiceJob JSON with linking info

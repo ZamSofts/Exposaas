@@ -127,6 +127,11 @@ model Vehicle {
   length                Int?
   m3                    Decimal?          @db.Decimal(8, 2)
   width                 Int?
+  engineModel           String?
+  vehicleWeight         Int?
+  grossVehicleWeight    Int?
+  engineDisplacement    Int?
+  firstRegistrationDate String?
   createdById           Int?
   updatedById           Int?
   mergedAt              DateTime?
