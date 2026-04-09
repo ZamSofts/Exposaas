@@ -60,3 +60,11 @@ export function getConfidenceBorder(confidence) {
   if (!level) return {};
   return { borderColor: CONFIDENCE_COLORS[level].color, borderWidth: "2px" };
 }
+
+/** Gemini model names — update here to change across all workers at once */
+export const GEMINI_MODELS = {
+  EXTRACTION:     "gemini-2.0-flash",     // invoice pages, cert extraction
+  CLASSIFICATION: "gemini-2.5-flash",     // doc classification, PDF rotation
+  EMBEDDING:      "gemini-embedding-001", // few-shot embeddings
+  OPTIMIZATION:   "gemini-2.5-flash",     // meta-prompting / optimizer
+};

@@ -25,7 +25,7 @@ import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
 import { logVehicleAudit } from "../utils/auditLog.mjs";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DOC_ZOD_MAP } from "../ai/zodSchemas.mjs";
-import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.mjs";
+import { QUOTA_REQUEUE_DELAY_SECONDS, GEMINI_MODELS } from "../../src/config/aiConstants.mjs";
 
 let boss;
 
@@ -69,7 +69,7 @@ let boss;
           customPrompt: extractionPrompt,
           rawJsonResponse: true,
           responseConfig,
-          model: "gemini-2.0-flash",
+          model: GEMINI_MODELS.EXTRACTION,
         });
 
         // Validate with Zod (soft — log warning, don't block extraction)
