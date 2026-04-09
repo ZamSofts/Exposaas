@@ -90,7 +90,7 @@ export default function DocumentViewer({ data, onBack }) {
   const extracted = data?.Json?.extracted || {};
   const linkedVehicleId = data?.Json?.linkedVehicleId || null;
 
-  const pdfUrl = data?.DocumentURL;
+  const pdfUrl = data?.parentDocumentUrl || data?.DocumentURL;
 
   // Search for vehicles by chassis number
   const handleSearchVehicle = async () => {
