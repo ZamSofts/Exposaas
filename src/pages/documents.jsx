@@ -506,7 +506,16 @@ export default function DocumentsPage() {
                               {retrying === row.id ? "Retrying..." : "Retry"}
                             </button>
                           ) : isActionDone(row) ? (
-                            <span className="applied">確認済み</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 bg-[var(--success)]/10 text-[var(--success)] rounded-full text-[11px] font-medium border border-[var(--success)]/20">確認済み</span>
+                              <button
+                                onClick={() => openViewer(row)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded text-[11px] transition-colors"
+                              >
+                                <Eye className="w-3 h-3" />
+                                PDF
+                              </button>
+                            </div>
                           ) : row.status === "completed" ? (
                             <button
                               onClick={() => openViewer(row)}
