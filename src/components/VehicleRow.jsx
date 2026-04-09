@@ -127,13 +127,14 @@ function renderStaticCell(col, v, ctx) {
           #{v.id}
         </span>
       );
-    case "invoice":
-      return v.sourceInvoiceJob?.DocumentURL ? (
+    case "invoice": {
+      const invoiceUrl = v.sourceInvoiceJob?.parentDocumentUrl || v.sourceInvoiceJob?.DocumentURL;
+      return invoiceUrl ? (
         <button
           onClick={() =>
             ctx.setDocumentPreview({
-              url: v.sourceInvoiceJob.DocumentURL,
-              fileName: `invoice_${v.sourceInvoiceJob.DocumentURL.split("/").pop()}`,
+              url: invoiceUrl,
+              fileName: `invoice_${invoiceUrl.split("/").pop()}`,
             })
           }
           className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 text-green-500 rounded hover:bg-green-500/20 transition-colors"
@@ -145,6 +146,7 @@ function renderStaticCell(col, v, ctx) {
       ) : (
         <span className="text-[13px] text-[var(--secondary-foreground)]">-</span>
       );
+    }
     case "docs": {
       const certDocs = (v.documents || []).filter(d => d.docType && d.docType !== "invoice");
       if (certDocs.length === 0) {

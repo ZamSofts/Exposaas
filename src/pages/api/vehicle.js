@@ -122,7 +122,7 @@ const getIncludeRelations = (includeDocuments = true) => {
   const base = {
     brand: { select: { name: true } },
     customer: { select: { id: true, name: true } },
-    sourceInvoiceJob: { select: { id: true, DocumentURL: true } },
+    sourceInvoiceJob: { select: { id: true, DocumentURL: true, parentDocumentUrl: true } },
   };
   if (includeDocuments) {
     base.documents = { select: { id: true, Url: true, docType: true, createdAt: true } };

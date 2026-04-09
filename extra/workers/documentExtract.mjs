@@ -16,7 +16,6 @@
 import { ensureQueue } from "../queues/pgBoss.mjs";
 import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import { deleteFile } from "../../src/lib/blob.mjs";
 import {
   DOCUMENT_SCHEMA_MAP,
   buildDocumentExtractionPrompt,
@@ -110,11 +109,8 @@ let boss;
 
         console.log(`✅ Extraction complete for InvoiceJob #${invoiceJobId}:`, JSON.stringify(extracted));
 
-        // Cleanup: delete the split-page blob (fire-and-forget)
-        if (fileUrl) {
-          try { await deleteFile(fileUrl); }
-          catch (cleanupErr) { console.warn(`[docExtract] Failed to delete page blob:`, cleanupErr.message); }
-        }
+        // Note: split-page blob is intentionally kept (not deleted).
+        // DocumentURL points to a single-page PDF — needed for the cert viewer.
 
         // Auto-link to vehicle by chassis number
         const chassisNumber = extracted.chassis_number;
@@ -147,11 +143,11 @@ let boss;
             if (vehicle) {
               console.log(`🔗 Auto-linking ${docType} to vehicle #${vehicle.id} (${chassisNumber})`);
 
-              // Create VehicleDocument record — use parentDocumentUrl (original PDF, never deleted)
+              // Create VehicleDocument record — use fileUrl (single-page blob, kept permanently)
               await prisma.vehicleDocument.create({
                 data: {
                   vehicleId: vehicle.id,
-                  Url: parentDocumentUrl || fileUrl,
+                  Url: fileUrl,
                   docType,
                 },
               });
