@@ -246,8 +246,8 @@ export default async function handler(req, res) {
           return res.json(vehicle);
         }
 
-        // Paginated list — documents excluded for performance (only needed in detail view)
-        const include = getIncludeRelations(false);
+        // Paginated list — include documents (pagination keeps row count small)
+        const include = getIncludeRelations(true);
         const [vehicles, total] = await Promise.all([
           prisma.vehicle.findMany({
             skip: (page - 1) * limit,

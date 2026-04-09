@@ -147,19 +147,6 @@ function renderStaticCell(col, v, ctx) {
       );
     case "docs": {
       const certDocs = (v.documents || []).filter(d => d.docType && d.docType !== "invoice");
-      // List view: documents relation not loaded — fall back to documentStatus text field
-      if (certDocs.length === 0 && v.documentStatus) {
-        return (
-          <span
-            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium"
-            style={{ backgroundColor: "#8b5cf615", color: "#8b5cf6" }}
-            title={v.documentStatus}
-          >
-            <FileX className="w-3 h-3" />
-            {v.documentStatus}
-          </span>
-        );
-      }
       if (certDocs.length === 0) {
         return <span className="text-[13px] text-[var(--secondary-foreground)]">-</span>;
       }
