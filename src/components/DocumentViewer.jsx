@@ -92,12 +92,12 @@ export default function DocumentViewer({ data, onBack }) {
   const extracted = data?.Json?.extracted || {};
   const linkedVehicleId = data?.Json?.linkedVehicleId || null;
 
-  // Prefer original multi-page PDF (parentDocumentUrl) — never deleted, always available.
-  // Jump to the correct page via #page=N. Fall back to single-page blob (DocumentURL) only
-  // if there is no parent PDF (e.g. manually uploaded single-page document).
-  const pdfUrl = data?.parentDocumentUrl || data?.DocumentURL;
+  // Prefer single-page blob (DocumentURL) — split by classifyDocument worker, kept permanently.
+  // Fall back to parentDocumentUrl (original multi-page PDF) with #page=N for records
+  // where the split blob no longer exists (uploaded before the blob-retention fix).
+  const pdfUrl = data?.DocumentURL || data?.parentDocumentUrl;
   const pdfPage = data?.pageNumber || 1;
-  const isParentPdf = !!data?.parentDocumentUrl;
+  const isParentPdf = !data?.DocumentURL && !!data?.parentDocumentUrl;
 
   // Search for vehicles by chassis number
   const handleSearchVehicle = async () => {
