@@ -43,11 +43,18 @@ let boss;
       console.log(`📄 Extracting ${docType} document: InvoiceJob #${invoiceJobId}`);
 
       try {
-        // Update status to processing
-        await prisma.invoiceJobs.update({
-          where: { id: invoiceJobId },
-          data: { status: "processing" },
-        });
+        // Update status to processing — also fetch parentDocumentUrl for VehicleDocument
+        const [, invoiceJobMeta] = await Promise.all([
+          prisma.invoiceJobs.update({
+            where: { id: invoiceJobId },
+            data: { status: "processing" },
+          }),
+          prisma.invoiceJobs.findUnique({
+            where: { id: invoiceJobId },
+            select: { parentDocumentUrl: true, pageNumber: true },
+          }),
+        ]);
+        const parentDocumentUrl = invoiceJobMeta?.parentDocumentUrl || null;
 
         // Get the appropriate schema for this doc type
         const schema = DOCUMENT_SCHEMA_MAP[docType];
@@ -140,11 +147,11 @@ let boss;
             if (vehicle) {
               console.log(`🔗 Auto-linking ${docType} to vehicle #${vehicle.id} (${chassisNumber})`);
 
-              // Create VehicleDocument record
+              // Create VehicleDocument record — use parentDocumentUrl (original PDF, never deleted)
               await prisma.vehicleDocument.create({
                 data: {
                   vehicleId: vehicle.id,
-                  Url: fileUrl,
+                  Url: parentDocumentUrl || fileUrl,
                   docType,
                 },
               });

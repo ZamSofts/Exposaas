@@ -91,6 +91,7 @@ export default function DocumentViewer({ data, onBack }) {
   const linkedVehicleId = data?.Json?.linkedVehicleId || null;
 
   const pdfUrl = data?.parentDocumentUrl || data?.DocumentURL;
+  const pdfPage = data?.pageNumber || 1;
 
   // Search for vehicles by chassis number
   const handleSearchVehicle = async () => {
@@ -196,7 +197,7 @@ export default function DocumentViewer({ data, onBack }) {
           <div className="w-1/2 border-r border-[var(--border)] bg-[var(--surface)]">
             {pdfUrl ? (
               <iframe
-                src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                src={`${pdfUrl}#page=${pdfPage}&toolbar=1&navpanes=0&scrollbar=1`}
                 className="w-full h-full border-0"
                 title="Document Preview"
               />
