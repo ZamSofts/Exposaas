@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { downloadFile } from "../../src/lib/blob.mjs";
+import { GEMINI_MODELS } from "../../src/config/aiConstants.mjs";
 
 const RETRY_CONFIG = {
   maxRetries: 5,
@@ -168,7 +169,7 @@ export async function processPageWithGemini(pageUrl, pageNumber, options = {}) {
 
     // Build request with optional Structured Output config
     const request = {
-      model: options.model || "gemini-2.0-flash",
+      model: options.model || GEMINI_MODELS.EXTRACTION,
       contents: [
         {
           inlineData: {

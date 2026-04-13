@@ -16,7 +16,6 @@
 import { ensureQueue } from "../queues/pgBoss.mjs";
 import { processPageWithGemini, QuotaExhaustedError } from "./geminiProcess.mjs";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-import { deleteFile } from "../../src/lib/blob.mjs";
 import {
   DOCUMENT_SCHEMA_MAP,
   buildDocumentExtractionPrompt,
@@ -25,7 +24,7 @@ import { DOCUMENT_TYPES } from "../ai/classificationSchema.mjs";
 import { logVehicleAudit } from "../utils/auditLog.mjs";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { DOC_ZOD_MAP } from "../ai/zodSchemas.mjs";
-import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.mjs";
+import { QUOTA_REQUEUE_DELAY_SECONDS, GEMINI_MODELS } from "../../src/config/aiConstants.mjs";
 
 let boss;
 
@@ -43,11 +42,18 @@ let boss;
       console.log(`📄 Extracting ${docType} document: InvoiceJob #${invoiceJobId}`);
 
       try {
-        // Update status to processing
-        await prisma.invoiceJobs.update({
-          where: { id: invoiceJobId },
-          data: { status: "processing" },
-        });
+        // Update status to processing — also fetch parentDocumentUrl for VehicleDocument
+        const [, invoiceJobMeta] = await Promise.all([
+          prisma.invoiceJobs.update({
+            where: { id: invoiceJobId },
+            data: { status: "processing" },
+          }),
+          prisma.invoiceJobs.findUnique({
+            where: { id: invoiceJobId },
+            select: { parentDocumentUrl: true, pageNumber: true },
+          }),
+        ]);
+        const parentDocumentUrl = invoiceJobMeta?.parentDocumentUrl || null;
 
         // Get the appropriate schema for this doc type
         const schema = DOCUMENT_SCHEMA_MAP[docType];
@@ -69,7 +75,7 @@ let boss;
           customPrompt: extractionPrompt,
           rawJsonResponse: true,
           responseConfig,
-          model: "gemini-1.5-flash",
+          model: GEMINI_MODELS.EXTRACTION,
         });
 
         // Validate with Zod (soft — log warning, don't block extraction)
@@ -103,11 +109,8 @@ let boss;
 
         console.log(`✅ Extraction complete for InvoiceJob #${invoiceJobId}:`, JSON.stringify(extracted));
 
-        // Cleanup: delete the split-page blob (fire-and-forget)
-        if (fileUrl) {
-          try { await deleteFile(fileUrl); }
-          catch (cleanupErr) { console.warn(`[docExtract] Failed to delete page blob:`, cleanupErr.message); }
-        }
+        // Note: split-page blob is intentionally kept (not deleted).
+        // DocumentURL points to a single-page PDF — needed for the cert viewer.
 
         // Auto-link to vehicle by chassis number
         const chassisNumber = extracted.chassis_number;
@@ -140,7 +143,7 @@ let boss;
             if (vehicle) {
               console.log(`🔗 Auto-linking ${docType} to vehicle #${vehicle.id} (${chassisNumber})`);
 
-              // Create VehicleDocument record
+              // Create VehicleDocument record — use fileUrl (single-page blob, kept permanently)
               await prisma.vehicleDocument.create({
                 data: {
                   vehicleId: vehicle.id,
@@ -161,24 +164,30 @@ let boss;
                 data: { documentStatus: newStatus },
               });
 
-              // Sync size fields to Vehicle (only update null fields)
-              const sizeUpdates = {};
-              if (extracted.length  && !vehicle.length)  sizeUpdates.length = parseInt(extracted.length)  || undefined;
-              if (extracted.width   && !vehicle.width)    sizeUpdates.width  = parseInt(extracted.width)   || undefined;
-              if (extracted.height  && !vehicle.height)   sizeUpdates.height = parseInt(extracted.height)  || undefined;
-              if (extracted.m3      && vehicle.m3 == null) sizeUpdates.m3    = parseFloat(extracted.m3)    || undefined;
+              // Sync cert fields to Vehicle — always overwrite with latest extracted values
+              const certUpdates = {};
+              if (extracted.length)               certUpdates.length               = parseInt(extracted.length)               || undefined;
+              if (extracted.width)                certUpdates.width                = parseInt(extracted.width)                || undefined;
+              if (extracted.height)               certUpdates.height               = parseInt(extracted.height)               || undefined;
+              if (extracted.m3)                   certUpdates.m3                   = parseFloat(extracted.m3)                 || undefined;
+              if (extracted.engine_model)         certUpdates.engineModel          = String(extracted.engine_model);
+              if (extracted.vehicle_weight)       certUpdates.vehicleWeight        = parseInt(extracted.vehicle_weight)       || undefined;
+              if (extracted.gross_vehicle_weight) certUpdates.grossVehicleWeight   = parseInt(extracted.gross_vehicle_weight) || undefined;
+              if (extracted.engine_displacement)  certUpdates.engineDisplacement   = parseInt(extracted.engine_displacement)  || undefined;
+              if (extracted.first_registration_date) certUpdates.firstRegistrationDate = String(extracted.first_registration_date);
+              if (extracted.registration_number)  certUpdates.numberPlate          = String(extracted.registration_number);
 
               // Remove undefined entries
-              for (const k of Object.keys(sizeUpdates)) {
-                if (sizeUpdates[k] === undefined) delete sizeUpdates[k];
+              for (const k of Object.keys(certUpdates)) {
+                if (certUpdates[k] === undefined) delete certUpdates[k];
               }
 
-              if (Object.keys(sizeUpdates).length > 0) {
+              if (Object.keys(certUpdates).length > 0) {
                 await prisma.vehicle.update({
                   where: { id: vehicle.id },
-                  data: sizeUpdates,
+                  data: certUpdates,
                 });
-                console.log(`📐 Synced size fields to vehicle #${vehicle.id}:`, sizeUpdates);
+                console.log(`📐 Synced cert fields to vehicle #${vehicle.id}:`, certUpdates);
               }
 
               // Update the InvoiceJob JSON with linking info

@@ -10,8 +10,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { prisma } from "../PrismaClient/prismaClient.mjs";
-
-const EMBEDDING_MODEL = "gemini-embedding-001";
+import { GEMINI_MODELS } from "../../src/config/aiConstants.mjs";
 
 /**
  * Convert a PaymentConfirmation JSON to a text representation for embedding.
@@ -86,7 +85,7 @@ export async function computeEmbedding(text) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const result = await ai.models.embedContent({
-    model: EMBEDDING_MODEL,
+    model: GEMINI_MODELS.EMBEDDING,
     contents: text,
   });
   return result.embeddings[0].values;

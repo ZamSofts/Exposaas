@@ -34,7 +34,7 @@ const classificationResponseConfig = {
 };
 
 import { streamToBuffer } from "../utils/streamUtils.mjs";
-import { QUOTA_REQUEUE_DELAY_SECONDS } from "../../src/config/aiConstants.mjs";
+import { QUOTA_REQUEUE_DELAY_SECONDS, GEMINI_MODELS } from "../../src/config/aiConstants.mjs";
 
 let boss;
 
@@ -121,7 +121,7 @@ let boss;
             customPrompt: CLASSIFICATION_PROMPT,
             rawJsonResponse: true,
             responseConfig: classificationResponseConfig,
-            model: "gemini-2.5-flash",
+            model: GEMINI_MODELS.CLASSIFICATION,
           }
         );
 

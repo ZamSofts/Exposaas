@@ -33,7 +33,8 @@ export const EXPORT_CERT_SCHEMA = {
       desc: "登録番号（ナンバープレート）",
       constraints: [
         "例: 品川 300 あ 1234",
-        "地名 + 分類番号 + ひらがな + 番号",
+        "地名 + 分類番号 + ひらがな1文字 + 番号",
+        "ひらがなは必ず1文字のみ",
       ],
     },
     brand: {
@@ -44,19 +45,20 @@ export const EXPORT_CERT_SCHEMA = {
         "例: トヨタ, 日産, ホンダ, スズキ",
       ],
     },
-    model_code: {
+    engine_model: {
       type: "string",
-      desc: "型式",
+      desc: "原動機の型式",
       constraints: [
-        "例: DBA-ZVW51, 4BA-JF3",
+        "例: 2ZR-FXE, K6A, MR20DD",
       ],
     },
     first_registration_date: {
       type: "string",
       desc: "初度登録年月",
       constraints: [
-        "YYYY/MM形式",
-        "和暦の場合は西暦に変換",
+        "YYYY/MM形式（西暦のみ）",
+        "和暦（令和・平成・昭和等）は必ず西暦に変換する",
+        "例: 令和2年3月 → 2020/03, 平成23年6月 → 2011/06",
       ],
     },
     vehicle_weight: {
@@ -65,6 +67,23 @@ export const EXPORT_CERT_SCHEMA = {
       constraints: [
         "数値のみ（単位は含めない）",
         "例: 1050, 1320, 980",
+      ],
+    },
+    gross_vehicle_weight: {
+      type: "string",
+      desc: "車両総重量（kg）",
+      constraints: [
+        "数値のみ（単位は含めない）",
+        "例: 1350, 1700, 1230",
+      ],
+    },
+    engine_displacement: {
+      type: "string",
+      desc: "総排気量（cc）",
+      constraints: [
+        "必ずcc単位の整数で返す（単位は含めない）",
+        "書類にリットル表記（例: 1.79, 2.99）がある場合は×1000してcc換算する",
+        "例: 1.79 → 1790, 2.99 → 2990, 0.66 → 660",
       ],
     },
     length: {
@@ -100,28 +119,21 @@ export const EXPORT_CERT_SCHEMA = {
         "例: 10.63, 12.55, 7.73",
       ],
     },
-    export_scheduled_date: {
-      type: "string",
-      desc: "輸出予定日",
-      constraints: [
-        "YYYY/MM/DD形式",
-        "和暦の場合は西暦に変換",
-      ],
-    },
   },
 
   outputTemplate: {
     chassis_number: "ZVW51-6097706",
     registration_number: "品川 300 あ 1234",
     brand: "トヨタ",
-    model_code: "DBA-ZVW51",
+    engine_model: "2ZR-FXE",
     first_registration_date: "2020/03",
     vehicle_weight: "1050",
+    gross_vehicle_weight: "1350",
+    engine_displacement: "1800",
     length: "439",
     width: "169",
     height: "143",
     m3: "10.63",
-    export_scheduled_date: "2025/05/15",
   },
 };
 
@@ -153,18 +165,11 @@ export const INSPECTION_CERT_SCHEMA = {
         "例: トヨタ, 日産, ホンダ, スズキ",
       ],
     },
-    model: {
+    engine_model: {
       type: "string",
-      desc: "車種名・型式名",
+      desc: "原動機の型式",
       constraints: [
-        "例: プリウス, N-BOX, フィット",
-      ],
-    },
-    model_code: {
-      type: "string",
-      desc: "型式",
-      constraints: [
-        "例: DBA-ZVW51, 4BA-JF3",
+        "例: 2ZR-FXE, K6A, MR20DD",
       ],
     },
     registration_number: {
@@ -172,30 +177,42 @@ export const INSPECTION_CERT_SCHEMA = {
       desc: "登録番号（ナンバープレート）",
       constraints: [
         "例: 品川 300 あ 1234",
+        "地名 + 分類番号 + ひらがな1文字 + 番号",
+        "ひらがなは必ず1文字のみ",
       ],
     },
     first_registration_date: {
       type: "string",
       desc: "初度登録年月",
       constraints: [
-        "YYYY/MM形式",
-        "和暦の場合は西暦に変換",
-      ],
-    },
-    expiry_date: {
-      type: "string",
-      desc: "有効期間の満了する日",
-      constraints: [
-        "YYYY/MM/DD形式",
-        "和暦の場合は西暦に変換",
+        "YYYY/MM形式（西暦のみ）",
+        "和暦（令和・平成・昭和等）は必ず西暦に変換する",
+        "例: 令和2年3月 → 2020/03, 平成23年6月 → 2011/06",
       ],
     },
     engine_displacement: {
       type: "string",
       desc: "総排気量又は定格出力（cc）",
       constraints: [
+        "必ずcc単位の整数で返す（単位は含めない）",
+        "書類にリットル表記（例: 1.79, 2.99）がある場合は×1000してcc換算する",
+        "例: 1.79 → 1790, 2.99 → 2990, 0.66 → 660",
+      ],
+    },
+    vehicle_weight: {
+      type: "string",
+      desc: "車両重量（kg）",
+      constraints: [
         "数値のみ（単位は含めない）",
-        "例: 1500, 660, 2000",
+        "例: 1050, 1320, 980",
+      ],
+    },
+    gross_vehicle_weight: {
+      type: "string",
+      desc: "車両総重量（kg）",
+      constraints: [
+        "数値のみ（単位は含めない）",
+        "例: 1350, 1700, 1230",
       ],
     },
     length: {
@@ -236,12 +253,12 @@ export const INSPECTION_CERT_SCHEMA = {
   outputTemplate: {
     chassis_number: "ZVW51-6097706",
     brand: "トヨタ",
-    model: "プリウス",
-    model_code: "DBA-ZVW51",
+    engine_model: "2ZR-FXE",
     registration_number: "品川 300 あ 1234",
     first_registration_date: "2020/03",
-    expiry_date: "2025/03/15",
     engine_displacement: "1800",
+    vehicle_weight: "1050",
+    gross_vehicle_weight: "1350",
     length: "439",
     width: "169",
     height: "143",
@@ -274,21 +291,8 @@ export const TEMP_CANCEL_SCHEMA = {
       desc: "登録番号（ナンバープレート）",
       constraints: [
         "例: 品川 300 あ 1234",
-      ],
-    },
-    owner_name: {
-      type: "string",
-      desc: "所有者の氏名・法人名",
-      constraints: [
-        "個人名または法人名",
-      ],
-    },
-    cancellation_date: {
-      type: "string",
-      desc: "抹消日（一時抹消日）",
-      constraints: [
-        "YYYY/MM/DD形式",
-        "和暦の場合は西暦に変換",
+        "地名 + 分類番号 + ひらがな1文字 + 番号",
+        "ひらがなは必ず1文字のみ",
       ],
     },
     brand: {
@@ -299,18 +303,45 @@ export const TEMP_CANCEL_SCHEMA = {
         "例: トヨタ, 日産, ホンダ, スズキ",
       ],
     },
-    model_code: {
+    engine_model: {
       type: "string",
-      desc: "型式",
+      desc: "原動機の型式",
       constraints: [
-        "例: DBA-ZVW51, 4BA-JF3",
+        "例: 2ZR-FXE, K6A, MR20DD",
       ],
     },
-    registration_id: {
+    first_registration_date: {
       type: "string",
-      desc: "登録識別情報（一時抹消の固有番号）",
+      desc: "初度登録年月",
       constraints: [
-        "一時抹消登録証明書に記載される識別情報",
+        "YYYY/MM形式（西暦のみ）",
+        "和暦（令和・平成・昭和等）は必ず西暦に変換する",
+        "例: 令和2年3月 → 2020/03, 平成23年6月 → 2011/06",
+      ],
+    },
+    engine_displacement: {
+      type: "string",
+      desc: "総排気量（cc）",
+      constraints: [
+        "必ずcc単位の整数で返す（単位は含めない）",
+        "書類にリットル表記（例: 1.79, 2.99）がある場合は×1000してcc換算する",
+        "例: 1.79 → 1790, 2.99 → 2990, 0.66 → 660",
+      ],
+    },
+    vehicle_weight: {
+      type: "string",
+      desc: "車両重量（kg）",
+      constraints: [
+        "数値のみ（単位は含めない）",
+        "例: 1050, 1320, 980",
+      ],
+    },
+    gross_vehicle_weight: {
+      type: "string",
+      desc: "車両総重量（kg）",
+      constraints: [
+        "数値のみ（単位は含めない）",
+        "例: 1350, 1700, 1230",
       ],
     },
     length: {
@@ -351,11 +382,12 @@ export const TEMP_CANCEL_SCHEMA = {
   outputTemplate: {
     chassis_number: "ZVW51-6097706",
     registration_number: "品川 300 あ 1234",
-    owner_name: "山田 太郎",
-    cancellation_date: "2025/04/05",
     brand: "トヨタ",
-    model_code: "DBA-ZVW51",
-    registration_id: "1234-5678-9012",
+    engine_model: "2ZR-FXE",
+    first_registration_date: "2020/03",
+    engine_displacement: "1800",
+    vehicle_weight: "1050",
+    gross_vehicle_weight: "1350",
     length: "439",
     width: "169",
     height: "143",

@@ -22,14 +22,15 @@ const DOC_TYPE_CONFIG = {
       { key: "chassis_number", label: "車台番号", labelEn: "Chassis Number" },
       { key: "registration_number", label: "登録番号", labelEn: "Registration Number" },
       { key: "brand", label: "車名", labelEn: "Brand" },
-      { key: "model_code", label: "型式", labelEn: "Model Code" },
+      { key: "engine_model", label: "原動機の型式", labelEn: "Engine Model" },
       { key: "first_registration_date", label: "初度登録年月", labelEn: "First Registration" },
-      { key: "vehicle_weight", label: "車両重量", labelEn: "Weight (kg)" },
+      { key: "engine_displacement", label: "排気量", labelEn: "Displacement (cc)" },
+      { key: "vehicle_weight", label: "車両重量", labelEn: "Vehicle Weight (kg)" },
+      { key: "gross_vehicle_weight", label: "車両総重量", labelEn: "Gross Weight (kg)" },
       { key: "length", label: "長さ", labelEn: "Length (cm)" },
       { key: "width", label: "幅", labelEn: "Width (cm)" },
       { key: "height", label: "高さ", labelEn: "Height (cm)" },
       { key: "m3", label: "M3", labelEn: "Cubic Meters" },
-      { key: "export_scheduled_date", label: "輸出予定日", labelEn: "Export Scheduled Date" },
     ],
   },
   inspection_cert: {
@@ -39,12 +40,12 @@ const DOC_TYPE_CONFIG = {
     fields: [
       { key: "chassis_number", label: "車台番号", labelEn: "Chassis Number" },
       { key: "brand", label: "車名", labelEn: "Brand" },
-      { key: "model", label: "車種", labelEn: "Model" },
-      { key: "model_code", label: "型式", labelEn: "Model Code" },
+      { key: "engine_model", label: "原動機の型式", labelEn: "Engine Model" },
       { key: "registration_number", label: "登録番号", labelEn: "Registration Number" },
       { key: "first_registration_date", label: "初度登録", labelEn: "First Registration" },
-      { key: "expiry_date", label: "有効期限", labelEn: "Expiry Date" },
       { key: "engine_displacement", label: "排気量", labelEn: "Displacement (cc)" },
+      { key: "vehicle_weight", label: "車両重量", labelEn: "Vehicle Weight (kg)" },
+      { key: "gross_vehicle_weight", label: "車両総重量", labelEn: "Gross Weight (kg)" },
       { key: "length", label: "長さ", labelEn: "Length (cm)" },
       { key: "width", label: "幅", labelEn: "Width (cm)" },
       { key: "height", label: "高さ", labelEn: "Height (cm)" },
@@ -58,11 +59,12 @@ const DOC_TYPE_CONFIG = {
     fields: [
       { key: "chassis_number", label: "車台番号", labelEn: "Chassis Number" },
       { key: "registration_number", label: "登録番号", labelEn: "Registration Number" },
-      { key: "owner_name", label: "所有者", labelEn: "Owner" },
-      { key: "cancellation_date", label: "抹消日", labelEn: "Cancellation Date" },
       { key: "brand", label: "車名", labelEn: "Brand" },
-      { key: "model_code", label: "型式", labelEn: "Model Code" },
-      { key: "registration_id", label: "登録識別情報", labelEn: "Registration ID" },
+      { key: "engine_model", label: "原動機の型式", labelEn: "Engine Model" },
+      { key: "first_registration_date", label: "初度登録年月", labelEn: "First Registration" },
+      { key: "engine_displacement", label: "排気量", labelEn: "Displacement (cc)" },
+      { key: "vehicle_weight", label: "車両重量", labelEn: "Vehicle Weight (kg)" },
+      { key: "gross_vehicle_weight", label: "車両総重量", labelEn: "Gross Weight (kg)" },
       { key: "length", label: "長さ", labelEn: "Length (cm)" },
       { key: "width", label: "幅", labelEn: "Width (cm)" },
       { key: "height", label: "高さ", labelEn: "Height (cm)" },
@@ -90,7 +92,12 @@ export default function DocumentViewer({ data, onBack }) {
   const extracted = data?.Json?.extracted || {};
   const linkedVehicleId = data?.Json?.linkedVehicleId || null;
 
-  const pdfUrl = data?.DocumentURL;
+  // Prefer single-page blob (DocumentURL) — split by classifyDocument worker, kept permanently.
+  // Fall back to parentDocumentUrl (original multi-page PDF) with #page=N for records
+  // where the split blob no longer exists (uploaded before the blob-retention fix).
+  const pdfUrl = data?.DocumentURL || data?.parentDocumentUrl;
+  const pdfPage = data?.pageNumber || 1;
+  const isParentPdf = !data?.DocumentURL && !!data?.parentDocumentUrl;
 
   // Search for vehicles by chassis number
   const handleSearchVehicle = async () => {
@@ -196,7 +203,7 @@ export default function DocumentViewer({ data, onBack }) {
           <div className="w-1/2 border-r border-[var(--border)] bg-[var(--surface)]">
             {pdfUrl ? (
               <iframe
-                src={`${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+                src={isParentPdf ? `${pdfUrl}#page=${pdfPage}&toolbar=1&navpanes=0&scrollbar=1` : `${pdfUrl}#toolbar=1&navpanes=0&scrollbar=1`}
                 className="w-full h-full border-0"
                 title="Document Preview"
               />

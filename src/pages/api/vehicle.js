@@ -122,7 +122,7 @@ const getIncludeRelations = (includeDocuments = true) => {
   const base = {
     brand: { select: { name: true } },
     customer: { select: { id: true, name: true } },
-    sourceInvoiceJob: { select: { id: true, DocumentURL: true } },
+    sourceInvoiceJob: { select: { id: true, DocumentURL: true, parentDocumentUrl: true } },
   };
   if (includeDocuments) {
     base.documents = { select: { id: true, Url: true, docType: true, createdAt: true } };
@@ -179,6 +179,21 @@ const parseVehicleFields = body => {
   if (body.m3 !== undefined && body.m3 !== null && body.m3 !== "") {
     const parsed = parseFloat(body.m3);
     if (!isNaN(parsed)) fields.m3 = parsed;
+  }
+
+  // Cert-extracted integer fields
+  for (const key of ["vehicleWeight", "grossVehicleWeight", "engineDisplacement"]) {
+    if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+      const parsed = parseInt(body[key]);
+      if (!isNaN(parsed)) fields[key] = parsed;
+    }
+  }
+
+  // Cert-extracted string fields
+  for (const key of ["engineModel", "firstRegistrationDate"]) {
+    if (body[key] !== undefined && body[key] !== null && body[key] !== "") {
+      fields[key] = body[key];
+    }
   }
 
   // titleTransferDeadline (DateTime)
@@ -246,8 +261,8 @@ export default async function handler(req, res) {
           return res.json(vehicle);
         }
 
-        // Paginated list — documents excluded for performance (only needed in detail view)
-        const include = getIncludeRelations(false);
+        // Paginated list — include documents (pagination keeps row count small)
+        const include = getIncludeRelations(true);
         const [vehicles, total] = await Promise.all([
           prisma.vehicle.findMany({
             skip: (page - 1) * limit,
@@ -360,7 +375,8 @@ export default async function handler(req, res) {
           const trackedFields = ["chassisNumber", "auction", "lotNumber", "remarks", "brandId", "customerId", "name",
             "bidAmount", "auctionFee", "insuranceFee", "recyclingFee", "transportFee", "otherFees",
             "auctionDate", "session", "transportCompany", "deliverTo", "numberPlate", "containerNumber", "etd", "documentStatus", "memo",
-            "length", "width", "height", "m3", "titleTransferDeadline"];
+            "length", "width", "height", "m3", "titleTransferDeadline",
+            "engineModel", "vehicleWeight", "grossVehicleWeight", "engineDisplacement", "firstRegistrationDate"];
           const changes = trackedFields
             .filter(f => updateData[f] !== undefined)
             .map(f => ({ field: f, oldValue: oldVehicle[f], newValue: updateData[f] }));

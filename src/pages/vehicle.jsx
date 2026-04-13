@@ -416,7 +416,7 @@ export default function VehiclesPage() {
               <thead className="bg-[var(--secondary)]">
                 <tr>
                   {visibleCols.map((col) => (
-                    <th key={col.id} id={col.id}>{col.label}</th>
+                    <th key={col.id} id={col.noSort ? undefined : col.id}>{col.label}</th>
                   ))}
                 </tr>
               </thead>
