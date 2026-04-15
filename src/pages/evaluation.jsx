@@ -75,7 +75,7 @@ export default function EvaluationPage() {
         <title>Evaluation Dataset - ExpoSaaS</title>
       </Head>
       <Sidebar>
-        <div className="p-6 md:p-8 bg-[var(--background)] min-h-screen">
+        <div className="p-6 bg-[var(--background)] min-h-screen">
           <Error message={error} />
 
           {/* Header */}

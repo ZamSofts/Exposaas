@@ -1,5 +1,18 @@
 import { Trash2 } from "lucide-react";
 import { CONFIDENCE_COLORS, getConfidenceLevel, getAccuracyColor as getConfidenceColor, getConfidenceBorder } from "@/config/aiConstants";
+import { AUCTION_VENUES } from "@/config/auctionVenues";
+
+// "2025/05/23" or "2025-05-23" → "2025-05-23" (for type="date" input value)
+function toDateInputValue(val) {
+  if (!val) return "";
+  return String(val).replace(/\//g, "-");
+}
+
+// "2025-05-23" → "2025/05/23" (preserve existing storage format)
+function toSlashDate(val) {
+  if (!val) return "";
+  return String(val).replace(/-/g, "/");
+}
 
 export default function DetailModeEditor({
   editable,
@@ -117,22 +130,27 @@ export default function DetailModeEditor({
             <div>
               <label className="text-xs text-[var(--secondary-foreground)]">Auction</label>
               <input
+                list="auction-venues-list"
                 value={selectedChassis.auction || ""}
                 onChange={e => handleFieldChange(selectedChassis.chassis_number, "auction", e.target.value)}
                 className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
                 style={getConfidenceBorder(selectedChassis.confidence)}
                 title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
+                placeholder="会場名を選択または入力"
               />
+              <datalist id="auction-venues-list">
+                {AUCTION_VENUES.map(v => <option key={v} value={v} />)}
+              </datalist>
             </div>
             <div>
               <label className="text-xs text-[var(--secondary-foreground)]">Auction Date</label>
               <input
-                value={selectedChassis.auction_date || ""}
-                onChange={e => handleFieldChange(selectedChassis.chassis_number, "auction_date", e.target.value)}
+                type="date"
+                value={toDateInputValue(selectedChassis.auction_date)}
+                onChange={e => handleFieldChange(selectedChassis.chassis_number, "auction_date", toSlashDate(e.target.value))}
                 className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
                 style={getConfidenceBorder(selectedChassis.confidence)}
                 title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
-                placeholder="YYYY/MM/DD"
               />
             </div>
           </div>

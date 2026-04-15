@@ -66,6 +66,8 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: "Invoice job not found" });
   }
 
+  const auctionInvoiceId = invoiceJob.auctionInvoiceId ?? null;
+
   const results = {
     created: 0,
     updated: 0,
@@ -125,6 +127,7 @@ export default async function handler(req, res) {
               brandId,
               customerId: customerId || null,
               sourceInvoiceJobId: invoiceJobId,
+              ...(auctionInvoiceId ? { auctionInvoiceId } : {}),
               ...chargeData,
             },
             existing: mergeCandidate,
@@ -176,6 +179,7 @@ export default async function handler(req, res) {
           brandId,
           sourceInvoiceJobId: invoiceJobId,
           updatedById: parseInt(session.id, 10) || null,
+          ...(auctionInvoiceId ? { auctionInvoiceId } : {}),
           ...(customerId ? { customerId } : {}),
           ...chargeData,
         },
@@ -188,6 +192,7 @@ export default async function handler(req, res) {
           companyId: session.companyId,
           sourceInvoiceJobId: invoiceJobId,
           createdById: parseInt(session.id, 10) || null,
+          ...(auctionInvoiceId ? { auctionInvoiceId } : {}),
           ...(customerId ? { customerId } : {}),
           ...chargeData,
         },
@@ -217,6 +222,18 @@ export default async function handler(req, res) {
         chassis: vehicle.chassis_number || "unknown",
         error: error.message,
       });
+    }
+  }
+
+  // Mark AuctionInvoice as verified once vehicles are confirmed by the user
+  if (auctionInvoiceId) {
+    try {
+      await prisma.auctionInvoice.update({
+        where: { id: auctionInvoiceId },
+        data: { status: "verified" },
+      });
+    } catch (err) {
+      console.error(`Failed to update AuctionInvoice #${auctionInvoiceId} status:`, err.message);
     }
   }
 

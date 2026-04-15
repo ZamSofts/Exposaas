@@ -68,7 +68,7 @@ export default function HomePage() {
         <title>ホーム - ExpoSaaS</title>
       </Head>
       <Sidebar>
-        <div className="p-8 bg-[var(--background)] min-h-screen">
+        <div className="p-6 bg-[var(--background)] min-h-screen">
           {/* 日付 + 挨拶 */}
           <div className="mb-8">
             <p className="text-sm text-[var(--secondary-foreground)] mb-1">

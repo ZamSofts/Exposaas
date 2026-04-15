@@ -60,6 +60,34 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const [auctionAccuracy, setAuctionAccuracy] = useState(null); // { accuracy, count, auction }
   const [expandedRows, setExpandedRows] = useState(new Set());
 
+  // Header editing state — always shown, pre-filled from AuctionInvoice if available
+  const [headerDraft, setHeaderDraft] = useState({
+    auctionVenue:  "",
+    sessionNumber: "",
+    invoiceTotal:  "",
+    paymentDueDate: "",
+  });
+  const [headerSaving, setHeaderSaving] = useState(false);
+
+  // Initialize header draft from AuctionInvoice (or page-level fallback) whenever data changes
+  useEffect(() => {
+    const ai = data?.auctionInvoice;
+    const toDateStr = (val) => {
+      if (!val) return "";
+      const d = new Date(val);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    setHeaderDraft({
+      auctionVenue:   ai?.auctionVenue  ?? "",
+      sessionNumber:  ai?.sessionNumber ?? data?.session ?? "",
+      invoiceTotal:   ai?.invoiceTotal  != null ? String(ai.invoiceTotal) : (data?.invoice_total != null ? String(data.invoice_total) : ""),
+      paymentDueDate: toDateStr(ai?.paymentDueDate),
+    });
+  }, [data]);
+
   // Initialize editable data on mount
   useEffect(() => {
     if (vehicles.length > 0) {
@@ -227,6 +255,31 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const goToNextChassis = () => {
     if (selectedIndexInPage < editable.length - 1) {
       handleSelectChassis(editable[selectedIndexInPage + 1]);
+    }
+  };
+
+  /** Save AuctionInvoice header fields (venue/session/total/paymentDueDate) via PATCH */
+  const saveHeader = async () => {
+    const auctionInvoiceId = data?.auctionInvoice?.id;
+    if (!auctionInvoiceId) return;
+    setHeaderSaving(true);
+    try {
+      await fetch("/api/auctionInvoices", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: auctionInvoiceId,
+          auctionVenue:   headerDraft.auctionVenue  || null,
+          sessionNumber:  headerDraft.sessionNumber || null,
+          invoiceTotal:   headerDraft.invoiceTotal  !== "" ? headerDraft.invoiceTotal : null,
+          paymentDueDate: headerDraft.paymentDueDate || null,
+        }),
+      });
+      showToast("ヘッダー情報を保存しました", "success");
+    } catch (err) {
+      showToast("保存に失敗しました", "error");
+    } finally {
+      setHeaderSaving(false);
     }
   };
 
@@ -529,6 +582,63 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
             {/* Right: parsed data */}
             <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 md:p-6 flex flex-col shadow-sm max-h-[calc(100vh-160px)] md:max-h-[1000px] overflow-auto">
               <div className="mb-4">
+                {/* Invoice-level header — always shown, editable, saved to AuctionInvoice */}
+                {data?.auctionInvoice?.id && (
+                  <div className="mb-4 p-3 bg-[var(--secondary)]/30 border border-[var(--border)] rounded-lg text-sm">
+                    <div className="flex flex-wrap gap-3">
+                      {/* 会場 */}
+                      <div className="flex flex-col min-w-[120px]">
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">会場</label>
+                        <input
+                          type="text"
+                          value={headerDraft.auctionVenue}
+                          onChange={e => setHeaderDraft(d => ({ ...d, auctionVenue: e.target.value }))}
+                          onBlur={saveHeader}
+                          placeholder="会場名"
+                          className="text-xs font-medium bg-transparent border-b border-[var(--border)] focus:border-[var(--primary)] outline-none text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] py-0.5"
+                        />
+                      </div>
+                      {/* 開催回 */}
+                      <div className="flex flex-col min-w-[90px]">
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">開催回</label>
+                        <input
+                          type="text"
+                          value={headerDraft.sessionNumber}
+                          onChange={e => setHeaderDraft(d => ({ ...d, sessionNumber: e.target.value }))}
+                          onBlur={saveHeader}
+                          placeholder="第○○○回"
+                          className="text-xs font-medium bg-transparent border-b border-[var(--border)] focus:border-[var(--primary)] outline-none text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] py-0.5"
+                        />
+                      </div>
+                      {/* 請求書合計 */}
+                      <div className="flex flex-col min-w-[100px]">
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">請求書合計</label>
+                        <input
+                          type="number"
+                          value={headerDraft.invoiceTotal}
+                          onChange={e => setHeaderDraft(d => ({ ...d, invoiceTotal: e.target.value }))}
+                          onBlur={saveHeader}
+                          placeholder="0"
+                          className="text-xs font-medium bg-transparent border-b border-[var(--border)] focus:border-[var(--primary)] outline-none text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] py-0.5"
+                        />
+                      </div>
+                      {/* 支払期日 */}
+                      <div className="flex flex-col min-w-[120px]">
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">支払期日</label>
+                        <input
+                          type="date"
+                          value={headerDraft.paymentDueDate}
+                          onChange={e => setHeaderDraft(d => ({ ...d, paymentDueDate: e.target.value }))}
+                          onBlur={saveHeader}
+                          className="text-xs font-medium bg-transparent border-b border-[var(--border)] focus:border-[var(--primary)] outline-none text-[var(--foreground)] py-0.5"
+                        />
+                      </div>
+                      {headerSaving && (
+                        <div className="self-end text-xs text-[var(--muted-foreground)] pb-0.5">保存中...</div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between mb-1">
                   <h2 className="text-lg font-semibold text-[var(--foreground)]">Extracted Data</h2>
                   {/* Review mode toggle */}

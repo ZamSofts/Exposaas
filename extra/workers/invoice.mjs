@@ -40,6 +40,16 @@ let boss;
         return;
       }
 
+      // Create AuctionInvoice as the parent entity for this invoice
+      const auctionInvoice = await prisma.auctionInvoice.create({
+        data: {
+          companyId,
+          parentDocumentUrl: filePath,
+          status: 'pending',
+        }
+      });
+      console.log(`📋 AuctionInvoice created: id=${auctionInvoice.id}`);
+
       try {
         const pdfStream = await downloadFile(filePath);
         const pdfBuffer = await streamToBuffer(pdfStream);
@@ -56,6 +66,7 @@ let boss;
               parentDocumentUrl: filePath,      // Original multi-page PDF URL
               pageNumber: page.pageNumber,
               originalTotalPages: pages.length,
+              auctionInvoiceId: auctionInvoice.id,
               status: 'pending',
               Json: {}
             }
@@ -69,7 +80,8 @@ let boss;
             pageNumber: page.pageNumber,
             totalPages: pages.length,
             companyId,
-            userId
+            userId,
+            auctionInvoiceId: auctionInvoice.id,
           });
 
         }

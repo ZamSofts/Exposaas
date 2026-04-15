@@ -84,6 +84,16 @@ Vehicle Count:
 - NEVER return more than 20 vehicles per page — if you detect more, you are likely hallucinating
 - Count actual vehicle rows in the PDF before extracting. Double-check the count.
 
+Invoice Header Fields:
+- Look for 「開催回」or「第○○○回」near the document header and return it as the top-level "session" key
+- Look for 「差引ご請求残高」「差引お支払額」「差引合計」「ご請求残高」for the invoice_total — this is the FINAL amount to pay including any previous balance carryover
+- If those labels are not found, fall back to 「請求書合計」「今回合計」「合計 請求」
+- NEVER use 「本日取引ご請求額」「当回AA小計」「今回ご請求分合計」— those are subtotals for the current session only, not the true total
+- invoice_total appears on the LAST page only — return null if not on this page
+- session typically appears at the top of the first page but may repeat on all pages
+- Return BOTH fields at the top level of the JSON, OUTSIDE the page_1 vehicle array
+- If a value is not found, return null for that key (do NOT omit the key)
+
 Global Rules:
 - NEVER include company names, addresses, phone numbers, bank details
 - NEVER include tax breakdowns (taxable amounts, consumption tax)
@@ -136,6 +146,8 @@ function buildOutputFormatSection(schema) {
     `- 必ず完全で有効なJSON形式で返すこと（trailing commaなし、}で終わる）`,
     `- JSON以外のテキスト・説明・コメントは一切含めない`,
     `- quantity, yearフィールドは含めない — 完全に無視すること`,
+    `- session と invoice_total は page_1 配列の外側（top-level）に返す`,
+    `- invoice_total が見つからない場合は null を返す（最終ページにのみ存在する場合あり）`,
   ];
 
   return lines.join("\n");
