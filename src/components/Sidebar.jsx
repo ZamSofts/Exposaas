@@ -13,6 +13,8 @@ import {
   Sparkles,
   FolderOpen,
   FileSpreadsheet,
+  CalendarDays,
+  Truck,
 } from "lucide-react";
 import { isAllowed } from "../hooks/wrapper";
 import SidebarNav from "@/components/sidebar/SidebarNav";
@@ -79,8 +81,10 @@ const ALL_SIDEBAR_SECTIONS = [
     title: "業務",
     isCollapsible: true,
     items: [
-      { id: "vehicle",          label: "在庫台帳",         icon: <Car size={18} />,           href: "/vehicle",         roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "documents",        label: "受信書類",         icon: <FolderOpen size={18} />,    href: "/documents",       roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "vehicle",          label: "在庫台帳",         icon: <Car size={18} />,             href: "/vehicle",         roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "documents",        label: "受信書類",         icon: <FolderOpen size={18} />,      href: "/documents",       roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "calendar",         label: "支払いカレンダー", icon: <CalendarDays size={18} />,    href: "/calendar",        roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "transport",        label: "陸送管理",         icon: <Truck size={18} />,           href: "/transport",       roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
       { id: "export-templates", label: "Excelテンプレート", icon: <FileSpreadsheet size={18} />, href: "/exportTemplates", roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
     ],
   },

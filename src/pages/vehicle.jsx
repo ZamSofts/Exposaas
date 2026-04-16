@@ -301,7 +301,7 @@ export default function VehiclesPage() {
         <title>Vehicles Management - ExpoSaaS</title>
       </Head>
       <Sidebar>
-        <div className="p-2 bg-[var(--background)] min-h-screen">
+        <div className="p-4 bg-[var(--background)] min-h-screen">
           <Error message={listError} />
           {customLoader && <Loader />}
 

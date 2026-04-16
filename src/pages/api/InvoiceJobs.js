@@ -74,7 +74,7 @@ export default async function handler(req, res) {
 
         const item = await prisma.invoiceJobs.findUnique({
           where: { id },
-          ...(effectiveSelect ? { select: effectiveSelect } : {})
+          ...(effectiveSelect ? { select: effectiveSelect } : { include: { auctionInvoice: true } })
         });
 
         // Optionally include the latest user-corrected data from PaymentConfirmation
@@ -122,7 +122,7 @@ export default async function handler(req, res) {
         const [items, total] = await Promise.all([
           prisma.invoiceJobs.findMany({
             where: finalWhere,
-            ...(selectFields ? { select: selectFields } : {}),
+            ...(selectFields ? { select: selectFields } : { include: { auctionInvoice: true } }),
             orderBy: { [sortBy]: sortOrder },
             skip,
             take
@@ -135,7 +135,7 @@ export default async function handler(req, res) {
 
       const rows = await prisma.invoiceJobs.findMany({
         where: finalWhere,
-        ...(selectFields ? { select: selectFields } : {}),
+        ...(selectFields ? { select: selectFields } : { include: { auctionInvoice: true } }),
         orderBy: { [sortBy]: sortOrder }
       });
       return res.json({ data: rows, total: rows.length });

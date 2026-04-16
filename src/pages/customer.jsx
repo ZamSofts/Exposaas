@@ -147,7 +147,7 @@ export default function Customers() {
       </Head>
 
       <Sidebar>
-        <div className="p-8 bg-[var(--background)] min-h-screen relative">
+        <div className="p-6 bg-[var(--background)] min-h-screen relative">
           {customLoader && <Loader />}
 
           {/* Header Section */}

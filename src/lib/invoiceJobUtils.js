@@ -48,6 +48,7 @@ export function buildViewerData(row, correctedJson) {
     status: row.status,
     pageNumber: row.pageNumber,
     originalTotalPages: row.originalTotalPages,
+    auctionInvoice: row.auctionInvoice ?? null,
   };
 }
 

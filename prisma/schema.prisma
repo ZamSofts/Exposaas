@@ -17,6 +17,7 @@ model Company {
   exportTemplates      ExportTemplate[]
   gmailAccount         GmailAccount?
   InvoiceJobs          InvoiceJobs[]
+  auctionInvoices      AuctionInvoice[]
   paymentConfirmations PaymentConfirmation[]
   promptVersions       PromptVersion[]
   roles                Role[]
@@ -42,14 +43,15 @@ model Customer {
 }
 
 model User {
-  id        Int        @id @default(autoincrement())
-  username  String     @unique
-  password  String
-  companyId Int
-  createdAt DateTime   @default(now())
-  customer  Customer?
-  company   Company    @relation(fields: [companyId], references: [id])
-  roles     UserRole[]
+  id                Int                @id @default(autoincrement())
+  username          String             @unique
+  password          String
+  companyId         Int
+  createdAt         DateTime           @default(now())
+  customer          Customer?
+  company           Company            @relation(fields: [companyId], references: [id])
+  roles             UserRole[]
+  transportRequests TransportRequest[]
 
   @@index([companyId])
 }
@@ -141,9 +143,13 @@ model Vehicle {
   company               Company           @relation(fields: [companyId], references: [id])
   customer              Customer?         @relation(fields: [customerId], references: [id])
   sourceInvoiceJob      InvoiceJobs?      @relation(fields: [sourceInvoiceJobId], references: [id])
+  auctionInvoiceId      Int?
+  auctionInvoice        AuctionInvoice?   @relation(fields: [auctionInvoiceId], references: [id])
+  extractionDeadline    DateTime?
   auditLogs             VehicleAuditLog[]
   documents             VehicleDocument[]
   payments              VehiclePayments[]
+  transportRequests     TransportRequest[]
 
   @@unique([companyId, chassisNumber])
   @@index([companyId])
@@ -222,13 +228,57 @@ model InvoiceJobs {
   pageNumber           Int?
   parentDocumentUrl    String?
   docType              String                @default("invoice")
+  invoiceTotal         Int?
+  sessionNumber        String?
+  auctionInvoiceId     Int?
   company              Company               @relation(fields: [companyId], references: [id])
+  auctionInvoice       AuctionInvoice?       @relation(fields: [auctionInvoiceId], references: [id])
   paymentConfirmations PaymentConfirmation[] @relation("PaymentConfirmationInvoiceJob")
   vehicles             Vehicle[]
 
   @@index([companyId])
   @@index([companyId, docType])
   @@index([parentDocumentUrl])
+  @@index([auctionInvoiceId])
+}
+
+model AuctionInvoice {
+  id                Int               @id @default(autoincrement())
+  companyId         Int
+  parentDocumentUrl String?
+  auctionVenue      String?
+  auctionDate       DateTime?
+  sessionNumber     String?
+  invoiceTotal      Int?
+  paymentDueDate    DateTime?
+  isPaid                Boolean           @default(false)
+  isPrepaymentRequired  Boolean           @default(false)
+  status                String            @default("pending")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  company           Company           @relation(fields: [companyId], references: [id])
+  invoiceJobs       InvoiceJobs[]
+  vehicles          Vehicle[]
+
+  @@index([companyId])
+  @@index([parentDocumentUrl])
+}
+
+model TransportRequest {
+  id               Int       @id @default(autoincrement())
+  vehicleId        Int
+  transportCompany String
+  requestedById    Int
+  requestedAt      DateTime  @default(now())
+  completedAt      DateTime?
+  destination      String?
+  status           String    @default("pending")
+  notes            String?
+  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id])
+  requestedBy      User      @relation(fields: [requestedById], references: [id])
+
+  @@index([vehicleId])
+  @@index([requestedById])
 }
 
 model PromptVersion {

@@ -115,7 +115,7 @@ export default function ExportTemplates() {
         <title>Export Templates - ExpoSaaS</title>
       </Head>
       <Sidebar>
-        <div className="p-4 sm:p-6 bg-[var(--background)] min-h-screen">
+        <div className="p-4 md:p-6 max-w-6xl mx-auto">
           <Error message={listError || error} />
 
           {/* Header */}

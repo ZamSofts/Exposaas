@@ -101,10 +101,34 @@ export const EXTRACTION_SCHEMA = {
         "各chargeにconfidence (0.0-1.0) を付与",
       ],
     },
+    session: {
+      type: "string",
+      desc: "開催回。請求書ヘッダーに記載される開催番号（例: 第1285回）。",
+      constraints: [
+        "「第○○○回」の形式で返す",
+        "見つからない場合は null を返す",
+        "車両配列の外側（top-level）に返す",
+      ],
+    },
+    invoice_total: {
+      type: "integer",
+      desc: "実際に支払う合計金額。繰越残高・前回未払いを含む最終的な請求額。",
+      constraints: [
+        "カンマなし整数で返す",
+        "「差引ご請求残高」「差引お支払額」「差引合計」「ご請求残高」が最優先 — 繰越を含む最終支払額",
+        "次点: 「請求書合計」「今回合計」「合計 請求」",
+        "絶対に使わない: 「本日取引ご請求額」「当回AA小計」「今回ご請求分合計」— これらは今回分の小計であり、繰越が含まれない",
+        "最終ページにのみ表示される場合がある — このページにない場合は null を返す",
+        "見つからない場合は null を返す",
+        "車両配列の外側（top-level）に返す",
+      ],
+    },
   },
 
   // JSON output format template — used to show Gemini the expected structure
   outputTemplate: {
+    session: "第1285回",
+    invoice_total: 718190,
     page_1: [
       {
         auction: "HAA 神戸",

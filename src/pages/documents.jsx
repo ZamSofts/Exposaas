@@ -276,7 +276,7 @@ export default function DocumentsPage() {
       </Head>
 
       <Sidebar>
-        <div className="p-8 bg-[var(--background)] min-h-screen relative">
+        <div className="p-6 bg-[var(--background)] min-h-screen relative">
           {/* Header */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">

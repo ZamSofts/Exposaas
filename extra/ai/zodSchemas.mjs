@@ -44,13 +44,25 @@ export const VehicleExtractionSchema = z.object({
 });
 
 /**
- * Invoice page response — Gemini returns { page_1: [...vehicles] }.
+ * Invoice page response — Gemini returns { session, invoice_total, page_1: [...vehicles] }.
+ * session and invoice_total are invoice-level (top-level) fields.
  */
 export const InvoicePageResponseSchema = z
   .object({
+    session: z.string().nullable().optional(),
+    invoice_total: z.number().int().nullable().optional(),
     page_1: z.array(VehicleExtractionSchema).max(MAX_VEHICLES_PER_PAGE),
   })
   .passthrough();
+
+/** Invoice header response — extracted from the last page only */
+export const InvoiceHeaderResponseSchema = z.object({
+  auctionVenue:    z.string().nullable().optional(),
+  auctionDate:     z.string().nullable().optional(),
+  sessionNumber:   z.string().nullable().optional(),
+  invoiceTotal:    z.number().int().nullable().optional(),
+  paymentDueDate:  z.string().nullable().optional(), // YYYY/MM/DD — for venues that print it (JU, Hanamaru, Tau etc.)
+});
 
 // ─── Document Classification ────────────────────────────────────
 

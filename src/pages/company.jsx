@@ -136,7 +136,7 @@ export default function Company() {
       </Head>
 
       <Sidebar>
-        <div className="p-8 bg-[var(--background)] min-h-screen">
+        <div className="p-6 bg-[var(--background)] min-h-screen">
           {/* Header Section */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
