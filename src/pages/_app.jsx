@@ -3,9 +3,12 @@ import "@/styles/globals.css";
 import { Inter } from "next/font/google";
 
 const inter = Inter({ subsets: ["latin"] });
+import App from "next/app";
 import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { resolveLocaleFromCookieHeader, DEFAULT_LOCALE } from "@/i18n/resolveLocale";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,14 +59,27 @@ function AppContent({ Component, pageProps }) {
   );
 }
 
-export default function App({ Component, pageProps: { session, ...pageProps } }) {
+function MyApp({ Component, pageProps: { session, ...pageProps }, initialLocale }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SessionProvider session={session}>
-        <ErrorBoundary>
-          <AppContent Component={Component} pageProps={pageProps} />
-        </ErrorBoundary>
+        <LocaleProvider initialLocale={initialLocale}>
+          <ErrorBoundary>
+            <AppContent Component={Component} pageProps={pageProps} />
+          </ErrorBoundary>
+        </LocaleProvider>
       </SessionProvider>
     </QueryClientProvider>
   );
 }
+
+MyApp.getInitialProps = async (appContext) => {
+  const appProps = await App.getInitialProps(appContext);
+  const cookieHeader = appContext?.ctx?.req?.headers?.cookie || "";
+  const initialLocale = typeof window === "undefined"
+    ? resolveLocaleFromCookieHeader(cookieHeader)
+    : DEFAULT_LOCALE;
+  return { ...appProps, initialLocale };
+};
+
+export default MyApp;

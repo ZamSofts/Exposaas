@@ -1,0 +1,79 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "items": "items",
+    "units": "vehicles",
+    "viewAll": "View all",
+    "processNow": "Process now"
+  },
+  "language": {
+    "toggleToOther": "日本語",
+    "current": "English"
+  },
+  "sidebar": {
+    "menu": "Menu",
+    "logout": "Sign out",
+    "sections": {
+      "business": "Operations",
+      "admin": "Administration",
+      "aiSystem": "AI & System"
+    },
+    "items": {
+      "home": "Home",
+      "companies": "Companies",
+      "vehicle": "Inventory",
+      "documents": "Documents",
+      "calendar": "Payment calendar",
+      "transport": "Transport",
+      "exportTemplates": "Excel templates",
+      "user": "Users",
+      "customer": "Customers",
+      "role": "Roles",
+      "aiAccuracy": "AI accuracy",
+      "evaluation": "Evaluation",
+      "prompts": "Prompts"
+    }
+  },
+  "home": {
+    "title": "Home",
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "greetingWithName": "{greeting}, {name}",
+    "pendingAlert": "{count} document(s) awaiting processing",
+    "stats": {
+      "pendingDocs": "Pending documents",
+      "failedDocs": "Failed",
+      "todayVehicles": "Vehicles added today",
+      "missingInvoice": "Unlinked invoices"
+    },
+    "recentDocs": "Recent document activity",
+    "noDocuments": "No documents yet"
+  },
+  "pageTitles": {
+    "home": "Home - ExpoSaaS",
+    "vehicle": "Inventory - ExpoSaaS",
+    "documents": "Documents - ExpoSaaS",
+    "calendar": "Payment calendar - ExpoSaaS",
+    "transport": "Transport - ExpoSaaS",
+    "exportTemplates": "Excel templates - ExpoSaaS",
+    "user": "Users - ExpoSaaS",
+    "customer": "Customers - ExpoSaaS",
+    "role": "Roles - ExpoSaaS",
+    "company": "Companies - ExpoSaaS",
+    "accuracy": "AI accuracy - ExpoSaaS",
+    "evaluation": "Evaluation - ExpoSaaS",
+    "prompts": "Prompts - ExpoSaaS"
+  },
+  "errors": {
+    "default": "Something went wrong",
+    "requestFailed": "Request failed ({status})",
+    "network": "Network error"
+  }
+}

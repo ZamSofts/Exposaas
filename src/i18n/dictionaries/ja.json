@@ -1,0 +1,79 @@
+{
+  "common": {
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "loading": "読み込み中",
+    "confirm": "確認",
+    "close": "閉じる",
+    "back": "戻る",
+    "items": "件",
+    "units": "台",
+    "viewAll": "すべて見る",
+    "processNow": "今すぐ処理する"
+  },
+  "language": {
+    "toggleToOther": "English",
+    "current": "日本語"
+  },
+  "sidebar": {
+    "menu": "メニュー",
+    "logout": "ログアウト",
+    "sections": {
+      "business": "業務",
+      "admin": "管理",
+      "aiSystem": "AI・システム"
+    },
+    "items": {
+      "home": "ホーム",
+      "companies": "会社管理",
+      "vehicle": "在庫台帳",
+      "documents": "受信書類",
+      "calendar": "支払いカレンダー",
+      "transport": "陸送管理",
+      "exportTemplates": "Excelテンプレート",
+      "user": "ユーザー管理",
+      "customer": "顧客管理",
+      "role": "ロール管理",
+      "aiAccuracy": "AI精度",
+      "evaluation": "評価",
+      "prompts": "プロンプト"
+    }
+  },
+  "home": {
+    "title": "ホーム",
+    "greetingMorning": "おはようございます",
+    "greetingAfternoon": "こんにちは",
+    "greetingEvening": "こんばんは",
+    "greetingWithName": "{greeting}、{name}さん",
+    "pendingAlert": "未処理の書類が {count} 件あります",
+    "stats": {
+      "pendingDocs": "未処理書類",
+      "failedDocs": "処理失敗",
+      "todayVehicles": "本日登録車両",
+      "missingInvoice": "請求書未紐付け"
+    },
+    "recentDocs": "直近の書類処理",
+    "noDocuments": "書類がありません"
+  },
+  "pageTitles": {
+    "home": "ホーム - ExpoSaaS",
+    "vehicle": "在庫台帳 - ExpoSaaS",
+    "documents": "受信書類 - ExpoSaaS",
+    "calendar": "支払いカレンダー - ExpoSaaS",
+    "transport": "陸送管理 - ExpoSaaS",
+    "exportTemplates": "Excelテンプレート - ExpoSaaS",
+    "user": "ユーザー管理 - ExpoSaaS",
+    "customer": "顧客管理 - ExpoSaaS",
+    "role": "ロール管理 - ExpoSaaS",
+    "company": "会社管理 - ExpoSaaS",
+    "accuracy": "AI精度 - ExpoSaaS",
+    "evaluation": "評価 - ExpoSaaS",
+    "prompts": "プロンプト - ExpoSaaS"
+  },
+  "errors": {
+    "default": "エラーが発生しました",
+    "requestFailed": "リクエストに失敗しました ({status})",
+    "network": "ネットワークエラー"
+  }
+}

@@ -1,12 +1,16 @@
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/router";
 import { LogOut } from "lucide-react";
+import { useT } from "@/i18n/LocaleProvider";
+import LanguageToggle from "./LanguageToggle";
 
 export default function SidebarSettings({ isCollapsed }) {
   const router = useRouter();
+  const t = useT();
 
   return (
-    <div className="border-t border-[var(--border)] p-3">
+    <div className="border-t border-[var(--border)] p-3 space-y-1">
+      <LanguageToggle isCollapsed={isCollapsed} />
       <button
         onClick={async () => {
           await signOut({ redirect: false });
@@ -18,7 +22,7 @@ export default function SidebarSettings({ isCollapsed }) {
       >
         <LogOut size={18} />
         <span className={`text-sm transition-all duration-300 ${isCollapsed ? "md:opacity-0 md:w-0 overflow-hidden" : "opacity-100"}`}>
-          ログアウト
+          {t("sidebar.logout")}
         </span>
       </button>
     </div>

@@ -17,6 +17,7 @@ import {
   Truck,
 } from "lucide-react";
 import { isAllowed } from "../hooks/wrapper";
+import { useT } from "@/i18n/LocaleProvider";
 import SidebarNav from "@/components/sidebar/SidebarNav";
 import SidebarSettings from "@/components/sidebar/SidebarSettings";
 
@@ -70,40 +71,40 @@ const filterItemsByRole = (items, userRole, userPermissions = []) => {
 
 const ALL_SIDEBAR_SECTIONS = [
   {
-    title: null,
+    titleKey: null,
     isCollapsible: false,
     items: [
-      { id: "home",      label: "ホーム",   icon: <Home size={18} />,     href: "/home",    roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "companies", label: "会社管理", icon: <Building2 size={18} />, href: "/company", roles: ["Sadmin"] },
+      { id: "home",      labelKey: "sidebar.items.home",      icon: <Home size={18} />,     href: "/home",    roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "companies", labelKey: "sidebar.items.companies", icon: <Building2 size={18} />, href: "/company", roles: ["Sadmin"] },
     ],
   },
   {
-    title: "業務",
+    titleKey: "sidebar.sections.business",
     isCollapsible: true,
     items: [
-      { id: "vehicle",          label: "在庫台帳",         icon: <Car size={18} />,             href: "/vehicle",         roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "documents",        label: "受信書類",         icon: <FolderOpen size={18} />,      href: "/documents",       roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "calendar",         label: "支払いカレンダー", icon: <CalendarDays size={18} />,    href: "/calendar",        roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "transport",        label: "陸送管理",         icon: <Truck size={18} />,           href: "/transport",       roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "export-templates", label: "Excelテンプレート", icon: <FileSpreadsheet size={18} />, href: "/exportTemplates", roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "vehicle",          labelKey: "sidebar.items.vehicle",         icon: <Car size={18} />,             href: "/vehicle",         roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "documents",        labelKey: "sidebar.items.documents",       icon: <FolderOpen size={18} />,      href: "/documents",       roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "calendar",         labelKey: "sidebar.items.calendar",        icon: <CalendarDays size={18} />,    href: "/calendar",        roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "transport",        labelKey: "sidebar.items.transport",       icon: <Truck size={18} />,           href: "/transport",       roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "export-templates", labelKey: "sidebar.items.exportTemplates", icon: <FileSpreadsheet size={18} />, href: "/exportTemplates", roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
     ],
   },
   {
-    title: "管理",
+    titleKey: "sidebar.sections.admin",
     isCollapsible: true,
     items: [
-      { id: "user",     label: "ユーザー管理", icon: <Users size={18} />,  href: "/user",     roles: ["view:user"] },
-      { id: "customer", label: "顧客管理",     icon: <Users size={18} />,  href: "/customer", roles: ["view:customer"], excludeRoles: ["Sadmin"] },
-      { id: "role",     label: "ロール管理",   icon: <Shield size={18} />, href: "/role",     roles: ["view:role", "Sadmin"] },
+      { id: "user",     labelKey: "sidebar.items.user",     icon: <Users size={18} />,  href: "/user",     roles: ["view:user"] },
+      { id: "customer", labelKey: "sidebar.items.customer", icon: <Users size={18} />,  href: "/customer", roles: ["view:customer"], excludeRoles: ["Sadmin"] },
+      { id: "role",     labelKey: "sidebar.items.role",     icon: <Shield size={18} />, href: "/role",     roles: ["view:role", "Sadmin"] },
     ],
   },
   {
-    title: "AI・システム",
+    titleKey: "sidebar.sections.aiSystem",
     isCollapsible: true,
     items: [
-      { id: "ai-accuracy", label: "AI精度",    icon: <BarChart3 size={18} />,    href: "/accuracy",   roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "evaluation",  label: "評価",       icon: <FlaskConical size={18} />, href: "/evaluation", roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
-      { id: "prompts",     label: "プロンプト", icon: <Sparkles size={18} />,     href: "/prompts",    roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "ai-accuracy", labelKey: "sidebar.items.aiAccuracy", icon: <BarChart3 size={18} />,    href: "/accuracy",   roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "evaluation",  labelKey: "sidebar.items.evaluation", icon: <FlaskConical size={18} />, href: "/evaluation", roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
+      { id: "prompts",     labelKey: "sidebar.items.prompts",    icon: <Sparkles size={18} />,     href: "/prompts",    roles: ["view:vehicle"], excludeRoles: ["Sadmin"] },
     ],
   },
 ];
@@ -112,6 +113,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const { isCollapsed, setIsCollapsed } = useSidebar();
   const router = useRouter();
   const { session } = useAuth();
+  const t = useT();
 
   const [sectionStates, setSectionStates] = useState({});
 
@@ -124,10 +126,12 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
       ALL_SIDEBAR_SECTIONS
         .map(section => ({
           ...section,
-          items: filterItemsByRole(section.items, session?.role, session?.permissions),
+          title: section.titleKey ? t(section.titleKey) : null,
+          items: filterItemsByRole(section.items, session?.role, session?.permissions)
+            .map(item => ({ ...item, label: t(item.labelKey) })),
         }))
         .filter(section => section.items.length > 0),
-    [session?.role, session?.permissions]
+    [session?.role, session?.permissions, t]
   );
 
   const isActiveRoute = useCallback(
@@ -159,7 +163,7 @@ function SidebarContent({ isMobileMenuOpen, setIsMobileMenuOpen }) {
 
       {/* Mobile Header */}
       <div className="h-14 items-center justify-between px-3 border-b border-[var(--border)] flex md:hidden">
-        <span className="text-sm font-semibold text-[var(--foreground)]">Menu</span>
+        <span className="text-sm font-semibold text-[var(--foreground)]">{t("sidebar.menu")}</span>
         <button
           onClick={() => setIsMobileMenuOpen?.(false)}
           className="w-8 h-8 rounded-lg hover:bg-[var(--border)] flex items-center justify-center

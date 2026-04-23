@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/useAuth";
+import { translate, resolveLocaleClient } from "@/i18n";
 export { useAuth };
 export { default as Error } from "@/components/ui/Error";
 export { useConfirm } from "@/components/ui/ConfirmModal";
@@ -31,8 +32,19 @@ export const API = async (method, name, d = {}, isFile= false) => {
 
   const json = await resp.json().catch(() => ({}));
 
+  if (json && json.errorCode) {
+    const locale = resolveLocaleClient();
+    const translated = translate(locale, `errors.${json.errorCode}`);
+    if (translated !== `errors.${json.errorCode}`) {
+      json.error = translated;
+    } else if (!json.error) {
+      json.error = json.errorCode;
+    }
+  }
+
   if (!resp.ok && !json.error) {
-    json.error = `Request failed (${resp.status})`;
+    const locale = resolveLocaleClient();
+    json.error = translate(locale, "errors.requestFailed", { status: resp.status });
   }
 
   return json;
