@@ -8,10 +8,12 @@ import VehicleRow from "@/components/VehicleRow";
 import VehicleFilters from "@/components/VehicleFilters";
 import ExportDropdown from "@/components/export/ExportDropdown";
 import { VEHICLE_COLUMNS } from "@/config/vehicleColumns";
+import { useT } from "@/i18n/LocaleProvider";
 
 export default function VehiclesPage() {
   const { session } = useAuth(["view:vehicle"], ["Sadmin"]);
   const canEditCharges = isAllowed(["edit:vehicle"], session);
+  const t = useT();
 
   const { confirm, ConfirmComponent } = useConfirm();
   const queryClient = useQueryClient();
@@ -174,16 +176,16 @@ export default function VehiclesPage() {
           ),
         };
       });
-      showToast("Updated", "success");
+      showToast(t("vehicle.inlineUpdateSuccess"), "success");
     },
-    [queryClient, showToast]
+    [queryClient, showToast, t]
   );
 
   const handleInlineError = useCallback(
     (msg) => {
-      showToast(msg || "Failed to update", "error");
+      showToast(msg || t("vehicle.inlineUpdateFailed"), "error");
     },
-    [showToast]
+    [showToast, t]
   );
 
   // ── Filter change handler ──
@@ -241,20 +243,20 @@ export default function VehiclesPage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      showToast("エクスポート完了", "success");
+      showToast(t("vehicle.exportSuccess"), "success");
     } catch (err) {
-      showToast(err.message || "エクスポートに失敗しました", "error");
+      showToast(err.message || t("vehicle.exportFailed"), "error");
     } finally {
       setIsExporting(false);
     }
-  }, [filters, conjunction, searchInput, sortBy, sortOrder, showToast]);
+  }, [filters, conjunction, searchInput, sortBy, sortOrder, showToast, t]);
 
   // ── Delete vehicle ──
   const deleteIt = async (id) => {
     const confirmed = await confirm({
-      title: "Delete Vehicle",
-      message: "Are you sure you want to delete this vehicle? This will also permanently delete all associated documents and Payments. This action cannot be undone.",
-      confirmText: "Delete",
+      title: t("vehicle.deleteConfirmTitle"),
+      message: t("vehicle.deleteConfirmMessage"),
+      confirmText: t("vehicle.deleteConfirmButton"),
       type: "danger",
     });
     if (!confirmed) return;
@@ -268,8 +270,10 @@ export default function VehiclesPage() {
     }
 
     setCustomLoader(false);
-    const documentsDeletedText = data.documentsDeleted > 0 ? ` ${data.documentsDeleted} associated document(s) were also removed.` : "";
-    showToast(`Vehicle deleted successfully!${documentsDeletedText}`, "success");
+    const successMsg = data.documentsDeleted > 0
+      ? t("vehicle.deleteSuccessWithDocs", { count: data.documentsDeleted })
+      : t("vehicle.deleteSuccess");
+    showToast(successMsg, "success");
     invalidate();
   };
 
@@ -298,7 +302,7 @@ export default function VehiclesPage() {
   return (
     <>
       <Head>
-        <title>Vehicles Management - ExpoSaaS</title>
+        <title>{t("pageTitles.vehicle")}</title>
       </Head>
       <Sidebar>
         <div className="p-4 bg-[var(--background)] min-h-screen">
@@ -307,13 +311,13 @@ export default function VehiclesPage() {
 
           {/* Spreadsheet Toolbar */}
           <div className="flex flex-wrap items-center justify-between px-3 py-1.5 bg-[var(--surface)] border border-[var(--border)] border-b-0">
-            <h2 className="text-sm font-semibold text-[var(--foreground)]">Vehicles ({isLoading ? "..." : total})</h2>
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">{t("vehicle.header")} ({isLoading ? "..." : total})</h2>
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--secondary-foreground)]" />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={t("vehicle.searchPlaceholder")}
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -332,7 +336,7 @@ export default function VehiclesPage() {
                   }`}
               >
                 <Filter className="w-3.5 h-3.5" />
-                Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                {activeFilterCount > 0 ? t("vehicle.filterWithCount", { count: activeFilterCount }) : t("vehicle.filter")}
               </button>
               <div className="relative">
                 <button
@@ -340,7 +344,7 @@ export default function VehiclesPage() {
                   className="flex items-center gap-1 px-2 py-1 text-xs font-medium border rounded transition-colors bg-[var(--secondary)] text-[var(--foreground)] border-[var(--border)] hover:bg-[var(--border)]"
                 >
                   <Columns2 className="w-3.5 h-3.5" />
-                  列を表示
+                  {t("vehicle.showColumns")}
                 </button>
                 {showColPicker && (
                   <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-lg p-2 w-44 max-h-72 overflow-y-auto">
@@ -355,7 +359,7 @@ export default function VehiclesPage() {
                           onChange={() => toggleCol(col.id)}
                           className="accent-[var(--primary)]"
                         />
-                        {col.label || col.id}
+                        {col.labelKey ? t(col.labelKey) : col.id}
                       </label>
                     ))}
                   </div>
@@ -373,7 +377,7 @@ export default function VehiclesPage() {
                              bg-[var(--primary)] text-white rounded hover:bg-[var(--primary-hover)]
                              transition-colors"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Add
+                  <Plus className="w-3.5 h-3.5" /> {t("vehicle.addButton")}
                 </button>
               )}
             </div>
@@ -416,7 +420,7 @@ export default function VehiclesPage() {
               <thead className="bg-[var(--secondary)]">
                 <tr>
                   {visibleCols.map((col) => (
-                    <th key={col.id} id={col.noSort ? undefined : col.id}>{col.label}</th>
+                    <th key={col.id} id={col.noSort ? undefined : col.id}>{col.labelKey ? t(col.labelKey) : col.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -458,20 +462,42 @@ export default function VehiclesPage() {
 
 // ── Merge Info Popup ──
 
-const MERGE_FIELD_LABELS = {
-  chassisNumber: "車台番号", lotNumber: "ロット番号", auction: "オークション",
-  auctionDate: "オークション日", brandId: "ブランド", customerId: "顧客",
-  name: "名前", remarks: "備考", bidAmount: "落札額", auctionFee: "オークション手数料",
-  insuranceFee: "保険料", recyclingFee: "リサイクル料", transportFee: "輸送費",
-  otherFees: "その他費用", taxSum: "消費税", totalCost: "合計",
-  session: "セッション", transportCompany: "輸送会社", deliverTo: "納車先",
-  numberPlate: "ナンバープレート", titleTransferDeadline: "名義変更期限",
-  containerNumber: "コンテナ番号", etd: "ETD", documentStatus: "書類状況",
-  memo: "メモ", length: "長さ", width: "幅", height: "高さ", m3: "m³",
-  sourceInvoiceJobId: "請求書ジョブ",
+// Maps internal field codes to i18n keys (shared taxonomy with fields.*)
+const MERGE_FIELD_LABEL_KEYS = {
+  chassisNumber: "fields.chassisNumber",
+  lotNumber: "fields.lotNumber",
+  auction: "fields.auction",
+  auctionDate: "fields.auctionDateLabel",
+  brandId: "fields.brandId",
+  customerId: "fields.customerId",
+  name: "fields.name",
+  remarks: "fields.remarks",
+  bidAmount: "fields.bidAmountShort",
+  auctionFee: "fields.auctionFee",
+  insuranceFee: "fields.insuranceFee",
+  recyclingFee: "fields.recyclingFee",
+  transportFee: "fields.transportFee",
+  otherFees: "fields.otherFees",
+  taxSum: "fields.taxSumAlt",
+  totalCost: "fields.totalCostShort",
+  session: "fields.session",
+  transportCompany: "fields.transportCompany",
+  deliverTo: "fields.deliverToAlt",
+  numberPlate: "fields.numberPlate",
+  titleTransferDeadline: "fields.titleTransferDeadline",
+  containerNumber: "fields.containerNumber",
+  etd: "fields.etd",
+  documentStatus: "fields.documentStatusAlt",
+  memo: "fields.memo",
+  length: "fields.lengthShort",
+  width: "fields.widthShort",
+  height: "fields.heightShort",
+  m3: "fields.m3",
+  sourceInvoiceJobId: "fields.sourceInvoiceJobId",
 };
 
 function MergeInfoPopup({ vehicle, onClose }) {
+  const t = useT();
   const merged = vehicle.mergedFields;
   if (!merged) return null;
 
@@ -482,37 +508,41 @@ function MergeInfoPopup({ vehicle, onClose }) {
         className="relative bg-[var(--surface)] border border-[var(--border)] rounded-lg shadow-xl p-5 w-80 max-h-[80vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <h4 className="text-sm font-semibold text-[var(--foreground)] mb-3">統合情報</h4>
+        <h4 className="text-sm font-semibold text-[var(--foreground)] mb-3">{t("vehicle.mergePopup.title")}</h4>
 
         <div className="text-xs space-y-2 text-[var(--secondary-foreground)]">
           <div className="flex justify-between">
-            <span>統合日</span>
+            <span>{t("vehicle.mergePopup.mergedAt")}</span>
             <span className="text-[var(--foreground)]">{new Date(vehicle.mergedAt).toLocaleDateString()}</span>
           </div>
           {vehicle.mergedFromId && (
             <div className="flex justify-between">
-              <span>元車両ID</span>
+              <span>{t("vehicle.mergePopup.sourceId")}</span>
               <span className="text-[var(--foreground)]">#{vehicle.mergedFromId}</span>
             </div>
           )}
           {merged.absorbedChassisNumber && (
             <div className="flex justify-between">
-              <span>元車台番号</span>
+              <span>{t("vehicle.mergePopup.sourceChassis")}</span>
               <span className="text-[var(--foreground)] font-mono">{merged.absorbedChassisNumber}</span>
             </div>
           )}
           <div className="flex justify-between">
-            <span>費用ソース</span>
-            <span className="text-[var(--foreground)]">{merged.chargeSource === "invoice" ? "請求書" : "CSV"}</span>
+            <span>{t("vehicle.mergePopup.chargeSource")}</span>
+            <span className="text-[var(--foreground)]">
+              {merged.chargeSource === "invoice"
+                ? t("vehicle.mergePopup.chargeSourceInvoice")
+                : t("vehicle.mergePopup.chargeSourceCsv")}
+            </span>
           </div>
 
           {merged.fieldsChanged?.length > 0 && (
             <div className="pt-2 border-t border-[var(--border)]">
-              <p className="mb-1 font-medium text-[var(--foreground)]">変更フィールド:</p>
+              <p className="mb-1 font-medium text-[var(--foreground)]">{t("vehicle.mergePopup.changedFields")}</p>
               <div className="flex flex-wrap gap-1">
                 {merged.fieldsChanged.map((f) => (
                   <span key={f} className="px-1.5 py-0.5 bg-[var(--input)] rounded text-[10px]">
-                    {MERGE_FIELD_LABELS[f] || f}
+                    {MERGE_FIELD_LABEL_KEYS[f] ? t(MERGE_FIELD_LABEL_KEYS[f]) : f}
                   </span>
                 ))}
               </div>
@@ -521,7 +551,7 @@ function MergeInfoPopup({ vehicle, onClose }) {
         </div>
 
         <div className="mt-3 pt-2 border-t border-[var(--border)]">
-          <p className="text-xs text-amber-500 font-medium">費用を確認してください</p>
+          <p className="text-xs text-amber-500 font-medium">{t("vehicle.mergePopup.warning")}</p>
         </div>
 
         <button

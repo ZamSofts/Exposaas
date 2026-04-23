@@ -1,40 +1,41 @@
 import { useState, useEffect } from "react";
 import { API } from "@/hooks/wrapper";
+import { useT } from "@/i18n/LocaleProvider";
 
 // Currency fields that should be formatted with ¥
 const CURRENCY_FIELDS = new Set(["bidAmount", "auctionFee", "insuranceFee", "recyclingFee", "transportFee", "otherFees", "taxSum", "totalCost"]);
 
-// Field display names
-const FIELD_LABELS = {
-  chassisNumber: "車台番号",
-  lotNumber: "ロット番号",
-  auction: "オークション",
-  auctionDate: "オークション日",
-  brandId: "ブランド",
-  customerId: "顧客",
-  name: "名前",
-  remarks: "備考",
-  bidAmount: "落札額",
-  auctionFee: "オークション手数料",
-  insuranceFee: "保険料",
-  recyclingFee: "リサイクル料",
-  transportFee: "輸送費",
-  otherFees: "その他費用",
-  taxSum: "消費税",
-  totalCost: "合計",
-  session: "セッション",
-  transportCompany: "輸送会社",
-  deliverTo: "納車先",
-  numberPlate: "ナンバープレート",
-  titleTransferDeadline: "名義変更期限",
-  containerNumber: "コンテナ番号",
-  etd: "ETD",
-  documentStatus: "書類状況",
-  memo: "メモ",
-  length: "長さ (cm)",
-  width: "幅 (cm)",
-  height: "高さ (cm)",
-  m3: "m³",
+// Maps internal field codes to i18n keys (shared with vehicle.jsx MergeInfoPopup)
+const FIELD_LABEL_KEYS = {
+  chassisNumber: "fields.chassisNumber",
+  lotNumber: "fields.lotNumber",
+  auction: "fields.auction",
+  auctionDate: "fields.auctionDateLabel",
+  brandId: "fields.brandId",
+  customerId: "fields.customerId",
+  name: "fields.name",
+  remarks: "fields.remarks",
+  bidAmount: "fields.bidAmountShort",
+  auctionFee: "fields.auctionFee",
+  insuranceFee: "fields.insuranceFee",
+  recyclingFee: "fields.recyclingFee",
+  transportFee: "fields.transportFee",
+  otherFees: "fields.otherFees",
+  taxSum: "fields.taxSumAlt",
+  totalCost: "fields.totalCostShort",
+  session: "fields.session",
+  transportCompany: "fields.transportCompany",
+  deliverTo: "fields.deliverToAlt",
+  numberPlate: "fields.numberPlate",
+  titleTransferDeadline: "fields.titleTransferDeadline",
+  containerNumber: "fields.containerNumber",
+  etd: "fields.etd",
+  documentStatus: "fields.documentStatusAlt",
+  memo: "fields.memo",
+  length: "fields.lengthShort",
+  width: "fields.widthShort",
+  height: "fields.heightShort",
+  m3: "fields.m3",
 };
 
 // Actor icons
@@ -54,22 +55,19 @@ function formatValue(field, value) {
   return String(value);
 }
 
-function formatTime(dateStr) {
+function formatTime(dateStr, t) {
   const d = new Date(dateStr);
   const now = new Date();
   const diff = now - d;
 
-  // Less than 1 hour
   if (diff < 3600000) {
     const mins = Math.floor(diff / 60000);
-    return mins <= 0 ? "たった今" : `${mins}分前`;
+    return mins <= 0 ? t("vehicle.history.justNow") : t("vehicle.history.minutesAgo", { minutes: mins });
   }
-  // Less than 24 hours
   if (diff < 86400000) {
     const hours = Math.floor(diff / 3600000);
-    return `${hours}時間前`;
+    return t("vehicle.history.hoursAgo", { hours });
   }
-  // Format as date
   const month = d.getMonth() + 1;
   const day = d.getDate();
   const hour = String(d.getHours()).padStart(2, "0");
@@ -78,10 +76,11 @@ function formatTime(dateStr) {
 }
 
 function ActionDescription({ log }) {
+  const t = useT();
   const { action, field, oldValue, newValue, actionLabel, metadata } = log;
 
   if (action === "update" && field) {
-    const label = FIELD_LABELS[field] || field;
+    const label = FIELD_LABEL_KEYS[field] ? t(FIELD_LABEL_KEYS[field]) : field;
     return (
       <span>
         <span className="font-medium">{label}</span>
@@ -134,7 +133,7 @@ function ActionDescription({ log }) {
         {actionLabel}: #{metadata.absorbedId} ({metadata.absorbedChassis || "—"})
         {metadata.relocationCounts && (
           <span className="text-[var(--secondary-foreground)] text-xs ml-1">
-            (書類: {metadata.relocationCounts.documents}, 支払: {metadata.relocationCounts.payments})
+            ({t("vehicle.history.docsLabel")}: {metadata.relocationCounts.documents}, {t("vehicle.history.paymentsLabel")}: {metadata.relocationCounts.payments})
           </span>
         )}
       </span>
@@ -145,6 +144,7 @@ function ActionDescription({ log }) {
 }
 
 export default function VehicleHistory({ vehicleId }) {
+  const t = useT();
   const [logs, setLogs] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -166,23 +166,25 @@ export default function VehicleHistory({ vehicleId }) {
   }, [vehicleId]);
 
   if (loading) {
-    return <div className="py-8 text-center text-[var(--secondary-foreground)]">読み込み中...</div>;
+    return <div className="py-8 text-center text-[var(--secondary-foreground)]">{t("vehicle.history.loading")}</div>;
   }
 
   if (logs.length === 0) {
     return (
       <div className="py-8 text-center text-[var(--secondary-foreground)]">
-        <p className="text-lg mb-2">履歴がありません</p>
-        <p className="text-sm">この車両の変更履歴はまだ記録されていません。</p>
+        <p className="text-lg mb-2">{t("vehicle.history.empty")}</p>
+        <p className="text-sm">{t("vehicle.history.emptyDetail")}</p>
       </div>
     );
   }
 
+  const countSuffix = t("vehicle.history.countSuffix");
+
   return (
     <div>
       <h3 className="text-xl font-semibold text-[var(--foreground)] mb-4">
-        変更履歴
-        <span className="text-sm font-normal text-[var(--secondary-foreground)] ml-2">({total}件)</span>
+        {t("vehicle.history.title")}
+        <span className="text-sm font-normal text-[var(--secondary-foreground)] ml-2">({total}{countSuffix})</span>
       </h3>
 
       <div className="space-y-1">
@@ -204,7 +206,7 @@ export default function VehicleHistory({ vehicleId }) {
 
               {/* Source + time */}
               <div className="flex items-center gap-2 mt-0.5 text-xs text-[var(--secondary-foreground)]">
-                <span>{formatTime(log.createdAt)}</span>
+                <span>{formatTime(log.createdAt, t)}</span>
                 {log.sourceLabel && (
                   <>
                     <span>·</span>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, cloneElement, useCallback 
 import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { useT } from "@/i18n/LocaleProvider";
 
 /** Count the number of <th> columns in the first <thead> <tr>. */
 function getColumnCount(children) {
@@ -76,6 +77,7 @@ export default function DataTable({
   variant = "default",
   tableWidth,
 }) {
+  const t = useT();
   const isSpreadsheet = variant === "spreadsheet";
   const [scrollEl, setScrollEl] = useState(null);
   const scrollRefCallback = useCallback((node) => setScrollEl(node), []);
@@ -356,7 +358,7 @@ export default function DataTable({
                     <option value={500}>500</option>
                     <option value={1000}>1000</option>
                     <option value={2000}>2000</option>
-                    <option value={99999}>全件</option>
+                    <option value={99999}>{t("common.all")}</option>
                   </select>
                 </div>
                 <div className="text-sm text-[var(--secondary-foreground)]">

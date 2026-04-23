@@ -4,6 +4,7 @@ import EditableCell from "@/components/ui/EditableCell";
 import { VEHICLE_COLUMNS, formatCurrency } from "@/config/vehicleColumns";
 import { isAllowed } from "@/hooks/wrapper";
 import { formatDate } from "@/lib/dateUtils";
+import { useT } from "@/i18n/LocaleProvider";
 
 // ─── TD class constants (mirrors EditableCell pattern) ──────
 const TD_BASE     = "px-2 py-[5px] whitespace-nowrap border border-[var(--border)] overflow-hidden text-ellipsis";
@@ -25,6 +26,7 @@ const VehicleRow = React.memo(function VehicleRow({
   session,
   visibleColIds,
 }) {
+  const t = useT();
   const columns = visibleColIds
     ? VEHICLE_COLUMNS.filter((c) => c.type === "actions" || visibleColIds.has(c.id))
     : VEHICLE_COLUMNS;
@@ -59,7 +61,7 @@ const VehicleRow = React.memo(function VehicleRow({
         if (col.type === "static") {
           return (
             <td key={col.id} className={TD_STATIC}>
-              {renderStaticCell(col, v, { setDocumentPreview, onShowMergeInfo })}
+              {renderStaticCell(col, v, { setDocumentPreview, onShowMergeInfo, t })}
             </td>
           );
         }
@@ -108,6 +110,7 @@ const VehicleRow = React.memo(function VehicleRow({
 
 /** Renders content for static column types based on column ID. */
 function renderStaticCell(col, v, ctx) {
+  const { t } = ctx;
   switch (col.id) {
     case "id":
       return (
@@ -119,7 +122,7 @@ function renderStaticCell(col, v, ctx) {
                 ctx.onShowMergeInfo?.(v);
               }}
               className="inline-flex items-center px-1 py-0.5 bg-amber-500/10 text-amber-500 rounded hover:bg-amber-500/20 transition-colors"
-              title={`統合済み — ${formatDate(v.mergedAt)}`}
+              title={t("vehicle.tooltipMerged", { date: formatDate(v.mergedAt) })}
             >
               <GitMerge className="w-3 h-3" />
             </button>
@@ -152,16 +155,17 @@ function renderStaticCell(col, v, ctx) {
       if (certDocs.length === 0) {
         return <span className="text-[13px] text-[var(--secondary-foreground)]">-</span>;
       }
-      const docTypeConfig = {
-        export_cert:     { icon: ShieldCheck,    color: "#10b981", title: "輸出抹消" },
-        inspection_cert: { icon: ClipboardCheck, color: "#f59e0b", title: "車検証" },
-        temp_cancel:     { icon: FileX,          color: "#8b5cf6", title: "一時抹消" },
+      const docTypeMeta = {
+        export_cert:     { icon: ShieldCheck,    color: "#10b981" },
+        inspection_cert: { icon: ClipboardCheck, color: "#f59e0b" },
+        temp_cancel:     { icon: FileX,          color: "#8b5cf6" },
       };
       return (
         <div className="flex items-center gap-0.5">
           {certDocs.map((doc) => {
-            const cfg = docTypeConfig[doc.docType] || { icon: FileText, color: "#6b7280", title: doc.docType };
-            const Icon = cfg.icon;
+            const meta = docTypeMeta[doc.docType] || { icon: FileText, color: "#6b7280" };
+            const Icon = meta.icon;
+            const title = docTypeMeta[doc.docType] ? t(`docTypes.${doc.docType}`) : doc.docType;
             return (
               <button
                 key={doc.id}
@@ -172,9 +176,9 @@ function renderStaticCell(col, v, ctx) {
                   })
                 }
                 className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded hover:opacity-80 transition-colors"
-                style={{ backgroundColor: `${cfg.color}15`, color: cfg.color }}
-                title={cfg.title}
-                aria-label={`Preview ${cfg.title} for vehicle ${v.id}`}
+                style={{ backgroundColor: `${meta.color}15`, color: meta.color }}
+                title={title}
+                aria-label={`Preview ${title} for vehicle ${v.id}`}
               >
                 <Icon className="w-3.5 h-3.5" />
               </button>
