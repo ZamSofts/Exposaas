@@ -43,14 +43,14 @@ describe("getStatusConfig", () => {
     for (const status of statuses) {
       const config = getStatusConfig(status);
       expect(config).toHaveProperty("icon");
-      expect(config).toHaveProperty("label");
+      expect(config).toHaveProperty("labelKey");
       expect(config).toHaveProperty("colorClass");
     }
   });
 
   it("returns pending config for unknown status", () => {
     const config = getStatusConfig("unknown_status");
-    expect(config.label).toBe("Pending");
+    expect(config.labelKey).toBe("status.pending");
   });
 
   it("completed shows green", () => {

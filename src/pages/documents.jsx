@@ -26,44 +26,47 @@ import {
   isActionDone,
 } from "@/lib/invoiceJobUtils";
 import { InvoiceDataViewer } from "@/hooks/wrapper";
+import { useT } from "@/i18n/LocaleProvider";
 
-// エラーコード → 日本語メッセージ変換
-function getErrorMessage(error) {
+function getErrorMessageKey(error) {
   if (!error) return null;
   const code = error?.code || error?.status;
-  if (code === 429) return "AI処理の上限に達しました。しばらく待ってRetryしてください";
-  if (code === 400) return "ファイル形式が対応していません";
-  if (code === 500) return "サーバーエラーが発生しました";
-  return "処理に失敗しました。Retryしてください";
+  if (code === 429) return "documents.errors.rateLimit";
+  if (code === 400) return "documents.errors.badFormat";
+  if (code === 500) return "documents.errors.serverError";
+  return "documents.errors.generic";
 }
 
-// Doc type configuration (mirrors classificationSchema.mjs for UI)
-const DOC_TYPES = {
-  all:             { label: "All",         labelJa: "すべて",      dotColor: null,      bg: null,        text: null,        border: null },
-  invoice:         { label: "Invoice",     labelJa: "請求書",      dotColor: "#2563eb", bg: "#dbeafe",   text: "#1e40af",   border: "#93c5fd" },
-  export_cert:     { label: "Export Cert", labelJa: "輸出抹消",    dotColor: "#059669", bg: "#d1fae5",   text: "#065f46",   border: "#6ee7b7" },
-  inspection_cert: { label: "Inspection",  labelJa: "車検証",      dotColor: "#d97706", bg: "#fef3c7",   text: "#92400e",   border: "#fcd34d" },
-  temp_cancel:     { label: "Temp Cancel", labelJa: "一時抹消",    dotColor: "#7c3aed", bg: "#ede9fe",   text: "#4c1d95",   border: "#c4b5fd" },
-  unknown:         { label: "Unknown",     labelJa: "不明",        dotColor: "#6b7280", bg: "#f3f4f6",   text: "#374151",   border: "#d1d5db" },
-  skipped:         { label: "Skipped",     labelJa: "スキップ済み", dotColor: "#ea580c", bg: "#ffedd5",   text: "#9a3412",   border: "#fdba74" },
+// Doc type colour configuration. Labels resolved via i18n at render time.
+const DOC_TYPE_STYLES = {
+  all:             { dotColor: null,      bg: null,        text: null,        border: null },
+  invoice:         { dotColor: "#2563eb", bg: "#dbeafe",   text: "#1e40af",   border: "#93c5fd" },
+  export_cert:     { dotColor: "#059669", bg: "#d1fae5",   text: "#065f46",   border: "#6ee7b7" },
+  inspection_cert: { dotColor: "#d97706", bg: "#fef3c7",   text: "#92400e",   border: "#fcd34d" },
+  temp_cancel:     { dotColor: "#7c3aed", bg: "#ede9fe",   text: "#4c1d95",   border: "#c4b5fd" },
+  unknown:         { dotColor: "#6b7280", bg: "#f3f4f6",   text: "#374151",   border: "#d1d5db" },
+  skipped:         { dotColor: "#ea580c", bg: "#ffedd5",   text: "#9a3412",   border: "#fdba74" },
 };
+const DOC_TYPE_KEYS = Object.keys(DOC_TYPE_STYLES);
 
 // ---------------------------------------------------------------------------
 // DocTypeBadge — small pill showing the document type
 // ---------------------------------------------------------------------------
 function DocTypeBadge({ docType }) {
-  const config = DOC_TYPES[docType] || DOC_TYPES.unknown;
+  const t = useT();
+  const styles = DOC_TYPE_STYLES[docType] || DOC_TYPE_STYLES.unknown;
+  const labelKey = DOC_TYPE_STYLES[docType] ? `docTypes.${docType}` : "docTypes.unknown";
   return (
     <span
       className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
       style={{
-        backgroundColor: config.bg,
-        color: config.text,
-        border: `1px solid ${config.border}`,
+        backgroundColor: styles.bg,
+        color: styles.text,
+        border: `1px solid ${styles.border}`,
       }}
     >
-      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: config.dotColor }} />
-      {config.labelJa}
+      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: styles.dotColor }} />
+      {t(labelKey)}
     </span>
   );
 }
@@ -74,6 +77,7 @@ function DocTypeBadge({ docType }) {
 export default function DocumentsPage() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
+  const t = useT();
 
   // Filter by docType tab
   const [activeTab, setActiveTab] = useState("all");
@@ -153,7 +157,7 @@ export default function DocumentsPage() {
   };
 
   const handleUploadError = (err) => {
-    setError(typeof err === "string" ? err : err?.message || "Upload failed");
+    setError(typeof err === "string" ? err : err?.message || t("documents.uploadFailed"));
   };
 
   // -----------------------------------------------------------------------
@@ -191,7 +195,7 @@ export default function DocumentsPage() {
         invalidate();
       }
     } catch (err) {
-      setError("Failed to retry job");
+      setError(t("documents.retryFailed"));
     } finally {
       setRetrying(null);
     }
@@ -205,8 +209,8 @@ export default function DocumentsPage() {
 
   const handleRetryAllFailed = async () => {
     const ok = await confirm({
-      title: "全件リトライの確認",
-      message: `失敗した ${failedCount} 件を一括リトライします。完了まで時間がかかる場合があります。`,
+      title: t("documents.retryAllConfirmTitle"),
+      message: t("documents.retryAllConfirmMessage", { count: failedCount }),
       type: "warning",
     });
     if (!ok) return;
@@ -220,7 +224,7 @@ export default function DocumentsPage() {
         invalidate();
       }
     } catch (err) {
-      setError("Failed to retry jobs");
+      setError(t("documents.retryAllFailedError"));
     } finally {
       setRetryingAll(false);
     }
@@ -235,7 +239,7 @@ export default function DocumentsPage() {
       if (res.error) setError(res.error);
       else queryClient.invalidateQueries({ queryKey: ["skipped-emails"] });
     } catch (err) {
-      setError("Failed to reclassify");
+      setError(t("documents.reclassifyFailed"));
     } finally {
       setReclassifying(null);
     }
@@ -272,7 +276,7 @@ export default function DocumentsPage() {
   return (
     <>
       <Head>
-        <title>Documents - ExpoSaaS</title>
+        <title>{t("pageTitles.documents")}</title>
       </Head>
 
       <Sidebar>
@@ -284,7 +288,7 @@ export default function DocumentsPage() {
                 <div className="p-2 bg-[var(--surface)] rounded-lg border border-[var(--border)]">
                   <FileText className="w-6 h-6 text-[var(--primary)]" />
                 </div>
-                <h1 className="text-3xl font-bold text-[var(--foreground)]">Documents</h1>
+                <h1 className="text-3xl font-bold text-[var(--foreground)]">{t("documents.header")}</h1>
               </div>
 
               <div className="flex items-center gap-2">
@@ -295,7 +299,7 @@ export default function DocumentsPage() {
                     className="flex items-center gap-2 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-800 border border-orange-300 rounded-lg transition-colors text-sm"
                   >
                     <RefreshCw className={`w-4 h-4 ${retryingAll ? "animate-spin" : ""}`} />
-                    {retryingAll ? "Retrying..." : "Retry All Failed"}
+                    {retryingAll ? t("documents.retryingAll") : t("documents.retryAllFailed")}
                   </button>
                 )}
                 <button
@@ -303,13 +307,12 @@ export default function DocumentsPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-lg hover:bg-[var(--primary)]/90 transition-colors shadow-sm"
                 >
                   <Upload className="w-4 h-4" />
-                  Upload File
+                  {t("documents.uploadButton")}
                 </button>
               </div>
             </div>
             <p className="text-[var(--secondary-foreground)]">
-              Upload PDFs or CSVs — invoices, export certs, inspection certs, vehicle data, and more.
-              Files are auto-classified and processed.
+              {t("documents.subtitle")}
             </p>
           </div>
 
@@ -318,38 +321,41 @@ export default function DocumentsPage() {
 
           <Error message={listError || error} />
 
-          {/* 未処理件数バナー */}
+          {/* Pending count banner */}
           {activeTab !== "skipped" && (() => {
             const pendingCount = rows.filter(r => r.status === "pending" || r.status === "processing").length;
             if (pendingCount === 0) return null;
             return (
               <div className="mb-4 bg-red-500/10 border border-red-500/30 text-red-600 rounded-lg p-3 text-sm font-medium">
-                未処理の書類が {pendingCount} 件あります
+                {t("documents.pendingBanner", { count: pendingCount })}
               </div>
             );
           })()}
 
           {/* Doc Type Tabs */}
           <div className="flex gap-1 mb-6 bg-[var(--surface)] rounded-lg p-1 border border-[var(--border)] w-fit">
-            {Object.entries(DOC_TYPES).map(([key, config]) => (
-              <button
-                key={key}
-                onClick={() => { setActiveTab(key); setPage(1); setSkippedPage(1); }}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === key
-                    ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
-                    : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
-                }`}
-              >
-                {config.color && (
-                  <span
-                    className="inline-block w-2 h-2 rounded-full mr-1.5"
-                    style={{ backgroundColor: config.color }}
-                  />
-                )}
-                {config.labelJa}
-              </button>
-            ))}
+            {DOC_TYPE_KEYS.map((key) => {
+              const styles = DOC_TYPE_STYLES[key];
+              return (
+                <button
+                  key={key}
+                  onClick={() => { setActiveTab(key); setPage(1); setSkippedPage(1); }}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === key
+                      ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
+                      : "text-[var(--secondary-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)]"
+                  }`}
+                >
+                  {styles.dotColor && (
+                    <span
+                      className="inline-block w-2 h-2 rounded-full mr-1.5"
+                      style={{ backgroundColor: styles.dotColor }}
+                    />
+                  )}
+                  {t(`docTypes.${key}`)}
+                </button>
+              );
+            })}
           </div>
 
           {/* Data Table — skipped emails tab uses a different endpoint */}
@@ -360,16 +366,16 @@ export default function DocumentsPage() {
               total={skippedTotal}
               isLoading={skippedLoading}
               onPageChange={skippedPageChange}
-              title="スキップ済みメール"
+              title={t("documents.skipped.title")}
               initialPerPage={10}
             >
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  <th>日付</th>
-                  <th>送信元</th>
-                  <th>件名</th>
-                  <th>理由</th>
-                  <th>操作</th>
+                  <th>{t("documents.skipped.date")}</th>
+                  <th>{t("documents.skipped.from")}</th>
+                  <th>{t("documents.skipped.subject")}</th>
+                  <th>{t("documents.skipped.reason")}</th>
+                  <th>{t("documents.skipped.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -407,7 +413,7 @@ export default function DocumentsPage() {
                             className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 text-[var(--primary)] rounded text-sm transition-colors"
                           >
                             <Eye className="w-3.5 h-3.5" />
-                            View
+                            {t("documents.skipped.view")}
                           </button>
                         )}
                         <button
@@ -416,7 +422,7 @@ export default function DocumentsPage() {
                           className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded text-sm transition-colors"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${reclassifying === row.id ? "animate-spin" : ""}`} />
-                          {reclassifying === row.id ? "Sending..." : "Re-classify"}
+                          {reclassifying === row.id ? t("documents.skipped.reclassifying") : t("documents.skipped.reclassify")}
                         </button>
                       </div>
                     </td>
@@ -430,22 +436,22 @@ export default function DocumentsPage() {
               data={rows}
               total={total}
               isLoading={isLoading}
-              searchPlaceholder="Search documents..."
+              searchPlaceholder={t("dataTable.search")}
               onSort={handleSort}
               onPageChange={handlePageChange}
-              title="Documents"
+              title={t("documents.title")}
               initialPerPage={10}
               sortBy={sortBy}
               sortOrder={sortOrder}
             >
               <thead className="bg-[var(--secondary)]">
                 <tr>
-                  <th>ID</th>
-                  <th>種別</th>
-                  <th>ステータス</th>
-                  <th>情報</th>
-                  <th>作成日</th>
-                  <th>操作</th>
+                  <th>{t("documents.table.id")}</th>
+                  <th>{t("documents.table.type")}</th>
+                  <th>{t("documents.table.status")}</th>
+                  <th>{t("documents.table.info")}</th>
+                  <th>{t("documents.table.createdAt")}</th>
+                  <th>{t("documents.table.actions")}</th>
                 </tr>
               </thead>
 
@@ -468,7 +474,7 @@ export default function DocumentsPage() {
                       </td>
 
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span title={row.status === "failed" && row.Json?.error ? getErrorMessage(row.Json.error) : undefined}>
+                        <span title={row.status === "failed" && row.Json?.error ? t(getErrorMessageKey(row.Json.error)) : undefined}>
                           <StatusBadge status={row.status} />
                         </span>
                       </td>
@@ -477,7 +483,7 @@ export default function DocumentsPage() {
                         {isInvoice ? (
                           <div className="flex items-center gap-2">
                             <Car className="w-4 h-4 text-[var(--secondary-foreground)]" />
-                            <span className="text-sm text-[var(--foreground)]">{vehicleCount} vehicles</span>
+                            <span className="text-sm text-[var(--foreground)]">{t("documents.table.vehiclesCount", { count: vehicleCount })}</span>
                           </div>
                         ) : linkedInfo ? (
                           linkedInfo
@@ -503,11 +509,11 @@ export default function DocumentsPage() {
                               className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded text-sm transition-colors"
                             >
                               <RefreshCw className={`w-3.5 h-3.5 ${retrying === row.id ? "animate-spin" : ""}`} />
-                              {retrying === row.id ? "Retrying..." : "Retry"}
+                              {retrying === row.id ? t("documents.retrying") : t("documents.retry")}
                             </button>
                           ) : isActionDone(row) ? (
                             <div className="flex items-center gap-1.5">
-                              <span className="px-2 py-0.5 bg-[var(--success)]/10 text-[var(--success)] rounded-full text-[11px] font-medium border border-[var(--success)]/20">確認済み</span>
+                              <span className="px-2 py-0.5 bg-[var(--success)]/10 text-[var(--success)] rounded-full text-[11px] font-medium border border-[var(--success)]/20">{t("status.confirmed")}</span>
                               <button
                                 onClick={() => openViewer(row)}
                                 className="inline-flex items-center gap-1 px-2 py-0.5 bg-[var(--secondary)] hover:bg-[var(--border)] text-[var(--secondary-foreground)] rounded text-[11px] transition-colors"
@@ -522,7 +528,7 @@ export default function DocumentsPage() {
                               className="inline-flex items-center gap-1 px-3 py-1.5 bg-[var(--primary)]/20 hover:bg-[var(--primary)]/30 text-[var(--primary)] rounded text-sm transition-colors"
                             >
                               <Eye className="w-3.5 h-3.5" />
-                              Review
+                              {t("documents.review")}
                             </button>
                           ) : null}
                         </div>

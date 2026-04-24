@@ -1,6 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { CONFIDENCE_COLORS, getConfidenceLevel, getAccuracyColor as getConfidenceColor, getConfidenceBorder } from "@/config/aiConstants";
 import { AUCTION_VENUES } from "@/config/auctionVenues";
+import { useT } from "@/i18n/LocaleProvider";
 
 // "2025/05/23" or "2025-05-23" → "2025-05-23" (for type="date" input value)
 function toDateInputValue(val) {
@@ -28,6 +29,7 @@ export default function DetailModeEditor({
   goToPrevChassis,
   goToNextChassis,
 }) {
+  const t = useT();
   return (
     <>
       <div className="mb-4">
@@ -136,7 +138,7 @@ export default function DetailModeEditor({
                 className="w-full mt-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--surface)] text-[var(--foreground)]"
                 style={getConfidenceBorder(selectedChassis.confidence)}
                 title={selectedChassis.confidence != null ? `AI confidence: ${Math.round(selectedChassis.confidence * 100)}%` : undefined}
-                placeholder="会場名を選択または入力"
+                placeholder={t("detailModeEditor.auctionPlaceholder")}
               />
               <datalist id="auction-venues-list">
                 {AUCTION_VENUES.map(v => <option key={v} value={v} />)}

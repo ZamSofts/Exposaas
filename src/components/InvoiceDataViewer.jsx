@@ -8,10 +8,12 @@ import SaveResultModal from "@/components/SaveResultModal";
 import SummaryModeTable from "@/components/invoice/SummaryModeTable";
 import DetailModeEditor from "@/components/invoice/DetailModeEditor";
 import CreateVehiclesModal from "@/components/invoice/CreateVehiclesModal";
+import { useT } from "@/i18n/LocaleProvider";
 
 export const InvoiceDataViewer = ({ data = null, onBack }) => {
   const router = useRouter();
   const { confirm, ConfirmComponent } = useConfirm();
+  const t = useT();
 
   // Get vehicles from data - supports both new and legacy formats
   const vehicles = useMemo(() => {
@@ -275,9 +277,9 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
           paymentDueDate: headerDraft.paymentDueDate || null,
         }),
       });
-      showToast("ヘッダー情報を保存しました", "success");
+      showToast(t("invoiceViewer.headerSaved"), "success");
     } catch (err) {
-      showToast("保存に失敗しました", "error");
+      showToast(t("invoiceViewer.saveFailed"), "error");
     } finally {
       setHeaderSaving(false);
     }
@@ -290,10 +292,10 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
     const chassisCount = editable.length;
 
     const confirmed = await confirm({
-      title: `Save Review`,
-      message: `You're about to save this review. This will record ${chassisCount} chassis item${chassisCount === 1 ? "" : "s"}. Do you want to continue?`,
-      confirmText: "Save",
-      cancelText: "Cancel",
+      title: t("invoiceViewer.saveReviewTitle"),
+      message: t("invoiceViewer.saveReviewMessage", { count: chassisCount }),
+      confirmText: t("invoiceViewer.saveReviewConfirm"),
+      cancelText: t("invoiceViewer.saveReviewCancel"),
       type: "primary",
     });
     if (!confirmed) return;
@@ -334,7 +336,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
         return;
       }
 
-      showToast(res.message || "Review saved successfully", "success");
+      showToast(res.message || t("invoiceViewer.reviewSaved"), "success");
       setHasChanges(false);
 
       // Store save result for diff display + golden marking
@@ -366,7 +368,7 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
       showToast(res.error, "error");
     } else {
       setSaveResult(prev => ({ ...prev, isGolden: true }));
-      showToast("ゴールデンデータに指定しました", "success");
+      showToast(t("invoiceViewer.goldenMarked"), "success");
     }
   };
 
@@ -586,33 +588,33 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                 {data?.auctionInvoice?.id && (
                   <div className="mb-4 p-3 bg-[var(--secondary)]/30 border border-[var(--border)] rounded-lg text-sm">
                     <div className="flex flex-wrap gap-3">
-                      {/* 会場 */}
+                      {/* Venue */}
                       <div className="flex flex-col min-w-[120px]">
-                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">会場</label>
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">{t("invoiceViewer.fields.auctionVenue")}</label>
                         <input
                           type="text"
                           value={headerDraft.auctionVenue}
                           onChange={e => setHeaderDraft(d => ({ ...d, auctionVenue: e.target.value }))}
                           onBlur={saveHeader}
-                          placeholder="会場名"
+                          placeholder={t("invoiceViewer.fields.auctionVenuePlaceholder")}
                           className="text-xs font-medium bg-transparent border-b border-[var(--border)] focus:border-[var(--primary)] outline-none text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] py-0.5"
                         />
                       </div>
-                      {/* 開催回 */}
+                      {/* Session number */}
                       <div className="flex flex-col min-w-[90px]">
-                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">開催回</label>
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">{t("invoiceViewer.fields.sessionNumber")}</label>
                         <input
                           type="text"
                           value={headerDraft.sessionNumber}
                           onChange={e => setHeaderDraft(d => ({ ...d, sessionNumber: e.target.value }))}
                           onBlur={saveHeader}
-                          placeholder="第○○○回"
+                          placeholder={t("invoiceViewer.fields.sessionPlaceholder")}
                           className="text-xs font-medium bg-transparent border-b border-[var(--border)] focus:border-[var(--primary)] outline-none text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] py-0.5"
                         />
                       </div>
-                      {/* 請求書合計 */}
+                      {/* Invoice total */}
                       <div className="flex flex-col min-w-[100px]">
-                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">請求書合計</label>
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">{t("invoiceViewer.fields.invoiceTotal")}</label>
                         <input
                           type="number"
                           value={headerDraft.invoiceTotal}
@@ -622,9 +624,9 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                           className="text-xs font-medium bg-transparent border-b border-[var(--border)] focus:border-[var(--primary)] outline-none text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] py-0.5"
                         />
                       </div>
-                      {/* 支払期日 */}
+                      {/* Payment due date */}
                       <div className="flex flex-col min-w-[120px]">
-                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">支払期日</label>
+                        <label className="text-xs text-[var(--secondary-foreground)] mb-1">{t("invoiceViewer.fields.paymentDueDate")}</label>
                         <input
                           type="date"
                           value={headerDraft.paymentDueDate}
@@ -634,13 +636,13 @@ export const InvoiceDataViewer = ({ data = null, onBack }) => {
                         />
                       </div>
                       {headerSaving && (
-                        <div className="self-end text-xs text-[var(--muted-foreground)] pb-0.5">保存中...</div>
+                        <div className="self-end text-xs text-[var(--muted-foreground)] pb-0.5">{t("invoiceViewer.saving")}</div>
                       )}
                     </div>
                   </div>
                 )}
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Extracted Data</h2>
+                  <h2 className="text-lg font-semibold text-[var(--foreground)]">{t("invoiceViewer.extractedData")}</h2>
                   {/* Review mode toggle */}
                   <div className="flex items-center gap-2">
                     {auctionAccuracy && (
