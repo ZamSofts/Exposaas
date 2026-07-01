@@ -8,17 +8,17 @@ ALTER TABLE "InvoiceJobs" ALTER COLUMN "status" TYPE "JobStatus" USING "status":
 ALTER TABLE "InvoiceJobs" ALTER COLUMN "status" SET DEFAULT 'pending'::"JobStatus";
 
 -- 3. Convert Vehicle.createdById from TEXT to INTEGER (preserving data)
-ALTER TABLE "Vehicle"
-  ALTER COLUMN "createdById" TYPE INTEGER USING "createdById"::INTEGER;
+--ALTER TABLE "Vehicle"
+  --ADD COLUMN "createdById" INTEGER;
 
 -- 4. Convert Vehicle.updatedById from TEXT to INTEGER (preserving data)
-ALTER TABLE "Vehicle"
-  ALTER COLUMN "updatedById" TYPE INTEGER USING "updatedById"::INTEGER;
+--ALTER TABLE "Vehicle"
+  --ADD COLUMN "updatedById" INTEGER;
 
 -- 5. Convert PaymentConfirmation.reviewedById from TEXT to INTEGER (preserving data)
-ALTER TABLE "PaymentConfirmation"
-  ALTER COLUMN "reviewedById" TYPE INTEGER USING "reviewedById"::INTEGER;
+--ALTER TABLE "PaymentConfirmation"
+--  ALTER COLUMN "reviewedById" TYPE INTEGER USING "reviewedById"::INTEGER;
 
 -- 6. Convert ExportTemplate.createdById from TEXT to INTEGER (preserving data)
-ALTER TABLE "ExportTemplate"
-  ALTER COLUMN "createdById" TYPE INTEGER USING "createdById"::INTEGER;
+--ALTER TABLE "ExportTemplate"
+ --ADD COLUMN "createdById" INTEGER;
