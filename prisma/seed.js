@@ -1,4 +1,4 @@
-const { PrismaClient } = require("../src/generated/prisma");
+const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 
 async function main() {
@@ -34,7 +34,7 @@ async function main() {
   try {
     await prisma.permission.deleteMany();
     await prisma.brand.deleteMany();
-  } catch {}
+  } catch { }
 
   for (const p of permissions) {
     await prisma.permission.upsert({
@@ -49,14 +49,14 @@ async function main() {
   });
 
   let customerRole = await prisma.role.findFirst({
-  where: {
-    name: {
-      equals: "Customer",
-      mode: "insensitive", 
+    where: {
+      name: {
+        equals: "Customer",
+        mode: "insensitive",
+      },
+      companyId: null,
     },
-    companyId: null,
-  },
-});
+  });
 
   if (!customerRole) {
     customerRole = await prisma.role.create({
